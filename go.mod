@@ -67,7 +67,6 @@ require (
 	github.com/goware/cachestore v0.8.0 // indirect
 	github.com/goware/calc v0.2.0 // indirect
 	github.com/goware/channel v0.2.4 // indirect
-	github.com/goware/logadapter-zerolog v0.2.0 // indirect
 	github.com/goware/logger v0.3.0 // indirect
 	github.com/goware/singleflight v0.2.0 // indirect
 	github.com/goware/superr v0.0.2 // indirect
@@ -114,5 +113,3 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/0xsequence/go-sequence => /Users/patryk/Projects/Horizon/go-sequence
