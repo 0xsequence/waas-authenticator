@@ -9,7 +9,7 @@ services:
     volumes:
       - .:/go/src/github.com/0xsequence/waas-authenticator
     environment:
-      CONFIG: ./etc/waas-auth.docker.conf
+      CONFIG: ./etc/waas-auth.conf
     ports:
       - "9123:9123"
 
