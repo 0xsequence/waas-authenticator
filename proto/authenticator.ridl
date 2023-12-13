@@ -1,0 +1,166 @@
+webrpc = v1 # TODO, use v2
+
+name = sequence-waas-authenticator
+version = v0.1.0
+
+
+struct Version
+  - webrpcVersion: string
+  - schemaVersion: string
+  - schemaHash: string
+  - appVersion: string
+
+struct RuntimeStatus
+  - healthOK: bool # overall status, true/false
+  - startTime: timestamp
+  - uptime: uint64
+
+struct RegisterSessionPayload
+  - projectId: uint64
+    + go.field.name = ProjectID
+  - idToken: string
+    + go.field.name = IDToken
+  - sessionAddress: string
+  - friendlyName: string
+  - intentJSON: string
+    + go.field.name = IntentJSON
+
+struct RefreshSessionPayload
+  - sessionId: string
+    + go.field.name = SessionID
+
+struct DropSessionPayload
+  - sessionId: string
+    + go.field.name = SessionID
+  - dropSessionId: string
+    + go.field.name = DropSessionID
+
+struct ListSessionsPayload
+  - sessionId: string
+    + go.field.name = SessionID
+
+struct GetAddressPayload
+  - sessionId: string
+    + go.field.name = SessionID
+
+struct SendIntentPayload
+  - sessionId: string
+    + go.field.name = SessionID
+  - intentJson: string
+    + go.field.name = IntentJSON
+
+struct Identity
+  - projectId: uint64
+    + go.field.name = ProjectID
+  - issuer: string
+  - subject: string
+
+struct OpenIdProvider
+  - issuer: string
+    + json = iss
+  - authorizedParty?: string
+    + json = azp
+  - audience?: string
+    + json = aud
+
+struct Tenant
+  - projectId: uint64
+    + go.field.name = ProjectID
+  - version: int
+  - oidcProviders: []OpenIdProvider
+    + go.field.name = OIDCProviders
+  - updatedAt: timestamp
+
+struct TenantData
+  - projectId: uint64
+    + go.field.name = ProjectID
+    + json = proj
+  - privateKey: string
+    + json = prv
+  - parentAddress: string
+    + json = addr
+    + go.field.type = common.Address
+    + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
+  - userSalt: string
+    + json = salt
+    + go.field.type = hexutil.Bytes
+    + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common/hexutil
+  - sequenceContext: MiniSequenceContext
+    + json = seqctx
+  - upgradeCode: string
+    + json = upc
+  - waasAccessToken: string
+    + json = wat
+  - oidcProviders: []OpenIdProvider
+    + go.field.name = OIDCProviders
+    + json = oidc
+  - transportKeys: []string
+    + json = transk
+  - sessionKeys: []string
+    + json = sessk
+
+struct MiniSequenceContext
+  - factory: string
+  - mainModule: string
+
+struct Session
+  - id: string
+    + go.field.name = ID
+  - address: string
+    + go.field.type = common.Address
+    + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
+  - userId: string
+    + go.field.name = UserID
+  - projectId: uint64
+    + go.field.name = ProjectID
+  - issuer: string
+  - subject: string
+  - friendlyName: string
+  - createdAt: timestamp
+  - refreshedAt: timestamp
+  - expiresAt: timestamp
+
+struct SessionData
+  - address: string
+    + json = addr
+    + go.field.type = common.Address
+    + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
+  - projectId: uint64
+    + go.field.name = ProjectID
+    + json = proj
+  - issuer: string
+    + json = iss
+  - subject: string
+    + json = sub
+  - createdAt: timestamp
+    + json = iat
+  - expiresAt: timestamp
+    + json = exp
+
+
+##
+## Errors
+##
+
+error 1000 Unauthorized "Unauthorized access" HTTP 401
+
+
+##
+## Services
+##
+
+service WaasAuthenticator
+    - RegisterSession(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (session: Session, data: any)
+    - ListSessions(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (sessions: []Session)
+    - DropSession(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (ok: bool)
+
+    - GetAddress(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (address: string)
+    - SendIntent(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (code: string, data: any)
+
+service WaasAuthenticatorAdmin
+    - Version() => (version: Version)
+    - RuntimeStatus() => (status: RuntimeStatus)
+    - Clock() => (serverTime: timestamp)
+
+    - GetTenant(projectId: uint64) => (tenant: Tenant)
+    - CreateTenant(projectId: uint64, waasAccessToken: string, oidcProviders: []OpenIdProvider) => (tenant: Tenant, upgradeCode: string)
