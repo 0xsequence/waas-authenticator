@@ -18,6 +18,8 @@ import (
 	"github.com/0xsequence/ethkit/ethwallet"
 	"github.com/0xsequence/ethkit/go-ethereum/common"
 	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
+	"github.com/0xsequence/go-sequence/intents"
+	"github.com/0xsequence/go-sequence/intents/packets"
 	"github.com/0xsequence/nitrocontrol/enclave"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -30,6 +32,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/require"
 
+	"github.com/0xsequence/waas-authenticator/config"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
@@ -91,6 +94,14 @@ nw34vNMCgYBfG/VbQXT1WCcJgVycnU1hX7zmyzB/hk0xkmLR0nUzTgXMKOKUUXgX
 cJEGAbCDYhyjvtjBLNy7YDQ1hdmCnqMxg/5AIwUMkvTTRg+qepfboA==
 -----END RSA PRIVATE KEY-----`
 )
+
+func initConfig(t *testing.T) *config.Config {
+	return &config.Config{
+		Admin: config.AdminConfig{
+			PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDCx1vYO1jq01ILTsL6wH76dN6rFWF5WebsxYv9Hx7QSa2/BIxLtIQgtNn0n/iJGu+cQv5nn6BJcVkP6JSYVV53LqsMqsm1/YqrZtT0S7Bniz3hZSpvs9Od6Vx1t6HRZgn6bUnsm2lu6BqQ0pFMrPwqGEn5HG42j4VtT5FwQ0o8G8HDYN8pOahfA/4WOpRGw9TzNokb7v5UFd9kUUqtH3FCsV/BHH7LaqFgs5dBqmsF3wsm3ZiLvkDg0+asZGw40L2c2HEVdD5DzOQqvcepN//kTf6wCGXhVYKt/B4RlycQjVYvIvBaMCUjlNwzPBhff8NpaBdZLvXgTio2jCGoq3oTmEBwziSx7ziqZMoSkqPZ4MTk7/2CrMzuB1f5UnS3Ek2enTkGUaqhU3iTKT+acFG1EqaGNtXNmvJ7og2ITSF08Y4E2g1vSmj7rRaXEUTKX4LkDZhA3GbL0wnvjGArSIXwbP/zHezPQwNP0JnrdoeSF3Xz8jMlxsUChAyhvogUISs= SequenceBuilder-dev",
+		},
+	}
+}
 
 func issueAccessTokenAndRunJwksServer(t *testing.T) (iss string, tok string, close func()) {
 	jwtKeyRaw, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -399,9 +410,23 @@ func (w walletServiceMock) IsValidMessageSignature(ctx context.Context, chainID 
 }
 
 func (w walletServiceMock) GenTransaction(ctx context.Context, payload string) (*proto_wallet.TransactionBundle, error) {
+	var intent intents.Intent
+	if err := json.Unmarshal([]byte(payload), &intent); err != nil {
+		return nil, err
+	}
+	var packet packets.SendTransactionsPacket
+	if err := json.Unmarshal(intent.Packet, &packet); err != nil {
+		return nil, err
+	}
+
+	nonce, err := packet.Nonce()
+	if err != nil {
+		return nil, err
+	}
+
 	return &proto_wallet.TransactionBundle{
-		ChainID: "137",
-		Nonce:   "0x1",
+		ChainID: packet.Network,
+		Nonce:   hexutil.EncodeBig(nonce),
 		Transactions: []*proto_wallet.Transaction{
 			{
 				To:       "0x27CabC9700EE6Db2797b6AC1e1eCe81C72A2cD8D",
