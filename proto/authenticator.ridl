@@ -1,4 +1,4 @@
-webrpc = v1 # TODO, use v2
+webrpc = v1
 
 name = sequence-waas-authenticator
 version = v0.1.0
@@ -14,6 +14,9 @@ struct RuntimeStatus
   - healthOK: bool # overall status, true/false
   - startTime: timestamp
   - uptime: uint64
+  - ver: string
+  - branch: string
+  - commitHash: string
 
 struct RegisterSessionPayload
   - projectId: uint64
