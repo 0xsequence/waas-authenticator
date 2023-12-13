@@ -5,7 +5,7 @@
 1. Generate an RSA keypair:
 
 ```
-ssh-keygen -t rsa -O ./etc/id_rsa
+ssh-keygen -t rsa -f ./etc/id_rsa
 ```
 
 2. Copy the sample config file:
