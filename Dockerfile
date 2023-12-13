@@ -1,7 +1,7 @@
 #
 # Enclave base image
 #
-FROM golang:1.20.3-bullseye AS base
+FROM golang:1.21-bullseye AS base
 
 RUN apt-get install -y --no-install-recommends \
     g++ \
@@ -31,7 +31,7 @@ RUN go mod download
 
 ADD ./ ./
 
-RUN go build -o bin/waas-auth ./cmd/waas-auth
+RUN make build
 
 #
 # Enclave dist image
@@ -45,7 +45,7 @@ RUN yum update -y && \
 
 WORKDIR /app
 
-ADD ./docker ./
+ADD ./docker/run.sh ./
 
 COPY --from=builder /go/src/github.com/0xsequence/waas-authenticator/bin/waas-auth ./
 ADD --chown=authenticator:authenticator ./etc /etc/waas-auth
@@ -59,6 +59,6 @@ FROM base AS dev
 
 WORKDIR /go/src/github.com/0xsequence/waas-authenticator
 
-ENV CONFIG=./etc/dev2.toml
+ENV CONFIG=./etc/waas-auth.conf
 
 CMD ["make", "run"]
