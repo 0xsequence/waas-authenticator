@@ -59,6 +59,6 @@ FROM base AS dev
 
 WORKDIR /go/src/github.com/0xsequence/waas-authenticator
 
-ENV CONFIG=./etc/dev2.toml
+ENV CONFIG=./etc/waas-auth.dev2.conf
 
 CMD ["make", "run"]
