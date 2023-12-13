@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/0xsequence/waas-authenticator/config"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc"
@@ -32,7 +31,7 @@ func TestRPC_GetAddress(t *testing.T) {
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
 
-	cfg := &config.Config{}
+	cfg := initConfig(t)
 
 	issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t)
 	defer closeJWKS()
@@ -95,7 +94,7 @@ func TestRPC_SendIntent_SignMessage(t *testing.T) {
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
 
-	cfg := &config.Config{}
+	cfg := initConfig(t)
 
 	issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t)
 	defer closeJWKS()
@@ -161,7 +160,7 @@ func TestRPC_SendIntent_SendTransaction(t *testing.T) {
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
 
-	cfg := &config.Config{}
+	cfg := initConfig(t)
 
 	issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t)
 	defer closeJWKS()
