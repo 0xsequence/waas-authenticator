@@ -119,7 +119,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 	switch intent.PacketCode() {
 	case packets.SignMessagePacketCode:
 		var packet packets.SignMessagePacket
-		if err := packet.Unmarshal(&intent); err != nil {
+		if err := packet.Unmarshal(intent.Packet); err != nil {
 			return "", nil, err
 		}
 
@@ -202,7 +202,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 		}
 
 		var packet packets.SendTransactionsPacket
-		if err := packet.Unmarshal(&intent); err != nil {
+		if err := packet.Unmarshal(intent.Packet); err != nil {
 			return "", nil, err
 		}
 
