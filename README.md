@@ -36,6 +36,7 @@ curl -H "Content-type: application/json" -H"Authorization: BEARER eyJhbGciOiJSUz
 
 1. Build the project + jwt-util, `make build`
 
-2. To generate a new RSA keypair: `./bin/jwt-util` and copy the private/public pairs. Note the
-JWT token generated for you as well. In the future, we should enhance this CLI tool.
+2. To generate a new RSA keypair: `./bin/jwt-util` and copy the private/public pairs and
+update waas-auth.conf `[admin] public_key = ".."` value. Note the JWT token generated for you as well.
+In the future, we should enhance this CLI tool.
 
