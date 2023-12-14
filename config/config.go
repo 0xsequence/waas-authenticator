@@ -22,11 +22,12 @@ type AdminConfig struct {
 }
 
 type ServiceConfig struct {
-	Mode        string `toml:"mode"`
-	VSock       bool   `toml:"vsock"`
-	UseNSM      bool   `toml:"use_nsm"`
-	EnclavePort uint32 `toml:"enclave_port"`
-	ProxyPort   uint32 `toml:"proxy_port"`
+	Mode          string `toml:"mode"`
+	VSock         bool   `toml:"vsock"`
+	UseNSM        bool   `toml:"use_nsm"`
+	EnclavePort   uint32 `toml:"enclave_port"`
+	ProxyPort     uint32 `toml:"proxy_port"`
+	DebugProfiler bool   `toml:"debug_profiler"`
 }
 
 type EndpointsConfig struct {

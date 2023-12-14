@@ -62,7 +62,7 @@ func main() {
 	_ = pubkey
 
 	token := jwt.New()
-	token.Set("hello", "world") // TODO ... add claims ..
+	// token.Set("admin", "contact@info.com")
 
 	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.RS256, privkey))
 	if err != nil {

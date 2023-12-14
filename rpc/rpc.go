@@ -205,8 +205,9 @@ func (s *RPC) Handler() http.Handler {
 	})
 	adminRouter.Post("/rpc/WaasAuthenticatorAdmin/*", proto.NewWaasAuthenticatorAdminServer(s).ServeHTTP)
 
-	// TODO: toggle this by config file..
-	r.Mount("/debug", middleware.Profiler())
+	if s.Config.Service.DebugProfiler {
+		r.Mount("/debug", middleware.Profiler())
+	}
 
 	return r
 }
