@@ -21,6 +21,9 @@ endef
 run:
 	$(call run,waas-auth)
 
+up:
+	docker-compose up
+
 build:
 	GOGC=off GOBIN=$$PWD/bin \
 	go install -v \
