@@ -19,7 +19,6 @@ require (
 	github.com/goware/rerun v0.0.9
 	github.com/lestrrat-go/jwx/v2 v2.0.18
 	github.com/mdlayher/vsock v1.2.1
-	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.31.0
 	github.com/stretchr/testify v1.8.4
 	github.com/webrpc/webrpc v0.14.0
@@ -86,6 +85,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mdlayher/socket v0.5.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/posener/diff v0.0.1 // indirect
 	github.com/posener/gitfs v1.2.1 // indirect

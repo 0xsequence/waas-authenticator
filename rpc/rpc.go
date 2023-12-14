@@ -8,6 +8,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0xsequence/nitrocontrol/enclave"
+	"github.com/0xsequence/waas-authenticator/config"
+	"github.com/0xsequence/waas-authenticator/data"
+	"github.com/0xsequence/waas-authenticator/proto"
+	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
+	"github.com/0xsequence/waas-authenticator/rpc/access"
+	"github.com/0xsequence/waas-authenticator/rpc/attestation"
+	"github.com/0xsequence/waas-authenticator/rpc/awscreds"
+	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -17,17 +26,6 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httplog"
 	"github.com/rs/zerolog"
-
-	"github.com/0xsequence/nitrocontrol/enclave"
-
-	"github.com/0xsequence/waas-authenticator/config"
-	"github.com/0xsequence/waas-authenticator/data"
-	"github.com/0xsequence/waas-authenticator/proto"
-	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
-	"github.com/0xsequence/waas-authenticator/rpc/access"
-	"github.com/0xsequence/waas-authenticator/rpc/attestation"
-	"github.com/0xsequence/waas-authenticator/rpc/awscreds"
-	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 )
 
 type HTTPClient interface {

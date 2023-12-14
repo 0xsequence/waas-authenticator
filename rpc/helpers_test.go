@@ -21,6 +21,11 @@ import (
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/go-sequence/intents/packets"
 	"github.com/0xsequence/nitrocontrol/enclave"
+	"github.com/0xsequence/waas-authenticator/config"
+	"github.com/0xsequence/waas-authenticator/data"
+	"github.com/0xsequence/waas-authenticator/proto"
+	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
+	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -31,12 +36,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/require"
-
-	"github.com/0xsequence/waas-authenticator/config"
-	"github.com/0xsequence/waas-authenticator/data"
-	"github.com/0xsequence/waas-authenticator/proto"
-	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
-	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 )
 
 type testContextKeyType string

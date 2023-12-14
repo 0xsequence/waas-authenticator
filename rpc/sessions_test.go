@@ -17,14 +17,13 @@ import (
 	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
 	"github.com/0xsequence/nitrocontrol/aescbc"
 	"github.com/0xsequence/nitrocontrol/enclave"
+	"github.com/0xsequence/waas-authenticator/data"
+	"github.com/0xsequence/waas-authenticator/proto"
+	"github.com/0xsequence/waas-authenticator/rpc"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/0xsequence/waas-authenticator/data"
-	"github.com/0xsequence/waas-authenticator/proto"
-	"github.com/0xsequence/waas-authenticator/rpc"
 )
 
 func TestRPC_RegisterSession(t *testing.T) {

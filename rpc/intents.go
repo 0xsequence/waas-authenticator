@@ -14,8 +14,6 @@ import (
 	v2 "github.com/0xsequence/go-sequence/core/v2"
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/go-sequence/intents/packets"
-	"github.com/pkg/errors"
-
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
@@ -29,7 +27,7 @@ func addressForUser(ctx context.Context, tntData *proto.TenantData, user string)
 
 	preimage, err := ethcoder.AbiCoder([]string{"string", "bytes32"}, []any{user, [32]byte(tntData.UserSalt)})
 	if err != nil {
-		return "", errors.Wrap(err, "failed to encode abi")
+		return "", fmt.Errorf("failed to encode abi: %w", err)
 	}
 
 	uniqueSalt := ethcoder.Keccak256(preimage)
@@ -56,7 +54,7 @@ func addressForUser(ctx context.Context, tntData *proto.TenantData, user string)
 	}
 	address, err := sequence.AddressFromImageHash(imageHash.String(), seqContext)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to compute address")
+		return "", fmt.Errorf("failed to compute address: %w", err)
 	}
 
 	return address.String(), nil
