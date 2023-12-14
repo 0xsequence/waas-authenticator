@@ -17,6 +17,7 @@ require (
 	github.com/go-chi/httplog v0.3.2
 	github.com/go-chi/jwtauth/v5 v5.3.0
 	github.com/goware/rerun v0.0.9
+	github.com/jxskiss/base62 v1.1.0
 	github.com/lestrrat-go/jwx/v2 v2.0.18
 	github.com/mdlayher/vsock v1.2.1
 	github.com/rs/zerolog v1.31.0
@@ -100,7 +101,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	golang.org/x/crypto v0.16.0 // indirect
-	golang.org/x/exp v0.0.0-20231206192017-f3f8817b8deb // indirect
+	golang.org/x/exp v0.0.0-20231214170342-aacd6d4b4611 // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect

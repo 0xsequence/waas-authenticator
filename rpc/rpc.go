@@ -170,6 +170,7 @@ func (s *RPC) Handler() http.Handler {
 		AllowedOrigins: []string{"https://*"},
 		AllowedMethods: []string{"POST", "OPTIONS"},
 		AllowedHeaders: []string{
+			// TODO: in future we can remove "X-Sequence-Tenant" as its replaced by "X-Access-Key"
 			"Accept", "Authorization", "Content-Type", "X-Attestation-Nonce", "X-Sequence-Tenant", "X-Access-Key",
 		},
 		AllowCredentials: true,
