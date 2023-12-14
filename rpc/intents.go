@@ -281,17 +281,23 @@ func (s *RPC) signUsingParent(wallet *ethwallet.Wallet, parentAddress common.Add
 	return append(sig, byte(1)), parentSubdigest, nil
 }
 
-func waasContext(ctx context.Context, optAccessToken ...string) (context.Context, error) {
-	var accessToken string
-	if len(optAccessToken) == 1 {
-		accessToken = optAccessToken[0]
+func waasContext(ctx context.Context, optJwtToken ...string) (context.Context, error) {
+	var jwtToken string
+	if len(optJwtToken) == 1 {
+		jwtToken = optJwtToken[0]
 	} else {
 		tntData := tenant.FromContext(ctx)
-		accessToken = tntData.WaasAccessToken
+		jwtToken = tntData.WaasAccessToken
 	}
 
 	waasHeader := http.Header{}
-	waasHeader.Set("authorization", "Bearer "+accessToken)
+	waasHeader.Set("Authorization", "BEARER "+jwtToken)
+
+	accessKey := tenant.AccessKeyFromContext(ctx)
+	if accessKey != "" {
+		waasHeader.Set("X-Access-Key", accessKey)
+	}
+
 	waasCtx, err := proto_wallet.WithHTTPRequestHeaders(ctx, waasHeader)
 	if err != nil {
 		return ctx, err

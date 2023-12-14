@@ -8,9 +8,17 @@ import (
 
 type contextKeyType string
 
-var contextKey = contextKeyType("tenant-data")
+var (
+	accessKeyCtxKey = contextKeyType("access-key")
+	tenantCtxKey    = contextKeyType("tenant-data")
+)
 
 func FromContext(ctx context.Context) *proto.TenantData {
-	v, _ := ctx.Value(contextKey).(*proto.TenantData)
+	v, _ := ctx.Value(tenantCtxKey).(*proto.TenantData)
+	return v
+}
+
+func AccessKeyFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(accessKeyCtxKey).(string)
 	return v
 }

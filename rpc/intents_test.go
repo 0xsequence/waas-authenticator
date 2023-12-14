@@ -9,7 +9,6 @@ import (
 	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 
 	"github.com/0xsequence/ethkit/ethwallet"
@@ -32,7 +31,7 @@ func TestRPC_GetAddress(t *testing.T) {
 
 	cfg := initConfig(t)
 
-	issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t)
+	issuer, _, closeJWKS := issueAccessTokenAndRunJwksServer(t)
 	defer closeJWKS()
 
 	random := mathrand.New(mathrand.NewSource(42))
@@ -79,8 +78,7 @@ func TestRPC_GetAddress(t *testing.T) {
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
-	header.Set("X-Sequence-Tenant", strconv.Itoa(int(tenant.ProjectID)))
-	header.Set("Authorization", "Bearer "+tok)
+	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 
 	addr, err := c.GetAddress(ctx, encryptedPayloadKey, payloadCiphertext, payloadSig)
@@ -95,7 +93,7 @@ func TestRPC_SendIntent_SignMessage(t *testing.T) {
 
 	cfg := initConfig(t)
 
-	issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t)
+	issuer, _, closeJWKS := issueAccessTokenAndRunJwksServer(t)
 	defer closeJWKS()
 
 	random := mathrand.New(mathrand.NewSource(42))
@@ -144,8 +142,7 @@ func TestRPC_SendIntent_SignMessage(t *testing.T) {
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
-	header.Set("X-Sequence-Tenant", strconv.Itoa(int(tenant.ProjectID)))
-	header.Set("Authorization", "Bearer "+tok)
+	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 
 	resCode, resData, err := c.SendIntent(ctx, encryptedPayloadKey, payloadCiphertext, payloadSig)
@@ -161,7 +158,7 @@ func TestRPC_SendIntent_SendTransaction(t *testing.T) {
 
 	cfg := initConfig(t)
 
-	issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t)
+	issuer, _, closeJWKS := issueAccessTokenAndRunJwksServer(t)
 	defer closeJWKS()
 
 	random := mathrand.New(mathrand.NewSource(42))
@@ -210,8 +207,7 @@ func TestRPC_SendIntent_SendTransaction(t *testing.T) {
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
-	header.Set("X-Sequence-Tenant", strconv.Itoa(int(tenant.ProjectID)))
-	header.Set("Authorization", "Bearer "+tok)
+	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 
 	resCode, resData, err := c.SendIntent(ctx, encryptedPayloadKey, payloadCiphertext, payloadSig)

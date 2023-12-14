@@ -10,7 +10,6 @@ import (
 	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 
 	"github.com/0xsequence/ethkit/ethwallet"
@@ -85,8 +84,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
-	header.Set("X-Sequence-Tenant", strconv.Itoa(int(tenant.ProjectID)))
-	header.Set("Authorization", "Bearer "+tok)
+	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 	require.NoError(t, err)
 
