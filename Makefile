@@ -24,12 +24,24 @@ run:
 up:
 	docker-compose up
 
-build:
+define build
 	GOGC=off GOBIN=$$PWD/bin \
 	go install -v \
+		-tags='$(BUILDTAGS)' \
 		-gcflags='-e' \
 		-ldflags='-X "github.com/0xsequence/waas-authenticator.VERSION=$(VERSION)" -X "github.com/0xsequence/waas-authenticator.GITBRANCH=$(GITBRANCH)" -X "github.com/0xsequence/waas-authenticator.GITCOMMIT=$(GITCOMMIT)" -X "github.com/0xsequence/waas-authenticator.GITCOMMITDATE=$(GITCOMMITDATE)" -X "github.com/0xsequence/waas-authenticator.GITCOMMITAUTHOR=$(GITCOMMITAUTHOR)"' \
-		./cmd/waas-auth
+		$(1)
+endef
+
+build: build-utils build-waas-auth
+
+build-waas-auth:
+	$(call build, ./cmd/waas-auth)
+
+build-utils: build-jwt-util
+
+build-jwt-util:
+	$(call build, ./cmd/jwt-util)
 
 generate:
 	go generate ./...
