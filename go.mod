@@ -12,14 +12,13 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.12.12
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.26.6
 	github.com/aws/aws-sdk-go-v2/service/kms v1.27.5
-	github.com/gliderlabs/ssh v0.3.5
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-chi/cors v1.2.1
 	github.com/go-chi/httplog v0.3.2
+	github.com/go-chi/jwtauth/v5 v5.3.0
 	github.com/goware/rerun v0.0.9
 	github.com/lestrrat-go/jwx/v2 v2.0.18
 	github.com/mdlayher/vsock v1.2.1
-	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.31.0
 	github.com/stretchr/testify v1.8.4
 	github.com/webrpc/webrpc v0.14.0
@@ -29,7 +28,6 @@ require (
 require (
 	github.com/0xsequence/go-ethauth v0.13.0 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.16.12 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.14.10 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.2.9 // indirect
@@ -56,6 +54,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.5.0 // indirect
 	github.com/gibson042/canonicaljson-go v1.0.3 // indirect
+	github.com/gliderlabs/ssh v0.3.5 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/golang-cz/textcase v1.2.1 // indirect
@@ -86,6 +85,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mdlayher/socket v0.5.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/posener/diff v0.0.1 // indirect
 	github.com/posener/gitfs v1.2.1 // indirect

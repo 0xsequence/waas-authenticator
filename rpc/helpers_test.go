@@ -21,6 +21,11 @@ import (
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/go-sequence/intents/packets"
 	"github.com/0xsequence/nitrocontrol/enclave"
+	"github.com/0xsequence/waas-authenticator/config"
+	"github.com/0xsequence/waas-authenticator/data"
+	"github.com/0xsequence/waas-authenticator/proto"
+	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
+	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -31,12 +36,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/require"
-
-	"github.com/0xsequence/waas-authenticator/config"
-	"github.com/0xsequence/waas-authenticator/data"
-	"github.com/0xsequence/waas-authenticator/proto"
-	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
-	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 )
 
 type testContextKeyType string
@@ -98,7 +97,15 @@ cJEGAbCDYhyjvtjBLNy7YDQ1hdmCnqMxg/5AIwUMkvTTRg+qepfboA==
 func initConfig(t *testing.T) *config.Config {
 	return &config.Config{
 		Admin: config.AdminConfig{
-			PublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDCx1vYO1jq01ILTsL6wH76dN6rFWF5WebsxYv9Hx7QSa2/BIxLtIQgtNn0n/iJGu+cQv5nn6BJcVkP6JSYVV53LqsMqsm1/YqrZtT0S7Bniz3hZSpvs9Od6Vx1t6HRZgn6bUnsm2lu6BqQ0pFMrPwqGEn5HG42j4VtT5FwQ0o8G8HDYN8pOahfA/4WOpRGw9TzNokb7v5UFd9kUUqtH3FCsV/BHH7LaqFgs5dBqmsF3wsm3ZiLvkDg0+asZGw40L2c2HEVdD5DzOQqvcepN//kTf6wCGXhVYKt/B4RlycQjVYvIvBaMCUjlNwzPBhff8NpaBdZLvXgTio2jCGoq3oTmEBwziSx7ziqZMoSkqPZ4MTk7/2CrMzuB1f5UnS3Ek2enTkGUaqhU3iTKT+acFG1EqaGNtXNmvJ7og2ITSF08Y4E2g1vSmj7rRaXEUTKX4LkDZhA3GbL0wnvjGArSIXwbP/zHezPQwNP0JnrdoeSF3Xz8jMlxsUChAyhvogUISs= SequenceBuilder-dev",
+			PublicKey: `-----BEGIN RSA PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAz+WUoYyHdSNN802C9q3Z
+fn9U1/hGblhsaKmnDMW1TrNcIbjp+W1iAXBgaGlyKpPq6pO6AezWswBTBJfRlXaJ
+Uqw6XfQxkv1JTJqoRRI3dRs7EopYr53eEM0xWx3q1EDCYr//z2XCG69XiIr3jD/4
+ndaCARls5nSx7ffc94dnxZGnUMIlY/hoftNoaLu1G6yVLJmBxhIv4HkpqdOa0QON
+P+cfxrocQl7dkdn31TKdrAfaZa0P7VIPiqE9dxN3vuhMFJoMWmWFlvpV8LXzLlm3
+O/1N3VmFauveH6CaYZ1uiBvwsNUiKczJWlPloDRNO/HKsH1gF/EqfF9ObU1WGP3A
+QwIDAQAB
+-----END RSA PUBLIC KEY-----`,
 		},
 	}
 }

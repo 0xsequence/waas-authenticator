@@ -9,6 +9,6 @@ chronyd -d &
 # Wait for any process to exit
 wait -n
 
-# Exit with status of process that exited first
-exit $?
+# Stay alive, makes it easier to debug
+sleep 2073600
 

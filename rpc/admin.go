@@ -9,12 +9,11 @@ import (
 	"github.com/0xsequence/ethkit/ethwallet"
 	"github.com/0xsequence/ethkit/go-ethereum/common"
 	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
+	"golang.org/x/sync/errgroup"
 )
 
 func (s *RPC) GetTenant(ctx context.Context, projectID uint64) (*proto.Tenant, error) {

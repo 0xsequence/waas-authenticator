@@ -9,10 +9,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/mdlayher/vsock"
-
 	"github.com/0xsequence/waas-authenticator/config"
 	"github.com/0xsequence/waas-authenticator/rpc"
+	"github.com/mdlayher/vsock"
 )
 
 func main() {

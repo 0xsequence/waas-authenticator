@@ -18,6 +18,5 @@ cp ./etc/waas-auth.sample.conf ./etc/waas-auth.conf
 4. Run the following to start the required services:
 
 ```
-docker-compose up
+make up
 ```
-

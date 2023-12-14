@@ -50,6 +50,9 @@ ADD ./docker/run.sh ./
 COPY --from=builder /go/src/github.com/0xsequence/waas-authenticator/bin/waas-auth ./
 ADD --chown=authenticator:authenticator ./etc /etc/waas-auth
 
+ARG ENV_ARG=dev2
+ENV CONFIG=/etc/waas-auth/waas-auth.${ENV_ARG}.conf
+
 CMD ["/app/run.sh"]
 
 #

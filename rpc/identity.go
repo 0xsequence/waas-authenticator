@@ -9,12 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/0xsequence/waas-authenticator/proto"
+	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/lestrrat-go/jwx/v2/jwt"
-
-	"github.com/0xsequence/waas-authenticator/proto"
-	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 )
 
 func withIssuer(expectedIss string) jwt.ValidatorFunc {
