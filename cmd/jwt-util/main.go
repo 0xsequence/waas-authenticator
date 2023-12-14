@@ -32,7 +32,7 @@ func main() {
 			Bytes: x509.MarshalPKCS1PrivateKey(rawprivkey),
 		},
 	)
-	fmt.Println("** private key (pem):\n", string(privPem))
+	fmt.Printf("** private key (pem):\n%s\n", string(privPem))
 
 	// Public key export
 	pubkeyBytes, err := x509.MarshalPKIXPublicKey(&rawprivkey.PublicKey)
@@ -45,7 +45,7 @@ func main() {
 			Bytes: pubkeyBytes,
 		},
 	)
-	fmt.Println("** public key (pem):\n", string(pubPem))
+	fmt.Printf("** public key (pem):\n%s\n", string(pubPem))
 
 	// Create JWT key from above private key
 	privkey, err := jwk.FromRaw(rawprivkey)

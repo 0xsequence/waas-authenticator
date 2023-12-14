@@ -2,6 +2,8 @@ package rpc
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
@@ -13,7 +15,6 @@ import (
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
-	"github.com/0xsequence/waas-authenticator/rpc/access"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/awscreds"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
@@ -25,6 +26,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httplog"
+	"github.com/go-chi/jwtauth/v5"
+	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/rs/zerolog"
 )
 
@@ -197,7 +200,7 @@ func (s *RPC) Handler() http.Handler {
 
 	adminRouter := r.Group(func(r chi.Router) {
 		// Validate admin JWTs
-		r.Use(access.Middleware(s.Config.Admin))
+		r.Use(adminJWTAuthMiddleware(s.Config))
 
 		// Generate attestation document
 		r.Use(attestation.Middleware(s.Enclave))
@@ -221,4 +224,15 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 
 func emptyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(""))
+}
+
+func adminJWTAuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
+	publicKeyBlock, _ := pem.Decode([]byte(cfg.Admin.PublicKey))
+	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
+	if err != nil {
+		panic(err) // TODO
+	}
+
+	ja := jwtauth.New(jwa.RS256.String(), nil, publicKey)
+	return jwtauth.Verifier(ja)
 }
