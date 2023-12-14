@@ -8,7 +8,6 @@ import (
 	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
 	"github.com/0xsequence/nitrocontrol/aescbc"
 	"github.com/0xsequence/nitrocontrol/enclave"
-
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 )

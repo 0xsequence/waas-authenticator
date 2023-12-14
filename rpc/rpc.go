@@ -170,7 +170,7 @@ func (s *RPC) Handler() http.Handler {
 		AllowedOrigins: []string{"https://*"},
 		AllowedMethods: []string{"POST", "OPTIONS"},
 		AllowedHeaders: []string{
-			"Accept", "Authorization", "Content-Type", "X-Attestation-Nonce", "X-Sequence-Tenant",
+			"Accept", "Authorization", "Content-Type", "X-Attestation-Nonce", "X-Sequence-Tenant", "X-Access-Key",
 		},
 		AllowCredentials: true,
 		MaxAge:           600,
@@ -204,6 +204,7 @@ func (s *RPC) Handler() http.Handler {
 	})
 	adminRouter.Post("/rpc/WaasAuthenticatorAdmin/*", proto.NewWaasAuthenticatorAdminServer(s).ServeHTTP)
 
+	// TODO: toggle this by config file..
 	r.Mount("/debug", middleware.Profiler())
 
 	return r

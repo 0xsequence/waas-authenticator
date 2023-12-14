@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/0xsequence/nitrocontrol/enclave"
-
 	"github.com/0xsequence/waas-authenticator/proto"
 )
 
