@@ -167,3 +167,4 @@ service WaasAuthenticatorAdmin
 
     - GetTenant(projectId: uint64) => (tenant: Tenant)
     - CreateTenant(projectId: uint64, waasAccessToken: string, oidcProviders: []OpenIdProvider) => (tenant: Tenant, upgradeCode: string)
+    - UpdateTenant(projectId: uint64, upgradeCode: string, oidcProviders: []OpenIdProvider) => (tenant: Tenant)

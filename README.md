@@ -40,3 +40,9 @@ curl -H "Content-type: application/json" -H"Authorization: BEARER eyJhbGciOiJSUz
 update waas-auth.conf `[admin] public_key = ".."` value. Note the JWT token generated for you as well.
 In the future, we should enhance this CLI tool.
 
+
+## Usage warnings
+
+- `CreateTenant` RPC takes `waasAccessToken` as argument. It's important that this token continues to be valid for as long as the tenant is active. Once set, this token **cannot be replaced** in the future.
+- Pay attention to the `upgradeCode` returned from `CreateTenant`. It is required for any `UpdateTenant` operation, it's returned only once and **cannot be retrieved ever again**. If lost, the tenant's configuration is stuck and impossible to change!
+
