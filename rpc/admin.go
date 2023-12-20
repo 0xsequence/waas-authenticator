@@ -46,7 +46,7 @@ func (s *RPC) CreateTenant(
 
 	_, found, err := s.Tenants.GetLatest(ctx, projectID)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("get latest tenant version: %w", err)
 	}
 	if found {
 		return nil, "", fmt.Errorf("tenant already exists")
@@ -63,36 +63,36 @@ func (s *RPC) CreateTenant(
 
 	waasCtx, err := waasContext(ctx, waasAccessToken)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("creating waas context: %w", err)
 	}
 
 	// TODO: these are 4 calls to WaaS API, can we do it all in one call?
 	if _, err := s.Wallets.UseHotWallet(waasCtx, wallet.Address().String()); err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("using hot wallet: %w", err)
 	}
 
 	userSalt, err := s.Wallets.UserSalt(waasCtx)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("retrieving user salt: %w", err)
 	}
 	userSaltBytes, err := hexutil.Decode(userSalt)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("decoding user salt: %w", err)
 	}
 
 	parentAddress, err := s.Wallets.ParentWallet(waasCtx)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("retrieving parent wallet: %w", err)
 	}
 
 	seqContext, err := s.Wallets.SequenceContext(waasCtx)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("retrieving Sequence context: %w", err)
 	}
 
 	upgradeCode := make([]byte, 10)
 	if _, err := att.Read(upgradeCode); err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("reading attestation: %w", err)
 	}
 
 	privateKey := wallet.PrivateKeyHex()[2:] // remove 0x prefix
@@ -126,7 +126,7 @@ func (s *RPC) CreateTenant(
 		CreatedAt:    time.Now(),
 	}
 	if err := s.Tenants.Add(ctx, dbTenant); err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("storing tenant: %w", err)
 	}
 
 	retTenant := &proto.Tenant{
@@ -138,8 +138,7 @@ func (s *RPC) CreateTenant(
 	return retTenant, tenantData.UpgradeCode, nil
 }
 
-func (s *RPC) UpdateTenant(ctx context.Context, projectID uint64, oidcProviders []*proto.OpenIdProvider) (*proto.Tenant, error) {
-	// TODO: should validate the upgrade code!
+func (s *RPC) UpdateTenant(ctx context.Context, projectID uint64, upgradeCode string, oidcProviders []*proto.OpenIdProvider) (*proto.Tenant, error) {
 	att := attestation.FromContext(ctx)
 
 	tnt, found, err := s.Tenants.GetLatest(ctx, projectID)
@@ -150,13 +149,18 @@ func (s *RPC) UpdateTenant(ctx context.Context, projectID uint64, oidcProviders 
 		return nil, fmt.Errorf("tenant not found")
 	}
 
-	if err := validateOIDCProviders(ctx, s.HTTPClient, oidcProviders); err != nil {
-		return nil, fmt.Errorf("invalid oidcProviders: %w", err)
-	}
-
 	tntData, _, err := crypto.DecryptData[*proto.TenantData](ctx, tnt.EncryptedKey, tnt.Ciphertext, s.Config.KMS.TenantKeys)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt tenant data: %w", err)
+	}
+
+	// TODO: this should be an input in a form hosted by the authenticator.
+	if tntData.UpgradeCode != upgradeCode {
+		return nil, fmt.Errorf("invalid upgrade code")
+	}
+
+	if err := validateOIDCProviders(ctx, s.HTTPClient, oidcProviders); err != nil {
+		return nil, fmt.Errorf("invalid oidcProviders: %w", err)
 	}
 
 	tntData.OIDCProviders = oidcProviders
