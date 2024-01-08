@@ -63,7 +63,11 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 			aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 				return aws.Endpoint{URL: cfg.Endpoints.AWSEndpoint}, nil
 			}),
-		), awsconfig.WithCredentialsProvider(&awscreds.StaticProvider{}))
+		), awsconfig.WithCredentialsProvider(&awscreds.StaticProvider{
+			AccessKeyID:     "test",
+			SecretAccessKey: "test",
+			SessionToken:    "test",
+		}))
 	}
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), options...)
