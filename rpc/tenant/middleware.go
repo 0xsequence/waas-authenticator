@@ -39,13 +39,13 @@ func Middleware(tenants *data.TenantTable, tenantKeys []string) func(http.Handle
 			// Find tenant based on project id
 			tenant, found, err := tenants.GetLatest(ctx, tenantID)
 			if err != nil || !found {
-				proto.RespondWithError(w, fmt.Errorf("invalid tenant: %q", tenantID))
+				proto.RespondWithError(w, fmt.Errorf("invalid tenant: %v", tenantID))
 				return
 			}
 
 			tntData, _, err := crypto.DecryptData[*proto.TenantData](ctx, tenant.EncryptedKey, tenant.Ciphertext, tenantKeys)
 			if err != nil {
-				proto.RespondWithError(w, fmt.Errorf("could not decrypt tenant data: %q", tenantID))
+				proto.RespondWithError(w, fmt.Errorf("could not decrypt tenant data: %v", tenantID))
 				return
 			}
 
