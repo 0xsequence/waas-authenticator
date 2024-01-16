@@ -109,6 +109,9 @@ O/1N3VmFauveH6CaYZ1uiBvwsNUiKczJWlPloDRNO/HKsH1gF/EqfF9ObU1WGP3A
 QwIDAQAB
 -----END RSA PUBLIC KEY-----`,
 		},
+		KMS: config.KMSConfig{
+			TenantKeys: []string{"TenantKey"},
+		},
 	}
 }
 
@@ -156,8 +159,7 @@ func issueAccessTokenAndRunJwksServer(t *testing.T) (iss string, tok string, clo
 }
 
 type kmsMock struct {
-	random             io.Reader
-	timesCalledDecrypt int
+	random io.Reader
 }
 
 func (m *kmsMock) Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error) {
@@ -166,21 +168,18 @@ func (m *kmsMock) Decrypt(ctx context.Context, params *kms.DecryptInput, optFns 
 		KeyId:               aws.String("TransportKey"),
 	}
 
-	switch m.timesCalledDecrypt {
-	case 0:
+	switch string(params.CiphertextBlob) {
+	case "CiphertextForTenantKey":
 		out.KeyId = aws.String("TenantKey")
-	case 1:
+	case "CiphertextForTransportKey":
 		out.KeyId = aws.String("TransportKey")
-	case 2:
+	case "CiphertextForSessionKey":
 		out.KeyId = aws.String("SessionKey")
+	default:
+		return nil, fmt.Errorf("invalid CiphertextBlob: %s", string(params.CiphertextBlob))
 	}
 
-	if r := params.Recipient; r != nil {
-		out.CiphertextForRecipient, _ = base64.StdEncoding.DecodeString("MIAGCSqGSIb3DQEHA6CAMIACAQIxggFrMIIBZwIBAoAgljGgxlmRCtWqvB/s/Aw+ZNTDlc6Uka86SLVmlNmFGAMwPAYJKoZIhvcNAQEHMC+gDzANBglghkgBZQMEAgEFAKEcMBoGCSqGSIb3DQEBCDANBglghkgBZQMEAgEFAASCAQAnkM/kUE5xxRRdFeIen3JFsc8jJcM7xn4mlEZL4MKdQmuUjyVg9qE9IXuR8CDRWcpNATSFINy8/ttd9mOu94vHAWKe+YsM3mckLsPMIhXl7mrZAYASZSyzu6bAeGbqZw1PRyNGz8yWWBzlJM0+kdToqZZ68dyzbLAA6x5gjbJlCYMI13MOvmrvPp2LiF5fZEMSzr1ZF2ZsR7zduRKnbq2QlPoeRX/ZFGQ438ohYQpzBDfNDUrOz14KjgziWS7NE3qhmnaNHsQNBBupGc68X1Uhoq+/WZn6MgSatW/W22R0n5Z02+DDw2Mw7JwVc6dyheN4odDnP/HSJ5wR2pjZcFqlMIAGCSqGSIb3DQEHATAdBglghkgBZQMEASoEEOOdJUsisyEkuWxUsJIxzgSggAQwC73Sq5rDaXSSFSJUKzTqrt0zdhL3Q2NtxOeIDSqvoOaS3vrbNH1d9gd7KUxJEafRAAAAAAAAAAAAAA==")
-	} else {
-		out.Plaintext, _ = base64.StdEncoding.DecodeString("RabEAhmjV3thObgGLjhJoza2jVDU0x4E8qHSL5MpsL4=")
-	}
-	m.timesCalledDecrypt++
+	out.Plaintext, _ = base64.StdEncoding.DecodeString("RabEAhmjV3thObgGLjhJoza2jVDU0x4E8qHSL5MpsL4=")
 	return out, nil
 }
 
@@ -189,12 +188,18 @@ func (m *kmsMock) GenerateDataKey(ctx context.Context, params *kms.GenerateDataK
 		return nil, fmt.Errorf("KeyId cannot be nil")
 	}
 	out := &kms.GenerateDataKeyOutput{KeyId: params.KeyId}
-	out.CiphertextBlob, _ = base64.StdEncoding.DecodeString("AQIDAHhSsN44C1VwetR6+sdkuCGqaJVquI96Ub9aSpCc8cM07gFkz2ECg6joWCrwlCamP+KuAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMuoJXIPF0RaIeZnI8AgEQgDtbMeqiQ5fEU8KkKPlzKeqCW88htk1HNGSufo3ZrThcwNmIFnOgy+YbM3BwvxVTYssoORrW6eSJDFAvzQ==")
-	if r := params.Recipient; r != nil {
-		out.CiphertextForRecipient, _ = base64.StdEncoding.DecodeString("MIAGCSqGSIb3DQEHA6CAMIACAQIxggFrMIIBZwIBAoAgljGgxlmRCtWqvB/s/Aw+ZNTDlc6Uka86SLVmlNmFGAMwPAYJKoZIhvcNAQEHMC+gDzANBglghkgBZQMEAgEFAKEcMBoGCSqGSIb3DQEBCDANBglghkgBZQMEAgEFAASCAQCicFA+nY1HTguzHcWR19Y7t9DPfSM3ca3u8auoIf2SstjKacCGpmxNazvEk/tcOaU2G8hzoC2i5lTvfrficEh36IxDIEzV1DnawdyfFmniSGpkP/ORXXg7Dij5truDtf71AOmEmHAUWLzFOXqQ0VdZ2lHVaAsapwq+3rv4G/0HCwlh33CakQzWy8u9az1vy4IRuS8LJjjZ/JLGPxz0uF3301WAMRUTjdU/u4phJv2TbvkXvZG8faIajk27x8AKjSnLy7P/B2Zi3RrJH+PPTlmwXjpBOtFwv8MjM/FcmerHd0utYn+jdnrqs+84eTtM220RyArZ8C/LYxQ0//IEl259MIAGCSqGSIb3DQEHATAdBglghkgBZQMEASoEEDOrR/kQEWdbYa/9rnGGEhmggAQww9uq+DOprZws+LFTRMGB8mW1guIaB1Jy6F3rbCpxjTjnR8Ov7RNmoFlHGAsbATWAAAAAAAAAAAAAAA==")
-	} else {
-		out.Plaintext, _ = base64.StdEncoding.DecodeString("RabEAhmjV3thObgGLjhJoza2jVDU0x4E8qHSL5MpsL4=")
+
+	switch *params.KeyId {
+	case "TransportKey":
+		out.CiphertextBlob = []byte("CiphertextForTransportKey")
+	case "TenantKey":
+		out.CiphertextBlob = []byte("CiphertextForTenantKey")
+	case "SessionKey":
+		out.CiphertextBlob = []byte("CiphertextForSessionKey")
+	default:
+		return out, fmt.Errorf("invalid KeyId: %s", *params.KeyId)
 	}
+	out.Plaintext, _ = base64.StdEncoding.DecodeString("RabEAhmjV3thObgGLjhJoza2jVDU0x4E8qHSL5MpsL4=")
 	return out, nil
 }
 
@@ -204,7 +209,31 @@ type dbMock struct {
 }
 
 func (d *dbMock) DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
-	panic("implement me")
+	if params.TableName == nil {
+		return nil, fmt.Errorf("empty TableName")
+	}
+
+	switch *params.TableName {
+	case "Sessions":
+		idParam, ok := params.Key["ID"]
+		if !ok {
+			return nil, fmt.Errorf("must include an ID key")
+		}
+		idAttr, ok := idParam.(*dynamodbtypes.AttributeValueMemberS)
+		if !ok {
+			return nil, fmt.Errorf("ID key must be of type S")
+		}
+		if _, ok := d.sessions[idAttr.Value]; !ok {
+			return nil, fmt.Errorf("session does not exist")
+		}
+
+		delete(d.sessions, idAttr.Value)
+
+		out := &dynamodb.DeleteItemOutput{}
+		return out, nil
+	}
+
+	return nil, fmt.Errorf("invalid TableName: %q", *params.TableName)
 }
 
 func (d *dbMock) GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
@@ -251,6 +280,13 @@ func (d *dbMock) PutItem(ctx context.Context, params *dynamodb.PutItemInput, opt
 		}
 		d.sessions[sess.ID] = &sess
 		return nil, nil
+	case "Tenants":
+		var tnt data.Tenant
+		if err := attributevalue.UnmarshalMap(params.Item, &tnt); err != nil {
+			return nil, err
+		}
+		d.tenants[tnt.ProjectID] = []*data.Tenant{&tnt}
+		return nil, nil
 	}
 
 	return nil, fmt.Errorf("invalid TableName: %q", *params.TableName)
@@ -262,6 +298,16 @@ func (d *dbMock) Query(ctx context.Context, params *dynamodb.QueryInput, optFns 
 	}
 
 	switch *params.TableName {
+	case "Sessions":
+		out := &dynamodb.QueryOutput{Items: make([]map[string]dynamodbtypes.AttributeValue, 0, len(d.sessions))}
+		for _, sess := range d.sessions {
+			item, err := attributevalue.MarshalMap(sess)
+			if err != nil {
+				return nil, err
+			}
+			out.Items = append(out.Items, item)
+		}
+		return out, nil
 	case "Tenants":
 		idParam, ok := params.ExpressionAttributeValues[":id"]
 		if !ok {
@@ -275,7 +321,7 @@ func (d *dbMock) Query(ctx context.Context, params *dynamodb.QueryInput, optFns 
 		idInt, _ := strconv.Atoi(idAttr.Value)
 		versions, ok := d.tenants[uint64(idInt)]
 		if !ok || len(versions) == 0 {
-			return nil, fmt.Errorf("tenant does not exist: %q", idAttr.Value)
+			return &dynamodb.QueryOutput{Items: nil}, nil
 		}
 
 		tnt := versions[len(versions)-1]
@@ -331,6 +377,11 @@ func newSession(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwa
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
 
+	if wallet == nil {
+		wallet, err = ethwallet.NewWalletFromRandomEntropy()
+		require.NoError(t, err)
+	}
+
 	payload := &proto.SessionData{
 		Address:   wallet.Address(),
 		ProjectID: 1,
@@ -363,7 +414,19 @@ func newRandAccessKey(projectID uint64) string {
 	return base62.EncodeToString(buf)
 }
 
-type walletServiceMock struct{}
+type walletServiceMock struct {
+	registeredSessions map[string]struct{}
+}
+
+func newWalletServiceMock(registeredSessions []string) *walletServiceMock {
+	m := &walletServiceMock{
+		registeredSessions: make(map[string]struct{}),
+	}
+	for _, sess := range registeredSessions {
+		m.registeredSessions[sess] = struct{}{}
+	}
+	return m
+}
 
 func (w walletServiceMock) CreatePartner(ctx context.Context, name string, config *proto_wallet.PartnerWalletPreConfig, jwtAlg string, jwtSecret *string, jwtPublic *string) (*proto_wallet.Partner, error) {
 	//TODO implement me
@@ -396,23 +459,19 @@ func (w walletServiceMock) PartnerUserSalt(ctx context.Context, partnerId uint64
 }
 
 func (w walletServiceMock) ParentWallet(ctx context.Context) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "0x00", nil
 }
 
 func (w walletServiceMock) SequenceContext(ctx context.Context) (*proto_wallet.MiniSequenceContext, error) {
-	//TODO implement me
-	panic("implement me")
+	return &proto_wallet.MiniSequenceContext{}, nil
 }
 
 func (w walletServiceMock) UserSalt(ctx context.Context) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "0x00", nil
 }
 
 func (w walletServiceMock) UseHotWallet(ctx context.Context, walletAddress string) (bool, error) {
-	//TODO implement me
-	panic("implement me")
+	return true, nil
 }
 
 func (w walletServiceMock) Wallets(ctx context.Context, page *proto_wallet.Page) ([]*proto_wallet.PartnerWallet, *proto_wallet.Page, error) {
@@ -478,8 +537,21 @@ func (w walletServiceMock) GetSession(ctx context.Context, sessionAddress string
 	panic("implement me")
 }
 
-func (w walletServiceMock) RegisterSession(ctx context.Context, userID string, sessionPayload string) (*proto_wallet.PayloadResponse, error) {
-	return &proto_wallet.PayloadResponse{}, nil
+func (w *walletServiceMock) RegisterSession(ctx context.Context, userID string, sessionPayload string) (*proto_wallet.PayloadResponse, error) {
+	var intent intents.Intent
+	if err := json.Unmarshal([]byte(sessionPayload), &intent); err != nil {
+		return nil, err
+	}
+	var packet packets.OpenSessionPacket
+	if err := json.Unmarshal(intent.Packet, &packet); err != nil {
+		return nil, err
+	}
+
+	w.registeredSessions[packet.Session] = struct{}{}
+
+	return &proto_wallet.PayloadResponse{
+		Code: "openedSession",
+	}, nil
 }
 
 func (w walletServiceMock) StartSessionValidation(ctx context.Context, walletAddress string, sessionAddress string, deviceMetadata string, redirectUrl *string) (*proto_wallet.PayloadResponse, error) {
@@ -487,14 +559,21 @@ func (w walletServiceMock) StartSessionValidation(ctx context.Context, walletAdd
 	panic("implement me")
 }
 
-func (w walletServiceMock) InvalidateSession(ctx context.Context, sessionAddress string) (bool, error) {
-	//TODO implement me
-	panic("implement me")
+func (w *walletServiceMock) InvalidateSession(ctx context.Context, sessionAddress string) (bool, error) {
+	if _, ok := w.registeredSessions[sessionAddress]; !ok {
+		return false, fmt.Errorf("session does not exist")
+	}
+	delete(w.registeredSessions, sessionAddress)
+	return true, nil
 }
 
 func (w walletServiceMock) SendIntent(ctx context.Context, wallet *proto_wallet.TargetWallet, payload string) (*proto_wallet.PayloadResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return &proto_wallet.PayloadResponse{
+		Code: "sentIntent",
+		Data: map[string]any{
+			"payload": payload,
+		},
+	}, nil
 }
 
 func (w walletServiceMock) ChainList(ctx context.Context) ([]*proto_wallet.Chain, error) {
