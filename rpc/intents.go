@@ -65,12 +65,12 @@ func (s *RPC) GetAddress(ctx context.Context, encryptedPayloadKey string, payloa
 
 	payload, payloadBytes, err := crypto.DecryptPayload[*proto.GetAddressPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("decrypting payload: %w", err)
 	}
 
 	_, sessData, err := s.verifySession(ctx, payload.SessionID, payloadBytes, payloadSig)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("verifying session: %w", err)
 	}
 
 	return addressForUser(ctx, tntData, sessData.Identity().String())
@@ -81,12 +81,12 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 
 	payload, payloadBytes, err := crypto.DecryptPayload[*proto.SendIntentPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("decrypting payload: %w", err)
 	}
 
 	_, sessData, err := s.verifySession(ctx, payload.SessionID, payloadBytes, payloadSig)
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("verifying session: %w", err)
 	}
 
 	var intent intents.Intent
@@ -101,12 +101,12 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 
 	parentWallet, err := ethwallet.NewWalletFromPrivateKey(tntData.PrivateKey)
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("recovering parent wallet: %w", err)
 	}
 
 	walletAddress, err := addressForUser(ctx, tntData, sessData.Identity().String())
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("computing user address: %w", err)
 	}
 
 	targetWallet := &proto_wallet.TargetWallet{
@@ -118,7 +118,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 	case packets.SignMessagePacketCode:
 		var packet packets.SignMessagePacket
 		if err := packet.Unmarshal(intent.Packet); err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("unmarshal packet: %w", err)
 		}
 
 		// Validate that message match intent
@@ -131,7 +131,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 
 		subdigest, err := sequence.SubDigest(chainID, common.HexToAddress(packet.Wallet), digest)
 		if err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("calculating digest: %w", err)
 		}
 
 		isValid := packet.IsValidInterpretation(common.Hash(subdigest))
@@ -142,7 +142,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 		// Our EOA belongs to the *parent* wallet, so we need to sign the subdigest with the parent key
 		sig, parentSubdigest, err := s.signUsingParent(parentWallet, tntData.ParentAddress, subdigest, chainID)
 		if err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("signing subdigest using parent wallet: %w", err)
 		}
 
 		signMessage := &proto_wallet.SignMessage{
@@ -160,7 +160,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 
 		res, err := s.Wallets.SignMessage(waasCtx, targetWallet, payload.IntentJSON, signMessage, signatures)
 		if err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("signing message: %w", err)
 		}
 
 		return res.Code, res.Data, nil
@@ -168,7 +168,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 	case packets.SendTransactionCode:
 		bundle, err := s.Wallets.GenTransaction(waasCtx, payload.IntentJSON)
 		if err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("generating transaction: %w", err)
 		}
 
 		nonce, ok := sequence.ParseHexOrDec(bundle.Nonce)
@@ -201,7 +201,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 
 		var packet packets.SendTransactionsPacket
 		if err := packet.Unmarshal(intent.Packet); err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("unmarshal packet: %w", err)
 		}
 
 		// Generate subdigest
@@ -211,7 +211,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 		}
 		digest, err := sbundle.Digest()
 		if err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("calculating transaction bundle digest: %w", err)
 		}
 		chainID, ok := sequence.ParseHexOrDec(packet.Network)
 		if !ok {
@@ -220,7 +220,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 
 		subdigest, err := sequence.SubDigest(chainID, common.HexToAddress(packet.Wallet), digest)
 		if err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("calculating subdigest: %w", err)
 		}
 
 		// Validate that transactions match intent
@@ -232,7 +232,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 		// Our EOA belongs to the *parent* wallet, so we need to sign the subdigest with the parent key
 		sig, parentSubdigest, err := s.signUsingParent(parentWallet, tntData.ParentAddress, subdigest, chainID)
 		if err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("signing subdigest using parent wallet: %w", err)
 		}
 
 		signatures := []*proto_wallet.ProvidedSignature{
@@ -245,7 +245,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 
 		res, err := s.Wallets.SendTransaction(waasCtx, targetWallet, payload.IntentJSON, bundle, signatures)
 		if err != nil {
-			return "", nil, err
+			return "", nil, fmt.Errorf("sending transaction: %w", err)
 		}
 
 		return res.Code, res.Data, nil
@@ -254,7 +254,7 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 	// Generic forwarding of intent, no special handling
 	res, err := s.Wallets.SendIntent(waasCtx, targetWallet, payload.IntentJSON)
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("sending intent: %w", err)
 	}
 
 	return res.Code, res.Data, nil
