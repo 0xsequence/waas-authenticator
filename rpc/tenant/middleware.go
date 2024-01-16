@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
@@ -25,27 +24,23 @@ func Middleware(tenants *data.TenantTable, tenantKeys []string) func(http.Handle
 			if accessKey != "" {
 				ctx = context.WithValue(ctx, accessKeyCtxKey, accessKey)
 			}
-			projectID, _ := DecodeProjectIDFromAccessKey(accessKey)
 
-			// For backwards compatibility, we also check the x-seqeunce-tenant
-			// TODO: remove this in the future
-			tid, _ := strconv.Atoi(r.Header.Get("x-sequence-tenant"))
-			tenantID := uint64(tid)
-
-			if projectID > 0 {
-				tenantID = projectID
+			projectID, err := decodeProjectIDFromAccessKey(accessKey)
+			if err != nil {
+				proto.RespondWithError(w, fmt.Errorf("invalid tenant: %v", projectID))
+				return
 			}
 
 			// Find tenant based on project id
-			tenant, found, err := tenants.GetLatest(ctx, tenantID)
+			tenant, found, err := tenants.GetLatest(ctx, projectID)
 			if err != nil || !found {
-				proto.RespondWithError(w, fmt.Errorf("invalid tenant: %v", tenantID))
+				proto.RespondWithError(w, fmt.Errorf("invalid tenant: %v", projectID))
 				return
 			}
 
 			tntData, _, err := crypto.DecryptData[*proto.TenantData](ctx, tenant.EncryptedKey, tenant.Ciphertext, tenantKeys)
 			if err != nil {
-				proto.RespondWithError(w, fmt.Errorf("could not decrypt tenant data: %v", tenantID))
+				proto.RespondWithError(w, fmt.Errorf("could not decrypt tenant data: %v", projectID))
 				return
 			}
 
@@ -55,7 +50,7 @@ func Middleware(tenants *data.TenantTable, tenantKeys []string) func(http.Handle
 	}
 }
 
-func DecodeProjectIDFromAccessKey(accessKey string) (uint64, error) {
+func decodeProjectIDFromAccessKey(accessKey string) (uint64, error) {
 	buf, err := base62.DecodeString(accessKey)
 	if err != nil || len(buf) < 8 {
 		return 0, fmt.Errorf("invalid access key")
