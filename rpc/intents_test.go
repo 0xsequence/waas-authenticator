@@ -215,3 +215,68 @@ func TestRPC_SendIntent_SendTransaction(t *testing.T) {
 	assert.Equal(t, "transactionReceipt", resCode)
 	assert.NotEmpty(t, resData)
 }
+
+func TestRPC_SendIntent_GenericIntent(t *testing.T) {
+	block, _ := pem.Decode([]byte(testPrivateKey))
+	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	require.NoError(t, err)
+
+	cfg := initConfig(t)
+
+	issuer, _, closeJWKS := issueAccessTokenAndRunJwksServer(t)
+	defer closeJWKS()
+
+	random := mathrand.New(mathrand.NewSource(42))
+	kmsClient := &kmsMock{random: random}
+	enc, err := enclave.New(context.Background(), enclave.DummyProvider, kmsClient, privKey)
+	require.NoError(t, err)
+
+	sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
+	require.NoError(t, err)
+
+	tenant := newTenant(t, enc, issuer)
+	sess := newSession(t, enc, issuer, sessWallet)
+
+	dbClient := &dbMock{
+		sessions: map[string]*data.Session{sess.ID: sess},
+		tenants:  map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
+	}
+	svc := &rpc.RPC{
+		Config:     cfg,
+		HTTPClient: http.DefaultClient,
+		Enclave:    enc,
+		Wallets:    &walletServiceMock{},
+		Tenants:    data.NewTenantTable(dbClient, "Tenants"),
+		Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
+	}
+
+	srv := httptest.NewServer(svc.Handler())
+	defer srv.Close()
+
+	intentJSON := `{"version":"","packet":{"code":"genericIntent","unknownParam":"Test","network":"1"}}`
+	payload := &proto.SendIntentPayload{SessionID: sess.ID, IntentJSON: intentJSON}
+	payloadBytes, err := json.Marshal(payload)
+	require.NoError(t, err)
+
+	payloadSigBytes, err := sessWallet.SignMessage(payloadBytes)
+	require.NoError(t, err)
+	payloadSig := hexutil.Encode(payloadSigBytes)
+
+	dkOut, err := kmsClient.GenerateDataKey(context.Background(), &kms.GenerateDataKeyInput{KeyId: aws.String("TransportKey")})
+	require.NoError(t, err)
+	encryptedPayloadKey := hexutil.Encode(dkOut.CiphertextBlob)
+
+	payloadCiphertextBytes, err := aescbc.Encrypt(rand.Reader, dkOut.Plaintext, payloadBytes)
+	require.NoError(t, err)
+	payloadCiphertext := hexutil.Encode(payloadCiphertextBytes)
+
+	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
+	header := make(http.Header)
+	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
+	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
+
+	resCode, resData, err := c.SendIntent(ctx, encryptedPayloadKey, payloadCiphertext, payloadSig)
+	require.NoError(t, err)
+	assert.Equal(t, "sentIntent", resCode)
+	assert.NotEmpty(t, resData)
+}

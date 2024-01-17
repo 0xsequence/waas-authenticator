@@ -20,12 +20,12 @@ func (s *RPC) RegisterSession(ctx context.Context, encryptedPayloadKey string, p
 
 	payload, payloadBytes, err := crypto.DecryptPayload[*proto.RegisterSessionPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("decrypting payload: %w", err)
 	}
 
 	identity, err := verifyIdentity(ctx, s.HTTPClient, payload.IDToken)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("verifying identity: %w", err)
 	}
 
 	if payload.ProjectID != identity.ProjectID || payload.ProjectID != tntData.ProjectID {
@@ -54,7 +54,7 @@ func (s *RPC) RegisterSession(ctx context.Context, encryptedPayloadKey string, p
 	// TODO: *OR* we don't need them in payload, we can get them directly from the intent
 	res, err := s.Wallets.RegisterSession(waasCtx, identity.String(), payload.IntentJSON)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("registering session with WaaS API: %w", err)
 	}
 
 	ttl := 100 * 365 * 24 * time.Hour // TODO: should be configured somewhere, maybe per tenant?
@@ -108,12 +108,12 @@ func (s *RPC) DropSession(ctx context.Context, encryptedPayloadKey string, paylo
 
 	payload, payloadBytes, err := crypto.DecryptPayload[*proto.DropSessionPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("decrypting payload: %w", err)
 	}
 
 	_, currentSessData, err := s.verifySession(ctx, payload.SessionID, payloadBytes, payloadSig)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("verifying session: %w", err)
 	}
 
 	dbSess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, payload.DropSessionID)
@@ -127,11 +127,11 @@ func (s *RPC) DropSession(ctx context.Context, encryptedPayloadKey string, paylo
 	}
 
 	if _, err := s.Wallets.InvalidateSession(waasCtx, payload.DropSessionID); err != nil {
-		return false, err
+		return false, fmt.Errorf("invalidating session with WaaS API: %w", err)
 	}
 
 	if err := s.Sessions.Delete(ctx, tntData.ProjectID, dbSess.ID); err != nil {
-		return false, err
+		return false, fmt.Errorf("deleting session: %w", err)
 	}
 
 	return true, nil
@@ -142,24 +142,24 @@ func (s *RPC) ListSessions(ctx context.Context, encryptedPayloadKey string, payl
 
 	payload, payloadBytes, err := crypto.DecryptPayload[*proto.ListSessionsPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decrypting payload: %w", err)
 	}
 
 	_, sessData, err := s.verifySession(ctx, payload.SessionID, payloadBytes, payloadSig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("verifying session: %w", err)
 	}
 
 	dbSessions, err := s.Sessions.ListByUserID(ctx, sessData.Identity().String())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing DB sessions: %w", err)
 	}
 
 	out := make([]*proto.Session, len(dbSessions))
 	for i, dbSess := range dbSessions {
 		sessData, _, err := crypto.DecryptData[*proto.SessionData](ctx, dbSess.EncryptedKey, dbSess.Ciphertext, tntData.SessionKeys)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("decrypting session data: %w", err)
 		}
 
 		out[i] = &proto.Session{
