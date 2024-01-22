@@ -22,3 +22,7 @@ func AccessKeyFromContext(ctx context.Context) string {
 	v, _ := ctx.Value(accessKeyCtxKey).(string)
 	return v
 }
+
+func WithAccessKey(ctx context.Context, accessKey string) context.Context {
+	return context.WithValue(ctx, accessKeyCtxKey, accessKey)
+}
