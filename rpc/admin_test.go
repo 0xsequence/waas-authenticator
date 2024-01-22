@@ -60,6 +60,7 @@ func TestRPC_GetTenant(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, tnt)
 		assert.Equal(t, uint64(1), tnt.ProjectID)
+		assert.Equal(t, []string{"http://localhost"}, tnt.AllowedOrigins)
 	})
 
 	t.Run("MissingTenant", func(t *testing.T) {
@@ -108,9 +109,10 @@ func TestRPC_CreateTenant(t *testing.T) {
 
 	audience := "audience"
 	validOidcProviders := []*proto.OpenIdProvider{{Issuer: issuer, Audience: &audience}}
+	allowedOrigins := []string{"http://localhost"}
 
 	t.Run("TenantAlreadyExists", func(t *testing.T) {
-		tnt, code, err := c.CreateTenant(ctx, tenant.ProjectID, "WAAS_ACCESS_TOKEN", validOidcProviders)
+		tnt, code, err := c.CreateTenant(ctx, tenant.ProjectID, "WAAS_ACCESS_TOKEN", validOidcProviders, allowedOrigins)
 		assert.Nil(t, tnt)
 		assert.Empty(t, code)
 		assert.ErrorContains(t, err, "tenant already exists")
@@ -121,14 +123,21 @@ func TestRPC_CreateTenant(t *testing.T) {
 			{Issuer: issuer, Audience: &audience},
 			{Issuer: "INVALID", Audience: &audience},
 		}
-		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", invalidOidcProviders)
+		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", invalidOidcProviders, allowedOrigins)
 		assert.Nil(t, tnt)
 		assert.Empty(t, code)
 		assert.ErrorContains(t, err, "invalid oidcProviders")
 	})
 
+	t.Run("NoAllowedOrigins", func(t *testing.T) {
+		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", validOidcProviders, nil)
+		assert.Nil(t, tnt)
+		assert.Empty(t, code)
+		assert.ErrorContains(t, err, "at least one allowed origin is required")
+	})
+
 	t.Run("Success", func(t *testing.T) {
-		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", validOidcProviders)
+		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", validOidcProviders, allowedOrigins)
 		require.NoError(t, err)
 		assert.NotEmpty(t, code)
 		assert.NotNil(t, tnt)
