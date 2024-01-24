@@ -21,6 +21,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,77 +31,126 @@ func TestRPC_RegisterSession(t *testing.T) {
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
 
-	cfg := initConfig(t)
-
-	issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t)
-	defer closeJWKS()
-
-	random := mathrand.New(mathrand.NewSource(42))
-	kmsClient := &kmsMock{random: random}
-	enc, err := enclave.New(context.Background(), enclave.DummyProvider, kmsClient, privKey)
-	require.NoError(t, err)
-
-	tenant := newTenant(t, enc, issuer)
-
-	dbClient := &dbMock{
-		sessions: map[string]*data.Session{},
-		tenants:  map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
-	}
-	walletService := newWalletServiceMock(nil)
-	svc := &rpc.RPC{
-		Config:     cfg,
-		HTTPClient: http.DefaultClient,
-		Enclave:    enc,
-		Wallets:    walletService,
-		Tenants:    data.NewTenantTable(dbClient, "Tenants"),
-		Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
-	}
-
-	srv := httptest.NewServer(svc.Handler())
-	defer srv.Close()
-
 	sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
 	require.NoError(t, err)
 
-	intentJSON := fmt.Sprintf(`{"version":"","packet":{"code":"openSession","session":"%s"}}`, sessWallet.Address())
-	payload := &proto.RegisterSessionPayload{
-		ProjectID:      tenant.ProjectID,
-		IDToken:        tok,
-		SessionAddress: sessWallet.Address().String(),
-		FriendlyName:   "FriendlyName",
-		IntentJSON:     intentJSON,
+	type assertionParams struct {
+		tenant        *data.Tenant
+		issuer        string
+		dbClient      *dbMock
+		walletService *walletServiceMock
 	}
-	payloadBytes, err := json.Marshal(payload)
-	require.NoError(t, err)
+	testCases := map[string]struct {
+		assertFn     func(t *testing.T, sess *proto.Session, err error, p assertionParams)
+		tokBuilderFn func(b *jwt.Builder)
+	}{
+		"Basic": {
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.NoError(t, err)
+				require.NotNil(t, sess)
 
-	payloadSigBytes, err := sessWallet.SignMessage(payloadBytes)
-	require.NoError(t, err)
-	payloadSig := hexutil.Encode(payloadSigBytes)
+				assert.Equal(t, sessWallet.Address().String(), sess.ID)
+				assert.Equal(t, fmt.Sprintf("%d#%s#%s", p.tenant.ProjectID, p.issuer, "subject"), sess.UserID)
+				assert.Equal(t, "FriendlyName", sess.FriendlyName)
 
-	dkOut, err := kmsClient.GenerateDataKey(context.Background(), &kms.GenerateDataKeyInput{KeyId: aws.String("TransportKey")})
-	require.NoError(t, err)
-	encryptedPayloadKey := hexutil.Encode(dkOut.CiphertextBlob)
+				assert.Contains(t, p.dbClient.sessions, sess.ID)
+				assert.Contains(t, p.walletService.registeredSessions, sess.ID)
+			},
+		},
+		"WithInvalidIssuer": {
+			tokBuilderFn: func(b *jwt.Builder) { b.Issuer("https://id.example.com") },
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.Nil(t, sess)
+				require.ErrorContains(t, err, `issuer "https://id.example.com" not valid for this tenant`)
+			},
+		},
+		"WithValidNonce": {
+			tokBuilderFn: func(b *jwt.Builder) { b.Claim("nonce", sessWallet.Address().String()) },
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.NoError(t, err)
+				require.NotNil(t, sess)
 
-	payloadCiphertextBytes, err := aescbc.Encrypt(rand.Reader, dkOut.Plaintext, payloadBytes)
-	require.NoError(t, err)
-	payloadCiphertext := hexutil.Encode(payloadCiphertextBytes)
+				assert.Equal(t, sessWallet.Address().String(), sess.ID)
+			},
+		},
+		"WithInvalidNonce": {
+			tokBuilderFn: func(b *jwt.Builder) { b.Claim("nonce", "0x1234567890abcdef") },
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.Nil(t, sess)
+				require.ErrorContains(t, err, "JWT validation: nonce not satisfied")
+			},
+		},
+	}
 
-	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
-	header := make(http.Header)
-	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
-	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
-	require.NoError(t, err)
+	for label, testCase := range testCases {
+		t.Run(label, func(t *testing.T) {
+			cfg := initConfig(t)
 
-	sess, _, err := c.RegisterSession(ctx, encryptedPayloadKey, payloadCiphertext, payloadSig)
-	require.NoError(t, err)
-	require.NotNil(t, sess)
+			issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t, testCase.tokBuilderFn)
+			defer closeJWKS()
 
-	assert.Equal(t, sessWallet.Address().String(), sess.ID)
-	assert.Equal(t, fmt.Sprintf("%d#%s#%s", tenant.ProjectID, issuer, "subject"), sess.UserID)
-	assert.Equal(t, "FriendlyName", sess.FriendlyName)
+			random := mathrand.New(mathrand.NewSource(42))
+			kmsClient := &kmsMock{random: random}
+			enc, err := enclave.New(context.Background(), enclave.DummyProvider, kmsClient, privKey)
+			require.NoError(t, err)
 
-	assert.Contains(t, dbClient.sessions, sess.ID)
-	assert.Contains(t, walletService.registeredSessions, sess.ID)
+			tenant := newTenant(t, enc, issuer)
+
+			dbClient := &dbMock{
+				sessions: map[string]*data.Session{},
+				tenants:  map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
+			}
+			walletService := newWalletServiceMock(nil)
+			svc := &rpc.RPC{
+				Config:     cfg,
+				HTTPClient: http.DefaultClient,
+				Enclave:    enc,
+				Wallets:    walletService,
+				Tenants:    data.NewTenantTable(dbClient, "Tenants"),
+				Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
+			}
+
+			srv := httptest.NewServer(svc.Handler())
+			defer srv.Close()
+
+			intentJSON := fmt.Sprintf(`{"version":"","packet":{"code":"openSession","session":"%s"}}`, sessWallet.Address())
+			payload := &proto.RegisterSessionPayload{
+				ProjectID:      tenant.ProjectID,
+				IDToken:        tok,
+				SessionAddress: sessWallet.Address().String(),
+				FriendlyName:   "FriendlyName",
+				IntentJSON:     intentJSON,
+			}
+			payloadBytes, err := json.Marshal(payload)
+			require.NoError(t, err)
+
+			payloadSigBytes, err := sessWallet.SignMessage(payloadBytes)
+			require.NoError(t, err)
+			payloadSig := hexutil.Encode(payloadSigBytes)
+
+			dkOut, err := kmsClient.GenerateDataKey(context.Background(), &kms.GenerateDataKeyInput{KeyId: aws.String("TransportKey")})
+			require.NoError(t, err)
+			encryptedPayloadKey := hexutil.Encode(dkOut.CiphertextBlob)
+
+			payloadCiphertextBytes, err := aescbc.Encrypt(rand.Reader, dkOut.Plaintext, payloadBytes)
+			require.NoError(t, err)
+			payloadCiphertext := hexutil.Encode(payloadCiphertextBytes)
+
+			c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
+			header := make(http.Header)
+			header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
+			ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
+			require.NoError(t, err)
+
+			sess, _, err := c.RegisterSession(ctx, encryptedPayloadKey, payloadCiphertext, payloadSig)
+			testCase.assertFn(t, sess, err, assertionParams{
+				tenant:        tenant,
+				issuer:        issuer,
+				dbClient:      dbClient,
+				walletService: walletService,
+			})
+		})
+	}
 }
 
 func TestRPC_DropSession(t *testing.T) {
