@@ -24,7 +24,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 	"github.com/go-chi/httplog"
 	"github.com/rs/zerolog"
 )
@@ -187,24 +186,6 @@ func (s *RPC) Handler() http.Handler {
 
 	// Timeout any request after 28 seconds as Cloudflare has a 30 second limit anyways.
 	r.Use(middleware.Timeout(28 * time.Second))
-
-	// CORS
-	corsOptions := cors.Options{
-		AllowedOrigins: []string{"https://*"},
-		AllowedMethods: []string{"POST", "OPTIONS"},
-		AllowedHeaders: []string{
-			// TODO: in future we can remove "X-Sequence-Tenant" as its replaced by "X-Access-Key"
-			"Accept", "Authorization", "Content-Type", "X-Attestation-Nonce", "X-Sequence-Tenant", "X-Access-Key",
-		},
-		AllowCredentials: true,
-		MaxAge:           600,
-	}
-	if s.Config.Mode != config.ProductionMode {
-		corsOptions.AllowedOrigins = append(corsOptions.AllowedOrigins, "http://*")
-	}
-
-	c := cors.New(corsOptions)
-	r.Use(c.Handler)
 
 	// Quick pages
 	r.Use(middleware.PageRoute("/", http.HandlerFunc(indexHandler)))
