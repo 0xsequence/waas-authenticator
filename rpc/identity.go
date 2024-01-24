@@ -25,7 +25,23 @@ func withIssuer(expectedIss string) jwt.ValidatorFunc {
 	}
 }
 
-func verifyIdentity(ctx context.Context, client HTTPClient, idToken string) (*proto.Identity, error) {
+func withNonce(expectedNonce string) jwt.ValidatorFunc {
+	return func(ctx context.Context, tok jwt.Token) jwt.ValidationError {
+		nonceClaim, ok := tok.Get("nonce")
+		if !ok {
+			// TODO: we might always want to require nonce to be present
+			return nil
+		}
+
+		nonceVal, _ := nonceClaim.(string)
+		if nonceVal != expectedNonce {
+			return jwt.NewValidationError(fmt.Errorf("nonce not satisfied"))
+		}
+		return nil
+	}
+}
+
+func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sessionID string) (*proto.Identity, error) {
 	tntData := tenant.FromContext(ctx)
 
 	tok, err := jwt.Parse([]byte(idToken), jwt.WithVerify(false), jwt.WithValidate(false))
@@ -47,7 +63,11 @@ func verifyIdentity(ctx context.Context, client HTTPClient, idToken string) (*pr
 		return nil, fmt.Errorf("signature verification: %w", err)
 	}
 
-	validateOptions := []jwt.ValidateOption{jwt.WithValidator(withIssuer(idp.Issuer)), jwt.WithAcceptableSkew(1 * time.Minute)}
+	validateOptions := []jwt.ValidateOption{
+		jwt.WithValidator(withIssuer(idp.Issuer)),
+		jwt.WithValidator(withNonce(sessionID)),
+		jwt.WithAcceptableSkew(10 * time.Second),
+	}
 	if idp.Audience != nil {
 		validateOptions = append(validateOptions, jwt.WithAudience(*idp.Audience))
 	}
