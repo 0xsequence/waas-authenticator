@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
@@ -22,7 +23,7 @@ func Middleware(tenants *data.TenantTable, tenantKeys []string) func(http.Handle
 			// and place the access key on the context.
 			accessKey := r.Header.Get("x-access-key")
 			if accessKey != "" {
-				ctx = context.WithValue(ctx, accessKeyCtxKey, accessKey)
+				ctx = WithAccessKey(ctx, accessKey)
 			}
 
 			projectID, err := decodeProjectIDFromAccessKey(accessKey)
@@ -42,6 +43,14 @@ func Middleware(tenants *data.TenantTable, tenantKeys []string) func(http.Handle
 			if err != nil {
 				proto.RespondWithError(w, fmt.Errorf("could not decrypt tenant data: %v", projectID))
 				return
+			}
+
+			origin := r.Header.Get("origin")
+			if origin != "" && len(tntData.AllowedOrigins) > 0 {
+				if !slices.Contains(tntData.AllowedOrigins, origin) {
+					proto.RespondWithError(w, fmt.Errorf("origin not allowed"))
+					return
+				}
 			}
 
 			ctx = context.WithValue(ctx, tenantCtxKey, tntData)

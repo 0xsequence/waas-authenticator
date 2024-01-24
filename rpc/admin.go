@@ -31,16 +31,17 @@ func (s *RPC) GetTenant(ctx context.Context, projectID uint64) (*proto.Tenant, e
 	}
 
 	retTenant := &proto.Tenant{
-		ProjectID:     tnt.ProjectID,
-		Version:       tnt.Version,
-		OIDCProviders: tenantData.OIDCProviders,
-		UpdatedAt:     tnt.CreatedAt,
+		ProjectID:      tnt.ProjectID,
+		Version:        tnt.Version,
+		OIDCProviders:  tenantData.OIDCProviders,
+		AllowedOrigins: tenantData.AllowedOrigins,
+		UpdatedAt:      tnt.CreatedAt,
 	}
 	return retTenant, nil
 }
 
 func (s *RPC) CreateTenant(
-	ctx context.Context, projectID uint64, waasAccessToken string, oidcProviders []*proto.OpenIdProvider,
+	ctx context.Context, projectID uint64, waasAccessToken string, oidcProviders []*proto.OpenIdProvider, allowedOrigins []string,
 ) (*proto.Tenant, string, error) {
 	att := attestation.FromContext(ctx)
 
@@ -54,6 +55,10 @@ func (s *RPC) CreateTenant(
 
 	if err := validateOIDCProviders(ctx, s.HTTPClient, oidcProviders); err != nil {
 		return nil, "", fmt.Errorf("invalid oidcProviders: %w", err)
+	}
+
+	if len(allowedOrigins) == 0 {
+		return nil, "", fmt.Errorf("at least one allowed origin is required")
 	}
 
 	wallet, err := ethwallet.NewWalletFromRandomEntropy()
@@ -110,6 +115,7 @@ func (s *RPC) CreateTenant(
 		OIDCProviders:   oidcProviders,
 		TransportKeys:   s.Config.KMS.DefaultTransportKeys,
 		SessionKeys:     s.Config.KMS.DefaultSessionKeys,
+		AllowedOrigins:  allowedOrigins,
 	}
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, s.Config.KMS.TenantKeys[0], tenantData)
@@ -130,15 +136,18 @@ func (s *RPC) CreateTenant(
 	}
 
 	retTenant := &proto.Tenant{
-		ProjectID:     projectID,
-		Version:       dbTenant.Version,
-		OIDCProviders: tenantData.OIDCProviders,
-		UpdatedAt:     dbTenant.CreatedAt,
+		ProjectID:      projectID,
+		Version:        dbTenant.Version,
+		OIDCProviders:  tenantData.OIDCProviders,
+		AllowedOrigins: tenantData.AllowedOrigins,
+		UpdatedAt:      dbTenant.CreatedAt,
 	}
 	return retTenant, tenantData.UpgradeCode, nil
 }
 
-func (s *RPC) UpdateTenant(ctx context.Context, projectID uint64, upgradeCode string, oidcProviders []*proto.OpenIdProvider) (*proto.Tenant, error) {
+func (s *RPC) UpdateTenant(
+	ctx context.Context, projectID uint64, upgradeCode string, oidcProviders []*proto.OpenIdProvider, allowedOrigins []string,
+) (*proto.Tenant, error) {
 	att := attestation.FromContext(ctx)
 
 	tnt, found, err := s.Tenants.GetLatest(ctx, projectID)
@@ -163,7 +172,12 @@ func (s *RPC) UpdateTenant(ctx context.Context, projectID uint64, upgradeCode st
 		return nil, fmt.Errorf("invalid oidcProviders: %w", err)
 	}
 
+	if len(allowedOrigins) == 0 {
+		return nil, fmt.Errorf("at least one allowed origin is required")
+	}
+
 	tntData.OIDCProviders = oidcProviders
+	tntData.AllowedOrigins = allowedOrigins
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, s.Config.KMS.TenantKeys[0], tntData)
 	if err != nil {

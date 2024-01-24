@@ -356,6 +356,7 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) *data.Tenant {
 		UpgradeCode:     "CHANGEME",
 		WaasAccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVyX2lkIjozfQ.g2fWwLrKPhTUpLFc7ZM9pMm4kEHGu8haCMzMOOGiqSM",
 		OIDCProviders:   []*proto.OpenIdProvider{{Issuer: issuer}},
+		AllowedOrigins:  []string{"http://localhost"},
 		TransportKeys:   []string{"TransportKey"},
 		SessionKeys:     []string{"SessionKey"},
 	}

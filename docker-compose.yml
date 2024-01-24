@@ -26,5 +26,5 @@ services:
       - EXTRA_CORS_ALLOWED_ORIGINS=http://localhost:5173
       - DYNAMODB_SHARE_DB=1
     volumes:
-      - "../docker/awslocal_ready_hook.sh:/etc/localstack/init/ready.d/awslocal_ready_hook.sh"
+      - "./docker/awslocal_ready_hook.sh:/etc/localstack/init/ready.d/awslocal_ready_hook.sh"
       - "/var/run/docker.sock:/var/run/docker.sock"

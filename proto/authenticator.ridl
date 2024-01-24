@@ -77,6 +77,7 @@ struct Tenant
   - version: int
   - oidcProviders: []OpenIdProvider
     + go.field.name = OIDCProviders
+  - allowedOrigins: []string
   - updatedAt: timestamp
 
 struct TenantData
@@ -106,6 +107,8 @@ struct TenantData
     + json = transk
   - sessionKeys: []string
     + json = sessk
+  - allowedOrigins: []string
+    + json = ogns
 
 struct MiniSequenceContext
   - factory: string
@@ -173,5 +176,5 @@ service WaasAuthenticatorAdmin
     - Clock() => (serverTime: timestamp)
 
     - GetTenant(projectId: uint64) => (tenant: Tenant)
-    - CreateTenant(projectId: uint64, waasAccessToken: string, oidcProviders: []OpenIdProvider) => (tenant: Tenant, upgradeCode: string)
-    - UpdateTenant(projectId: uint64, upgradeCode: string, oidcProviders: []OpenIdProvider) => (tenant: Tenant)
+    - CreateTenant(projectId: uint64, waasAccessToken: string, oidcProviders: []OpenIdProvider, allowedOrigins: []string) => (tenant: Tenant, upgradeCode: string)
+    - UpdateTenant(projectId: uint64, upgradeCode: string, oidcProviders: []OpenIdProvider, allowedOrigins: []string) => (tenant: Tenant)

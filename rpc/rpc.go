@@ -63,7 +63,11 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 			aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 				return aws.Endpoint{URL: cfg.Endpoints.AWSEndpoint}, nil
 			}),
-		), awsconfig.WithCredentialsProvider(&awscreds.StaticProvider{}))
+		), awsconfig.WithCredentialsProvider(&awscreds.StaticProvider{
+			AccessKeyID:     "test",
+			SecretAccessKey: "test",
+			SessionToken:    "test",
+		}))
 	}
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), options...)
@@ -194,7 +198,7 @@ func (s *RPC) Handler() http.Handler {
 		// Find and decrypt tenant data
 		r.Use(tenant.Middleware(s.Tenants, s.Config.KMS.TenantKeys))
 	})
-	userRouter.Post("/rpc/WaasAuthenticator/*", proto.NewWaasAuthenticatorServer(s).ServeHTTP)
+	userRouter.Handle("/rpc/WaasAuthenticator/*", proto.NewWaasAuthenticatorServer(s))
 
 	adminRouter := r.Group(func(r chi.Router) {
 		// Validate admin JWTs
@@ -203,7 +207,7 @@ func (s *RPC) Handler() http.Handler {
 		// Generate attestation document
 		r.Use(attestation.Middleware(s.Enclave))
 	})
-	adminRouter.Post("/rpc/WaasAuthenticatorAdmin/*", proto.NewWaasAuthenticatorAdminServer(s).ServeHTTP)
+	adminRouter.Handle("/rpc/WaasAuthenticatorAdmin/*", proto.NewWaasAuthenticatorAdminServer(s))
 
 	if s.Config.Service.DebugProfiler {
 		r.Mount("/debug", middleware.Profiler())
