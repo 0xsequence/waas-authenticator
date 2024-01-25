@@ -25,8 +25,13 @@ func withIssuer(expectedIss string) jwt.ValidatorFunc {
 	}
 }
 
-func withNonce(expectedNonce string) jwt.ValidatorFunc {
+func withSessionAddress(expectedSessionAddress string) jwt.ValidatorFunc {
 	return func(ctx context.Context, tok jwt.Token) jwt.ValidationError {
+		sessAddrClaim, ok := tok.Get("sequence:session_address")
+		if ok && sessAddrClaim == expectedSessionAddress {
+			return nil
+		}
+
 		nonceClaim, ok := tok.Get("nonce")
 		if !ok {
 			// TODO: we might always want to require nonce to be present
@@ -34,14 +39,15 @@ func withNonce(expectedNonce string) jwt.ValidatorFunc {
 		}
 
 		nonceVal, _ := nonceClaim.(string)
-		if nonceVal != expectedNonce {
-			return jwt.NewValidationError(fmt.Errorf("nonce not satisfied"))
+		if nonceVal == expectedSessionAddress {
+			return nil
 		}
-		return nil
+
+		return jwt.NewValidationError(fmt.Errorf("nonce not satisfied"))
 	}
 }
 
-func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sessionID string) (*proto.Identity, error) {
+func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sessionAddress string) (*proto.Identity, error) {
 	tntData := tenant.FromContext(ctx)
 
 	tok, err := jwt.Parse([]byte(idToken), jwt.WithVerify(false), jwt.WithValidate(false))
@@ -65,7 +71,7 @@ func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sess
 
 	validateOptions := []jwt.ValidateOption{
 		jwt.WithValidator(withIssuer(idp.Issuer)),
-		jwt.WithValidator(withNonce(sessionID)),
+		jwt.WithValidator(withSessionAddress(sessionAddress)),
 		jwt.WithAcceptableSkew(10 * time.Second),
 	}
 	if idp.Audience != nil {
