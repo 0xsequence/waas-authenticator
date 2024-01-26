@@ -80,6 +80,18 @@ func TestRPC_RegisterSession(t *testing.T) {
 				require.ErrorContains(t, err, "JWT validation: nonce not satisfied")
 			},
 		},
+		"WithInvalidNonceButValidSessionAddressClaim": {
+			tokBuilderFn: func(b *jwt.Builder) {
+				b.Claim("nonce", "0x1234567890abcdef").
+					Claim("sequence:session_address", sessWallet.Address().String())
+			},
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.NoError(t, err)
+				require.NotNil(t, sess)
+
+				assert.Equal(t, sessWallet.Address().String(), sess.ID)
+			},
+		},
 	}
 
 	for label, testCase := range testCases {

@@ -39,7 +39,7 @@ func withSessionAddress(expectedSessionAddress string) jwt.ValidatorFunc {
 		}
 
 		nonceVal, _ := nonceClaim.(string)
-		if nonceVal == expectedSessionAddress {
+		if nonceVal != "" && nonceVal == expectedSessionAddress {
 			return nil
 		}
 
