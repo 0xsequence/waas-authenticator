@@ -23,7 +23,7 @@ func (s *RPC) RegisterSession(ctx context.Context, encryptedPayloadKey string, p
 		return nil, nil, fmt.Errorf("decrypting payload: %w", err)
 	}
 
-	identity, err := verifyIdentity(ctx, s.HTTPClient, payload.IDToken)
+	identity, err := verifyIdentity(ctx, s.HTTPClient, payload.IDToken, payload.SessionAddress)
 	if err != nil {
 		return nil, nil, fmt.Errorf("verifying identity: %w", err)
 	}

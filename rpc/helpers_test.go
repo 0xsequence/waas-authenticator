@@ -115,7 +115,7 @@ QwIDAQAB
 	}
 }
 
-func issueAccessTokenAndRunJwksServer(t *testing.T) (iss string, tok string, close func()) {
+func issueAccessTokenAndRunJwksServer(t *testing.T, optTokenBuilderFn ...func(*jwt.Builder)) (iss string, tok string, close func()) {
 	jwtKeyRaw, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	jwtKey, err := jwk.FromRaw(jwtKeyRaw)
@@ -147,10 +147,15 @@ func issueAccessTokenAndRunJwksServer(t *testing.T) (iss string, tok string, clo
 	}))
 	uri = jwksServer.URL
 
-	tokRaw, err := jwt.NewBuilder().
+	tokBuilder := jwt.NewBuilder().
 		Issuer(jwksServer.URL).
-		Subject("subject").
-		Build()
+		Subject("subject")
+
+	if len(optTokenBuilderFn) > 0 && optTokenBuilderFn[0] != nil {
+		optTokenBuilderFn[0](tokBuilder)
+	}
+
+	tokRaw, err := tokBuilder.Build()
 	require.NoError(t, err)
 	tokBytes, err := jwt.Sign(tokRaw, jwt.WithKey(jwa.RS256, jwtKey))
 	require.NoError(t, err)
