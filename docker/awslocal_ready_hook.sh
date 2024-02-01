@@ -24,3 +24,13 @@ awslocal dynamodb create-table \
   --provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=10 \
   --global-secondary-indexes "IndexName=UserID-Index,KeySchema=[{AttributeName=UserID,KeyType=HASH},{AttributeName=CreatedAt,KeyType=SORT}],Projection={ProjectionType=ALL},ProvisionedThroughput={ReadCapacityUnits=10,WriteCapacityUnits=10}"
 
+awslocal dynamodb create-table \
+  --region us-east-1 \
+  --table-name AccountsTable \
+  --attribute-definitions AttributeName=ProjectID,AttributeType=N AttributeName=Identity,AttributeType=S AttributeName=UserID,AttributeType=S AttributeName=ProjectScopedEmail,AttributeType=S \
+  --key-schema AttributeName=ProjectID,KeyType=HASH AttributeName=Identity,KeyType=SORT \
+  --provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=10 \
+  --global-secondary-indexes \
+    "IndexName=UserID-Index,KeySchema=[{AttributeName=UserID,KeyType=HASH},{AttributeName=Identity,KeyType=SORT}],Projection={ProjectionType=ALL},ProvisionedThroughput={ReadCapacityUnits=10,WriteCapacityUnits=10}" \
+    "IndexName=Email-Index,KeySchema=[{AttributeName=ProjectScopedEmail,KeyType=HASH},{AttributeName=Identity,KeyType=SORT}],Projection={ProjectionType=ALL},ProvisionedThroughput={ReadCapacityUnits=10,WriteCapacityUnits=10}"
+
