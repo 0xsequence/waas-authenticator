@@ -73,7 +73,7 @@ func (s *RPC) GetAddress(ctx context.Context, encryptedPayloadKey string, payloa
 		return "", fmt.Errorf("verifying session: %w", err)
 	}
 
-	return addressForUser(ctx, tntData, sessData.Identity().String())
+	return addressForUser(ctx, tntData, sessData.UserID)
 }
 
 func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (string, any, error) {
@@ -104,13 +104,13 @@ func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloa
 		return "", nil, fmt.Errorf("recovering parent wallet: %w", err)
 	}
 
-	walletAddress, err := addressForUser(ctx, tntData, sessData.Identity().String())
+	walletAddress, err := addressForUser(ctx, tntData, sessData.UserID)
 	if err != nil {
 		return "", nil, fmt.Errorf("computing user address: %w", err)
 	}
 
 	targetWallet := &proto_wallet.TargetWallet{
-		User:    sessData.Identity().String(),
+		User:    sessData.UserID,
 		Address: walletAddress,
 	}
 

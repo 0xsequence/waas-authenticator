@@ -41,6 +41,7 @@ type RPC struct {
 	Enclave    *enclave.Enclave
 	Tenants    *data.TenantTable
 	Sessions   *data.SessionTable
+	Accounts   *data.AccountTable
 	Wallets    proto_wallet.Wallet
 
 	startTime time.Time
@@ -100,8 +101,12 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 		Enclave:    enc,
 		Tenants:    data.NewTenantTable(db, cfg.Database.TenantsTable),
 		Sessions:   data.NewSessionTable(db, cfg.Database.SessionsTable, "UserID-Index"),
-		Wallets:    proto_wallet.NewWalletClient(cfg.Endpoints.WaasAPIServer, client),
-		startTime:  time.Now(),
+		Accounts: data.NewAccountTable(db, cfg.Database.AccountsTable, data.AccountIndices{
+			ByUserID: "UserID-Index",
+			ByEmail:  "Email-Index",
+		}),
+		Wallets:   proto_wallet.NewWalletClient(cfg.Endpoints.WaasAPIServer, client),
+		startTime: time.Now(),
 	}
 	return s, nil
 }

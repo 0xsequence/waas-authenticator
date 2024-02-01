@@ -43,30 +43,28 @@ func withSessionAddress(expectedSessionAddress string) jwt.ValidatorFunc {
 			return nil
 		}
 
-		return jwt.NewValidationError(fmt.Errorf("nonce not satisfied"))
+		return jwt.NewValidationError(fmt.Errorf("nonce not satisfied: %s != %s", nonceVal, expectedSessionAddress))
 	}
 }
 
-func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sessionAddress string) (*proto.Identity, error) {
-	tntData := tenant.FromContext(ctx)
-
+func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sessionAddress string) (proto.Identity, error) {
 	tok, err := jwt.Parse([]byte(idToken), jwt.WithVerify(false), jwt.WithValidate(false))
 	if err != nil {
-		return nil, fmt.Errorf("parse JWT: %w", err)
+		return proto.Identity{}, fmt.Errorf("parse JWT: %w", err)
 	}
 
 	idp := getOIDCProvider(ctx, normalizeIssuer(tok.Issuer()))
 	if idp == nil {
-		return nil, fmt.Errorf("issuer %q not valid for this tenant", tok.Issuer())
+		return proto.Identity{}, fmt.Errorf("issuer %q not valid for this tenant", tok.Issuer())
 	}
 
 	keySet, err := getProviderKeySet(ctx, client, normalizeIssuer(idp.Issuer))
 	if err != nil {
-		return nil, err
+		return proto.Identity{}, err
 	}
 
 	if _, err := jws.Verify([]byte(idToken), jws.WithKeySet(keySet)); err != nil {
-		return nil, fmt.Errorf("signature verification: %w", err)
+		return proto.Identity{}, fmt.Errorf("signature verification: %w", err)
 	}
 
 	validateOptions := []jwt.ValidateOption{
@@ -82,13 +80,14 @@ func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sess
 	}
 
 	if err := jwt.Validate(tok, validateOptions...); err != nil {
-		return nil, fmt.Errorf("JWT validation: %w", err)
+		return proto.Identity{}, fmt.Errorf("JWT validation: %w", err)
 	}
 
-	identity := &proto.Identity{
-		ProjectID: tntData.ProjectID,
-		Issuer:    tok.Issuer(),
-		Subject:   tok.Subject(),
+	identity := proto.Identity{
+		Type:    proto.IdentityType_OIDC,
+		Issuer:  tok.Issuer(),
+		Subject: tok.Subject(),
+		Email:   getEmailFromToken(tok),
 	}
 	return identity, nil
 }
@@ -153,4 +152,30 @@ func normalizeIssuer(iss string) string {
 		return "https://" + iss
 	}
 	return iss
+}
+
+func getEmailFromToken(tok jwt.Token) string {
+	// TODO: we might want to relax this a bit and not depend so much on the `email_verified` claim
+	emailVerifiedClaim, ok := tok.Get("email_verified")
+	if !ok {
+		return ""
+	}
+
+	verified := false
+	switch v := emailVerifiedClaim.(type) {
+	case bool:
+		verified = v
+	case string:
+		verified = strings.TrimSpace(strings.ToLower(v)) == "true"
+	}
+	if !verified {
+		return ""
+	}
+
+	emailClaim, ok := tok.Get("email")
+	if !ok {
+		return ""
+	}
+	email, _ := emailClaim.(string)
+	return email
 }
