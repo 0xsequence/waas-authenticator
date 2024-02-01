@@ -211,6 +211,7 @@ func (m *kmsMock) GenerateDataKey(ctx context.Context, params *kms.GenerateDataK
 type dbMock struct {
 	tenants  map[uint64][]*data.Tenant
 	sessions map[string]*data.Session
+	accounts map[uint64]map[string]*data.Account
 }
 
 func (d *dbMock) DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
@@ -248,20 +249,39 @@ func (d *dbMock) GetItem(ctx context.Context, params *dynamodb.GetItemInput, opt
 
 	switch *params.TableName {
 	case "Sessions":
-		idParam, ok := params.Key["ID"]
-		if !ok {
-			return nil, fmt.Errorf("must include an ID key")
-		}
-		idAttr, ok := idParam.(*dynamodbtypes.AttributeValueMemberS)
-		if !ok {
-			return nil, fmt.Errorf("ID key must be of type S")
+		id, err := getDynamoAttribute[*dynamodbtypes.AttributeValueMemberS](params.Key, "ID")
+		if err != nil {
+			return nil, err
 		}
 		out := &dynamodb.GetItemOutput{}
-		acc := d.sessions[idAttr.Value]
+		sess := d.sessions[id.Value]
+		out.Item, err = attributevalue.MarshalMap(sess)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	case "Accounts":
+		projectAttr, err := getDynamoAttribute[*dynamodbtypes.AttributeValueMemberN](params.Key, "ProjectID")
+		if err != nil {
+			return nil, err
+		}
+		projectID, err := strconv.Atoi(projectAttr.Value)
+		if err != nil {
+			return nil, err
+		}
+		identity, err := getDynamoAttribute[*dynamodbtypes.AttributeValueMemberS](params.Key, "Identity")
+		if err != nil {
+			return nil, err
+		}
+		out := &dynamodb.GetItemOutput{}
+		projectAccounts, ok := d.accounts[uint64(projectID)]
 		if !ok {
 			return out, nil
 		}
-		var err error
+		acc, ok := projectAccounts[identity.Value]
+		if !ok {
+			return out, nil
+		}
 		out.Item, err = attributevalue.MarshalMap(acc)
 		if err != nil {
 			return nil, err
@@ -291,6 +311,16 @@ func (d *dbMock) PutItem(ctx context.Context, params *dynamodb.PutItemInput, opt
 			return nil, err
 		}
 		d.tenants[tnt.ProjectID] = []*data.Tenant{&tnt}
+		return nil, nil
+	case "Accounts":
+		var acc data.Account
+		if err := attributevalue.UnmarshalMap(params.Item, &acc); err != nil {
+			return nil, err
+		}
+		if _, ok := d.accounts[acc.ProjectID]; !ok {
+			d.accounts[acc.ProjectID] = make(map[string]*data.Account)
+		}
+		d.accounts[acc.ProjectID][acc.Identity.String()] = &acc
 		return nil, nil
 	}
 
@@ -341,6 +371,19 @@ func (d *dbMock) Query(ctx context.Context, params *dynamodb.QueryInput, optFns 
 	return nil, fmt.Errorf("invalid TableName: %q", *params.TableName)
 }
 
+func getDynamoAttribute[T dynamodbtypes.AttributeValue](attrVals map[string]dynamodbtypes.AttributeValue, name string) (T, error) {
+	var zero T
+	attr, ok := attrVals[name]
+	if !ok {
+		return zero, fmt.Errorf("must include key: %s", name)
+	}
+	value, ok := attr.(T)
+	if !ok {
+		return zero, fmt.Errorf("ID key must be of type %T", *new(T))
+	}
+	return value, nil
+}
+
 func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) *data.Tenant {
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
@@ -388,11 +431,16 @@ func newSession(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwa
 		require.NoError(t, err)
 	}
 
+	identity := proto.Identity{
+		Type:    proto.IdentityType_OIDC,
+		Issuer:  issuer,
+		Subject: "SUBJECT",
+	}
 	payload := &proto.SessionData{
 		Address:   wallet.Address(),
 		ProjectID: 1,
-		Issuer:    issuer,
-		Subject:   "SUBJECT",
+		UserID:    fmt.Sprintf("%d|%s", 1, wallet.Address()),
+		Identity:  identity.String(),
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
@@ -403,7 +451,8 @@ func newSession(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwa
 	return &data.Session{
 		ID:           wallet.Address().String(),
 		ProjectID:    1,
-		UserID:       fmt.Sprintf("%d#%s#%s", payload.ProjectID, payload.Issuer, payload.Subject),
+		UserID:       payload.UserID,
+		Identity:     payload.Identity,
 		FriendlyName: "FriendlyName",
 		EncryptedKey: encryptedKey,
 		Algorithm:    algorithm,
@@ -421,12 +470,14 @@ func newRandAccessKey(projectID uint64) string {
 }
 
 type walletServiceMock struct {
+	registeredUsers    map[string]struct{}
 	registeredSessions map[string]struct{}
 }
 
 func newWalletServiceMock(registeredSessions []string) *walletServiceMock {
 	m := &walletServiceMock{
 		registeredSessions: make(map[string]struct{}),
+		registeredUsers:    make(map[string]struct{}),
 	}
 	for _, sess := range registeredSessions {
 		m.registeredSessions[sess] = struct{}{}
@@ -554,6 +605,7 @@ func (w *walletServiceMock) RegisterSession(ctx context.Context, userID string, 
 	}
 
 	w.registeredSessions[packet.Session] = struct{}{}
+	w.registeredUsers[userID] = struct{}{}
 
 	return &proto_wallet.PayloadResponse{
 		Code: "openedSession",

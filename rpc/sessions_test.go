@@ -10,6 +10,7 @@ import (
 	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/0xsequence/ethkit/ethwallet"
@@ -50,11 +51,13 @@ func TestRPC_RegisterSession(t *testing.T) {
 				require.NotNil(t, sess)
 
 				assert.Equal(t, sessWallet.Address().String(), sess.ID)
-				assert.Equal(t, fmt.Sprintf("%d#%s#%s", p.tenant.ProjectID, p.issuer, "subject"), sess.UserID)
+				assert.Equal(t, fmt.Sprintf("%d|%s", p.tenant.ProjectID, strings.ToLower(sess.ID)), sess.UserID)
 				assert.Equal(t, "FriendlyName", sess.FriendlyName)
 
 				assert.Contains(t, p.dbClient.sessions, sess.ID)
+				assert.Contains(t, p.dbClient.accounts[p.tenant.ProjectID], sess.Identity.String())
 				assert.Contains(t, p.walletService.registeredSessions, sess.ID)
+				assert.Contains(t, p.walletService.registeredUsers, sess.UserID)
 			},
 		},
 		"WithInvalidIssuer": {
@@ -92,6 +95,28 @@ func TestRPC_RegisterSession(t *testing.T) {
 				assert.Equal(t, sessWallet.Address().String(), sess.ID)
 			},
 		},
+		"WithVerifiedEmail": {
+			tokBuilderFn: func(b *jwt.Builder) {
+				b.Claim("email", "user@example.com").Claim("email_verified", "true")
+			},
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.NoError(t, err)
+				require.NotNil(t, sess)
+
+				assert.Equal(t, "user@example.com", sess.Identity.Email)
+			},
+		},
+		"WithUnverifiedEmail": {
+			tokBuilderFn: func(b *jwt.Builder) {
+				b.Claim("email", "user@example.com").Claim("email_verified", "false")
+			},
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.NoError(t, err)
+				require.NotNil(t, sess)
+
+				assert.Equal(t, "", sess.Identity.Email)
+			},
+		},
 	}
 
 	for label, testCase := range testCases {
@@ -111,6 +136,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 			dbClient := &dbMock{
 				sessions: map[string]*data.Session{},
 				tenants:  map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
+				accounts: map[uint64]map[string]*data.Account{},
 			}
 			walletService := newWalletServiceMock(nil)
 			svc := &rpc.RPC{
@@ -120,6 +146,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 				Wallets:    walletService,
 				Tenants:    data.NewTenantTable(dbClient, "Tenants"),
 				Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
+				Accounts:   data.NewAccountTable(dbClient, "Accounts", data.AccountIndices{}),
 			}
 
 			srv := httptest.NewServer(svc.Handler())
