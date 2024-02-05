@@ -2,7 +2,6 @@ package rpc_test
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -12,16 +11,16 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/0xsequence/ethkit/ethwallet"
-	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
-	"github.com/0xsequence/nitrocontrol/aescbc"
+	"github.com/0xsequence/ethkit/go-ethereum/common"
+	"github.com/0xsequence/go-sequence/intents/packets"
 	"github.com/0xsequence/nitrocontrol/enclave"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/gibson042/canonicaljson-go"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,8 +41,9 @@ func TestRPC_RegisterSession(t *testing.T) {
 		walletService *walletServiceMock
 	}
 	testCases := map[string]struct {
-		assertFn     func(t *testing.T, sess *proto.Session, err error, p assertionParams)
-		tokBuilderFn func(b *jwt.Builder)
+		assertFn        func(t *testing.T, sess *proto.Session, err error, p assertionParams)
+		tokBuilderFn    func(b *jwt.Builder)
+		intentBuilderFn func(t *testing.T, packet rpc.Packet) *proto.Intent
 	}{
 		"Basic": {
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
@@ -117,10 +117,33 @@ func TestRPC_RegisterSession(t *testing.T) {
 				assert.Equal(t, "", sess.Identity.Email)
 			},
 		},
+		"MissingSignature": {
+			intentBuilderFn: func(t *testing.T, packet rpc.Packet) *proto.Intent {
+				packetJSON, err := canonicaljson.Marshal(&packet)
+				require.NoError(t, err)
+
+				return &proto.Intent{
+					Version: "1.0.0",
+					Packet:  packetJSON,
+				}
+			},
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				assert.ErrorContains(t, err, "expected exactly one valid signature")
+			},
+		},
 	}
 
 	for label, testCase := range testCases {
 		t.Run(label, func(t *testing.T) {
+			if testCase.intentBuilderFn == nil {
+				testCase.intentBuilderFn = func(t *testing.T, packet rpc.Packet) *proto.Intent {
+					intentJSON := generateIntent(t, sessWallet, packet)
+					var intent proto.Intent
+					require.NoError(t, json.Unmarshal([]byte(intentJSON), &intent))
+					return &intent
+				}
+			}
+
 			cfg := initConfig(t)
 
 			issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t, testCase.tokBuilderFn)
@@ -131,57 +154,38 @@ func TestRPC_RegisterSession(t *testing.T) {
 			enc, err := enclave.New(context.Background(), enclave.DummyProvider, kmsClient, privKey)
 			require.NoError(t, err)
 
-			tenant := newTenant(t, enc, issuer)
+			tenant, _ := newTenant(t, enc, issuer)
 
 			dbClient := &dbMock{
 				sessions: map[string]*data.Session{},
 				tenants:  map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
 				accounts: map[uint64]map[string]*data.Account{},
 			}
+			svc := initRPC(cfg, enc, dbClient)
 			walletService := newWalletServiceMock(nil)
-			svc := &rpc.RPC{
-				Config:     cfg,
-				HTTPClient: http.DefaultClient,
-				Enclave:    enc,
-				Wallets:    walletService,
-				Tenants:    data.NewTenantTable(dbClient, "Tenants"),
-				Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
-				Accounts:   data.NewAccountTable(dbClient, "Accounts", data.AccountIndices{}),
-			}
+			svc.Wallets = walletService
 
 			srv := httptest.NewServer(svc.Handler())
 			defer srv.Close()
 
-			intentJSON := fmt.Sprintf(`{"version":"","packet":{"code":"openSession","session":"%s"}}`, sessWallet.Address())
-			payload := &proto.RegisterSessionPayload{
-				ProjectID:      tenant.ProjectID,
-				IDToken:        tok,
-				SessionAddress: sessWallet.Address().String(),
-				FriendlyName:   "FriendlyName",
-				IntentJSON:     intentJSON,
+			packet := &packets.OpenSessionPacket{
+				BasePacket: packets.BasePacket{
+					Code:    packets.OpenSessionPacketCode,
+					Issued:  uint64(time.Now().Add(-1 * time.Second).Unix()),
+					Expires: uint64(time.Now().Add(5 * time.Minute).Unix()),
+				},
+				Session: sessWallet.Address().String(),
+				Proof:   packets.OpenSessionPacketProof{IDToken: tok},
 			}
-			payloadBytes, err := json.Marshal(payload)
-			require.NoError(t, err)
+			intent := testCase.intentBuilderFn(t, packet)
 
-			payloadSigBytes, err := sessWallet.SignMessage(payloadBytes)
-			require.NoError(t, err)
-			payloadSig := hexutil.Encode(payloadSigBytes)
-
-			dkOut, err := kmsClient.GenerateDataKey(context.Background(), &kms.GenerateDataKeyInput{KeyId: aws.String("TransportKey")})
-			require.NoError(t, err)
-			encryptedPayloadKey := hexutil.Encode(dkOut.CiphertextBlob)
-
-			payloadCiphertextBytes, err := aescbc.Encrypt(rand.Reader, dkOut.Plaintext, payloadBytes)
-			require.NoError(t, err)
-			payloadCiphertext := hexutil.Encode(payloadCiphertextBytes)
-
-			c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
+			c := proto.NewWaasAuthenticatorV1Client(srv.URL, http.DefaultClient)
 			header := make(http.Header)
 			header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 			ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 			require.NoError(t, err)
 
-			sess, _, err := c.RegisterSession(ctx, encryptedPayloadKey, payloadCiphertext, payloadSig)
+			sess, _, err := c.RegisterSession(ctx, intent, "FriendlyName")
 			testCase.assertFn(t, sess, err, assertionParams{
 				tenant:        tenant,
 				issuer:        issuer,
@@ -192,78 +196,156 @@ func TestRPC_RegisterSession(t *testing.T) {
 	}
 }
 
-func TestRPC_DropSession(t *testing.T) {
+func TestRPC_SendIntent_DropSession(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	require.NoError(t, err)
-
-	cfg := initConfig(t)
-
-	issuer, _, closeJWKS := issueAccessTokenAndRunJwksServer(t)
-	defer closeJWKS()
-
-	random := mathrand.New(mathrand.NewSource(42))
-	kmsClient := &kmsMock{random: random}
-	enc, err := enclave.New(context.Background(), enclave.DummyProvider, kmsClient, privKey)
 	require.NoError(t, err)
 
 	sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
 	require.NoError(t, err)
 
-	tenant := newTenant(t, enc, issuer)
-	session := newSession(t, enc, issuer, sessWallet)
-
-	dbClient := &dbMock{
-		sessions: map[string]*data.Session{session.ID: session},
-		tenants:  map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
+	type assertionParams struct {
+		tenant        *data.Tenant
+		issuer        string
+		dbClient      *dbMock
+		walletService *walletServiceMock
 	}
-	walletService := newWalletServiceMock([]string{session.ID})
-	svc := &rpc.RPC{
-		Config:     cfg,
-		HTTPClient: http.DefaultClient,
-		Enclave:    enc,
-		Wallets:    walletService,
-		Tenants:    data.NewTenantTable(dbClient, "Tenants"),
-		Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
+	testCases := map[string]struct {
+		assertFn        func(t *testing.T, code string, data any, err error, p assertionParams)
+		intentBuilderFn func(t *testing.T, packet rpc.Packet) *proto.Intent
+		dropSessionID   string
+	}{
+		"SameSession": {
+			assertFn: func(t *testing.T, code string, data any, err error, p assertionParams) {
+				require.NoError(t, err)
+				require.Equal(t, "sessionClosed", code)
+				require.Equal(t, true, data)
+
+				dropSession := sessWallet.Address().String()
+				assert.NotContains(t, p.dbClient.sessions, dropSession)
+				assert.NotContains(t, p.walletService.registeredSessions, dropSession)
+			},
+			dropSessionID: sessWallet.Address().String(),
+		},
+		"SameUser": {
+			assertFn: func(t *testing.T, code string, data any, err error, p assertionParams) {
+				require.NoError(t, err)
+				require.Equal(t, "sessionClosed", code)
+				require.Equal(t, true, data)
+
+				dropSession := "0x1111111111111111111111111111111111111111"
+				assert.NotContains(t, p.dbClient.sessions, dropSession)
+				assert.NotContains(t, p.walletService.registeredSessions, dropSession)
+			},
+			dropSessionID: "0x1111111111111111111111111111111111111111",
+		},
+		"OtherUser": {
+			assertFn: func(t *testing.T, code string, data any, err error, p assertionParams) {
+				assert.ErrorContains(t, err, "session not found")
+				assert.Empty(t, data)
+
+				dropSession := "0x2222222222222222222222222222222222222222"
+				assert.Contains(t, p.dbClient.sessions, dropSession)
+				assert.Contains(t, p.walletService.registeredSessions, dropSession)
+			},
+			dropSessionID: "0x2222222222222222222222222222222222222222",
+		},
 	}
 
-	srv := httptest.NewServer(svc.Handler())
-	defer srv.Close()
+	for label, testCase := range testCases {
+		t.Run(label, func(t *testing.T) {
+			if testCase.intentBuilderFn == nil {
+				testCase.intentBuilderFn = func(t *testing.T, packet rpc.Packet) *proto.Intent {
+					intentJSON := generateIntent(t, sessWallet, packet)
+					var intent proto.Intent
+					require.NoError(t, json.Unmarshal([]byte(intentJSON), &intent))
+					return &intent
+				}
+			}
 
-	payload := &proto.DropSessionPayload{
-		SessionID:     session.ID,
-		DropSessionID: session.ID,
+			cfg := initConfig(t)
+
+			issuer, _, closeJWKS := issueAccessTokenAndRunJwksServer(t)
+			defer closeJWKS()
+
+			random := mathrand.New(mathrand.NewSource(42))
+			kmsClient := &kmsMock{random: random}
+			enc, err := enclave.New(context.Background(), enclave.DummyProvider, kmsClient, privKey)
+			require.NoError(t, err)
+
+			tenant, tntData := newTenant(t, enc, issuer)
+			acc := newAccount(t, enc, issuer, sessWallet)
+			session := newSession(t, enc, issuer, sessWallet)
+
+			session2 := newSessionFromData(t, enc, &proto.SessionData{
+				Address:   common.HexToAddress("0x1111111111111111111111111111111111111111"),
+				ProjectID: 1,
+				UserID:    session.UserID,
+				Identity:  session.Identity,
+				CreatedAt: time.Now(),
+				ExpiresAt: time.Now().Add(1 * time.Minute),
+			})
+
+			session3 := newSessionFromData(t, enc, &proto.SessionData{
+				Address:   common.HexToAddress("0x2222222222222222222222222222222222222222"),
+				ProjectID: 1,
+				UserID:    "ANOTHER-USER",
+				Identity:  session.Identity,
+				CreatedAt: time.Now(),
+				ExpiresAt: time.Now().Add(1 * time.Minute),
+			})
+
+			walletAddr, err := rpc.AddressForUser(context.Background(), tntData, acc.UserID)
+			require.NoError(t, err)
+
+			dbClient := &dbMock{
+				sessions: map[string]*data.Session{
+					session.ID:  session,
+					session2.ID: session2,
+					session3.ID: session3,
+				},
+				tenants: map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
+				accounts: map[uint64]map[string]*data.Account{
+					tenant.ProjectID: {acc.UserID: acc},
+				},
+			}
+			svc := initRPC(cfg, enc, dbClient)
+			walletService := newWalletServiceMock([]string{session.ID, session2.ID, session3.ID})
+			svc.Wallets = walletService
+
+			srv := httptest.NewServer(svc.Handler())
+			defer srv.Close()
+
+			packet := &packets.CloseSessionPacket{
+				BasePacketForWallet: packets.BasePacketForWallet{
+					BasePacket: packets.BasePacket{
+						Code:    packets.CloseSessionPacketCode,
+						Issued:  uint64(time.Now().Add(-1 * time.Second).Unix()),
+						Expires: uint64(time.Now().Add(5 * time.Minute).Unix()),
+					},
+					Wallet: walletAddr,
+				},
+				Session: testCase.dropSessionID,
+			}
+			intent := testCase.intentBuilderFn(t, packet)
+
+			c := proto.NewWaasAuthenticatorV1Client(srv.URL, http.DefaultClient)
+			header := make(http.Header)
+			header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
+			ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
+
+			resCode, resData, err := c.SendIntent(ctx, intent)
+			testCase.assertFn(t, resCode, resData, err, assertionParams{
+				tenant:        tenant,
+				issuer:        issuer,
+				dbClient:      dbClient,
+				walletService: walletService,
+			})
+		})
 	}
-	payloadBytes, err := json.Marshal(payload)
-	require.NoError(t, err)
-
-	payloadSigBytes, err := sessWallet.SignMessage(payloadBytes)
-	require.NoError(t, err)
-	payloadSig := hexutil.Encode(payloadSigBytes)
-
-	dkOut, err := kmsClient.GenerateDataKey(context.Background(), &kms.GenerateDataKeyInput{KeyId: aws.String("TransportKey")})
-	require.NoError(t, err)
-	encryptedPayloadKey := hexutil.Encode(dkOut.CiphertextBlob)
-
-	payloadCiphertextBytes, err := aescbc.Encrypt(rand.Reader, dkOut.Plaintext, payloadBytes)
-	require.NoError(t, err)
-	payloadCiphertext := hexutil.Encode(payloadCiphertextBytes)
-
-	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
-	header := make(http.Header)
-	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
-	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
-	require.NoError(t, err)
-
-	ok, err := c.DropSession(ctx, encryptedPayloadKey, payloadCiphertext, payloadSig)
-	require.NoError(t, err)
-	require.True(t, ok)
-
-	assert.Empty(t, dbClient.sessions)
-	assert.Empty(t, walletService.registeredSessions)
 }
 
-func TestRPC_ListSessions(t *testing.T) {
+func TestRPC_SendIntent_ListSessions(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -281,10 +363,24 @@ func TestRPC_ListSessions(t *testing.T) {
 	sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
 	require.NoError(t, err)
 
-	tenant := newTenant(t, enc, issuer)
+	tenant, tntData := newTenant(t, enc, issuer)
+	acc := newAccount(t, enc, issuer, sessWallet)
 	sess1 := newSession(t, enc, issuer, sessWallet)
-	sess2 := newSession(t, enc, issuer, nil)
-	sess3 := newSession(t, enc, issuer, nil)
+	sess2 := newSessionFromData(t, enc, &proto.SessionData{
+		Address:   common.HexToAddress("0x1111111111111111111111111111111111111111"),
+		ProjectID: 1,
+		UserID:    sess1.UserID,
+		Identity:  sess1.Identity,
+	})
+	sess3 := newSessionFromData(t, enc, &proto.SessionData{
+		Address:   common.HexToAddress("0x2222222222222222222222222222222222222222"),
+		ProjectID: 1,
+		UserID:    "ANOTHER-USER",
+		Identity:  sess1.Identity,
+	})
+
+	walletAddr, err := rpc.AddressForUser(context.Background(), tntData, acc.UserID)
+	require.NoError(t, err)
 
 	dbClient := &dbMock{
 		sessions: map[string]*data.Session{
@@ -295,41 +391,37 @@ func TestRPC_ListSessions(t *testing.T) {
 		tenants: map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
 	}
 	walletService := newWalletServiceMock([]string{sess1.ID, sess2.ID, sess3.ID})
-	svc := &rpc.RPC{
-		Config:     cfg,
-		HTTPClient: http.DefaultClient,
-		Enclave:    enc,
-		Wallets:    walletService,
-		Tenants:    data.NewTenantTable(dbClient, "Tenants"),
-		Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
-	}
+	svc := initRPC(cfg, enc, dbClient)
+	svc.Wallets = walletService
 
 	srv := httptest.NewServer(svc.Handler())
 	defer srv.Close()
 
-	payload := &proto.ListSessionsPayload{SessionID: sess1.ID}
-	payloadBytes, err := json.Marshal(payload)
-	require.NoError(t, err)
+	packet := &rpc.ListSessionsPacket{
+		BasePacketForWallet: packets.BasePacketForWallet{
+			BasePacket: packets.BasePacket{
+				Code:    rpc.ListSessionsPacketCode,
+				Issued:  uint64(time.Now().Add(-1 * time.Second).Unix()),
+				Expires: uint64(time.Now().Add(5 * time.Minute).Unix()),
+			},
+			Wallet: walletAddr,
+		},
+	}
+	intentJSON := generateIntent(t, sessWallet, packet)
+	var intent proto.Intent
+	require.NoError(t, json.Unmarshal([]byte(intentJSON), &intent))
 
-	payloadSigBytes, err := sessWallet.SignMessage(payloadBytes)
-	require.NoError(t, err)
-	payloadSig := hexutil.Encode(payloadSigBytes)
-
-	dkOut, err := kmsClient.GenerateDataKey(context.Background(), &kms.GenerateDataKeyInput{KeyId: aws.String("TransportKey")})
-	require.NoError(t, err)
-	encryptedPayloadKey := hexutil.Encode(dkOut.CiphertextBlob)
-
-	payloadCiphertextBytes, err := aescbc.Encrypt(rand.Reader, dkOut.Plaintext, payloadBytes)
-	require.NoError(t, err)
-	payloadCiphertext := hexutil.Encode(payloadCiphertextBytes)
-
-	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
+	c := proto.NewWaasAuthenticatorV1Client(srv.URL, http.DefaultClient)
 	header := make(http.Header)
 	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 	require.NoError(t, err)
 
-	sessions, err := c.ListSessions(ctx, encryptedPayloadKey, payloadCiphertext, payloadSig)
+	resCode, resData, err := c.SendIntent(ctx, &intent)
 	require.NoError(t, err)
-	require.Len(t, sessions, 3)
+	assert.Equal(t, "sessionsListed", resCode)
+
+	sessions, ok := resData.([]any)
+	require.True(t, ok)
+	require.Len(t, sessions, 2)
 }
