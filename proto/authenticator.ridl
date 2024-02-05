@@ -108,9 +108,6 @@ struct AccountData
 struct Session
   - id: string
     + go.field.name = ID
-  - address: string
-    + go.field.type = common.Address
-    + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
   - projectId: uint64
     + go.field.name = ProjectID
   - userId: string
@@ -123,10 +120,8 @@ struct Session
   - expiresAt: timestamp
 
 struct SessionData
-  - address: string
-    + json = address
-    + go.field.type = common.Address
-    + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
+  - id: string
+    + go.field.name = ID
   - projectId: uint64
     + go.field.name = ProjectID
     + json = projectId
@@ -139,6 +134,16 @@ struct SessionData
     + json = createdAt
   - expiresAt: timestamp
     + json = expiresAt
+
+struct Signature
+  - sessionId: string
+  - signature: string
+
+struct Intent
+  - version: string
+  - packet: any
+    + go.field.type = json.RawMessage
+  - signatures: []Signature
 
 
 ##

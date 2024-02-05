@@ -103,7 +103,7 @@ func generateIntent(t *testing.T, sessWallet *ethwallet.Wallet, packet proto.Pac
 		Packet:  intent.Packet,
 		Signatures: []intents.Signature{
 			{
-				Session:   sessWallet.Address().String(),
+				SessionId: sessWallet.Address().String(),
 				Signature: signature.String(),
 			},
 		},
