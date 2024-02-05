@@ -170,6 +170,16 @@ struct SessionData
   - expiresAt: timestamp
     + json = exp
 
+struct Signature
+  - session: string
+  - signature: string
+
+struct Intent
+  - version: string
+  - packet: string
+    + go.field.type = json.RawMessage
+  - signatures: []Signature
+
 
 ##
 ## Errors
@@ -190,6 +200,11 @@ service WaasAuthenticator
     - GetAddress(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (address: string)
     - SendIntent(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (code: string, data: any)
 
+    - ChainList() => (chains: []Chain)
+
+service WaasAuthenticatorV1
+    - RegisterSession(intent: Intent, friendlyName: string) => (session: Session, data: any)
+    - SendIntent(intent: Intent) => (code: string, data: any)
     - ChainList() => (chains: []Chain)
 
 service WaasAuthenticatorAdmin
