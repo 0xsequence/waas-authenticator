@@ -19,7 +19,7 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 	att := attestation.FromContext(ctx)
 	tntData := tenant.FromContext(ctx)
 
-	payload, err := parseIntentWithPacket(intent, &packets.OpenSessionPacket{})
+	payload, err := proto.ParseIntentWithPacket(intent, &packets.OpenSessionPacket{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse intent: %w", err)
 	}
@@ -127,7 +127,7 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 }
 
 func (s *RPC) dropSession(
-	ctx context.Context, sess *data.Session, payload *Payload[*packets.CloseSessionPacket],
+	ctx context.Context, sess *data.Session, payload *proto.Payload[*packets.CloseSessionPacket],
 ) (bool, error) {
 	tntData := tenant.FromContext(ctx)
 
@@ -147,7 +147,7 @@ func (s *RPC) dropSession(
 	return true, nil
 }
 
-func (s *RPC) listSessions(ctx context.Context, sess *data.Session, payload *Payload[*ListSessionsPacket]) ([]*proto.Session, error) {
+func (s *RPC) listSessions(ctx context.Context, sess *data.Session, payload *proto.Payload[*proto.ListSessionsPacket]) ([]*proto.Session, error) {
 	tntData := tenant.FromContext(ctx)
 
 	dbSessions, err := s.Sessions.ListByUserID(ctx, sess.UserID)

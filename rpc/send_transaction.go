@@ -9,12 +9,13 @@ import (
 	"github.com/0xsequence/go-sequence"
 	"github.com/0xsequence/go-sequence/intents/packets"
 	"github.com/0xsequence/waas-authenticator/data"
+	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 )
 
 func (s *RPC) sendTransaction(
-	ctx context.Context, sess *data.Session, payload *Payload[*packets.SendTransactionsPacket],
+	ctx context.Context, sess *data.Session, payload *proto.Payload[*packets.SendTransactionsPacket],
 ) (string, any, error) {
 	tntData := tenant.FromContext(ctx)
 

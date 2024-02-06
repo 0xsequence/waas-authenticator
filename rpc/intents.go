@@ -61,7 +61,7 @@ func AddressForUser(ctx context.Context, tntData *proto.TenantData, user string)
 func (s *RPC) SendIntent(ctx context.Context, intent *proto.Intent) (string, any, error) {
 	tntData := tenant.FromContext(ctx)
 
-	payload, err := parseIntent(intent)
+	payload, err := proto.ParseIntent(intent)
 	if err != nil {
 		return "", nil, fmt.Errorf("parse intent: %w", err)
 	}
@@ -86,7 +86,7 @@ func (s *RPC) SendIntent(ctx context.Context, intent *proto.Intent) (string, any
 		return "", nil, fmt.Errorf("opening a session is unsupported outside of RegisterSession")
 
 	case packets.CloseSessionPacketCode:
-		payload, err := parsePacketInPayload(payload, &packets.CloseSessionPacket{})
+		payload, err := proto.ParsePacketInPayload(payload, &packets.CloseSessionPacket{})
 		if err != nil {
 			return "", nil, err
 		}
@@ -96,8 +96,8 @@ func (s *RPC) SendIntent(ctx context.Context, intent *proto.Intent) (string, any
 		}
 		return "sessionClosed", ok, nil
 
-	case ListSessionsPacketCode:
-		payload, err := parsePacketInPayload(payload, &ListSessionsPacket{})
+	case proto.ListSessionsPacketCode:
+		payload, err := proto.ParsePacketInPayload(payload, &proto.ListSessionsPacket{})
 		if err != nil {
 			return "", nil, err
 		}
@@ -108,14 +108,14 @@ func (s *RPC) SendIntent(ctx context.Context, intent *proto.Intent) (string, any
 		return "sessionsListed", sessions, nil
 
 	case packets.SignMessagePacketCode:
-		payload, err := parsePacketInPayload(payload, &packets.SignMessagePacket{})
+		payload, err := proto.ParsePacketInPayload(payload, &packets.SignMessagePacket{})
 		if err != nil {
 			return "", nil, err
 		}
 		return s.signMessage(ctx, sess, payload)
 
 	case packets.SendTransactionCode:
-		payload, err := parsePacketInPayload(payload, &packets.SendTransactionsPacket{})
+		payload, err := proto.ParsePacketInPayload(payload, &packets.SendTransactionsPacket{})
 		if err != nil {
 			return "", nil, err
 		}

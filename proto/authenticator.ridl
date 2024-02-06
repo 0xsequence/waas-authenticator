@@ -176,7 +176,7 @@ struct Signature
 
 struct Intent
   - version: string
-  - packet: string
+  - packet: any
     + go.field.type = json.RawMessage
   - signatures: []Signature
 

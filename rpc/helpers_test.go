@@ -82,7 +82,7 @@ func initRPC(cfg *config.Config, enc *enclave.Enclave, dbClient *dbMock) *rpc.RP
 	return svc
 }
 
-func generateIntent(t *testing.T, sessWallet *ethwallet.Wallet, packet rpc.Packet) string {
+func generateIntent(t *testing.T, sessWallet *ethwallet.Wallet, packet proto.Packet) string {
 	packetJSON, err := canonicaljson.Marshal(&packet)
 	require.NoError(t, err)
 

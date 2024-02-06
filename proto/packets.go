@@ -1,4 +1,4 @@
-package rpc
+package proto
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/go-sequence/intents/packets"
-	"github.com/0xsequence/waas-authenticator/proto"
 )
 
 type Packet interface {
@@ -21,7 +20,7 @@ type Payload[T Packet] struct {
 	packetJSON json.RawMessage
 }
 
-func parseIntent(rawIntent *proto.Intent) (*Payload[Packet], error) {
+func ParseIntent(rawIntent *Intent) (*Payload[Packet], error) {
 	packetSigs := make([]intents.Signature, len(rawIntent.Signatures))
 	for i, sig := range rawIntent.Signatures {
 		packetSigs[i].Session = sig.Session
@@ -59,7 +58,7 @@ func parseIntent(rawIntent *proto.Intent) (*Payload[Packet], error) {
 	return payload, nil
 }
 
-func parsePacketInPayload[T Packet](payload *Payload[Packet], packet T) (*Payload[T], error) {
+func ParsePacketInPayload[T Packet](payload *Payload[Packet], packet T) (*Payload[T], error) {
 	if err := packet.Unmarshal(payload.packetJSON); err != nil {
 		return nil, fmt.Errorf("packet unmarshal: %w", err)
 	}
@@ -72,12 +71,12 @@ func parsePacketInPayload[T Packet](payload *Payload[Packet], packet T) (*Payloa
 	return nextPayload, nil
 }
 
-func parseIntentWithPacket[T Packet](rawIntent *proto.Intent, packet T) (*Payload[T], error) {
-	payload, err := parseIntent(rawIntent)
+func ParseIntentWithPacket[T Packet](rawIntent *Intent, packet T) (*Payload[T], error) {
+	payload, err := ParseIntent(rawIntent)
 	if err != nil {
 		return nil, err
 	}
-	return parsePacketInPayload[T](payload, packet)
+	return ParsePacketInPayload[T](payload, packet)
 }
 
 type ListSessionsPacket struct {

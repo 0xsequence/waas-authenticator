@@ -43,7 +43,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 	testCases := map[string]struct {
 		assertFn        func(t *testing.T, sess *proto.Session, err error, p assertionParams)
 		tokBuilderFn    func(b *jwt.Builder)
-		intentBuilderFn func(t *testing.T, packet rpc.Packet) *proto.Intent
+		intentBuilderFn func(t *testing.T, packet proto.Packet) *proto.Intent
 	}{
 		"Basic": {
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
@@ -118,7 +118,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 			},
 		},
 		"MissingSignature": {
-			intentBuilderFn: func(t *testing.T, packet rpc.Packet) *proto.Intent {
+			intentBuilderFn: func(t *testing.T, packet proto.Packet) *proto.Intent {
 				packetJSON, err := canonicaljson.Marshal(&packet)
 				require.NoError(t, err)
 
@@ -136,7 +136,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 	for label, testCase := range testCases {
 		t.Run(label, func(t *testing.T) {
 			if testCase.intentBuilderFn == nil {
-				testCase.intentBuilderFn = func(t *testing.T, packet rpc.Packet) *proto.Intent {
+				testCase.intentBuilderFn = func(t *testing.T, packet proto.Packet) *proto.Intent {
 					intentJSON := generateIntent(t, sessWallet, packet)
 					var intent proto.Intent
 					require.NoError(t, json.Unmarshal([]byte(intentJSON), &intent))
@@ -212,7 +212,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 	}
 	testCases := map[string]struct {
 		assertFn        func(t *testing.T, code string, data any, err error, p assertionParams)
-		intentBuilderFn func(t *testing.T, packet rpc.Packet) *proto.Intent
+		intentBuilderFn func(t *testing.T, packet proto.Packet) *proto.Intent
 		dropSessionID   string
 	}{
 		"SameSession": {
@@ -255,7 +255,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 	for label, testCase := range testCases {
 		t.Run(label, func(t *testing.T) {
 			if testCase.intentBuilderFn == nil {
-				testCase.intentBuilderFn = func(t *testing.T, packet rpc.Packet) *proto.Intent {
+				testCase.intentBuilderFn = func(t *testing.T, packet proto.Packet) *proto.Intent {
 					intentJSON := generateIntent(t, sessWallet, packet)
 					var intent proto.Intent
 					require.NoError(t, json.Unmarshal([]byte(intentJSON), &intent))
@@ -397,10 +397,10 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 	srv := httptest.NewServer(svc.Handler())
 	defer srv.Close()
 
-	packet := &rpc.ListSessionsPacket{
+	packet := &proto.ListSessionsPacket{
 		BasePacketForWallet: packets.BasePacketForWallet{
 			BasePacket: packets.BasePacket{
-				Code:    rpc.ListSessionsPacketCode,
+				Code:    proto.ListSessionsPacketCode,
 				Issued:  uint64(time.Now().Add(-1 * time.Second).Unix()),
 				Expires: uint64(time.Now().Add(5 * time.Minute).Unix()),
 			},

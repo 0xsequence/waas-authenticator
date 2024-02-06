@@ -570,7 +570,7 @@ func TestV0_SendIntent_GenericIntent(t *testing.T) {
 	srv := httptest.NewServer(svc.Handler())
 	defer srv.Close()
 
-	packet := &rpc.ListSessionsPacket{
+	packet := &proto.ListSessionsPacket{
 		BasePacketForWallet: packets.BasePacketForWallet{
 			BasePacket: packets.BasePacket{
 				Code:    "genericIntent",
