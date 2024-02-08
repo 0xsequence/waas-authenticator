@@ -185,7 +185,7 @@ func TestRPC_RegisterSessionV1(t *testing.T) {
 			ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 			require.NoError(t, err)
 
-			sess, _, err := c.RegisterSessionV1(ctx, intent, "FriendlyName")
+			sess, _, err := c.RegisterSession(ctx, intent, "FriendlyName")
 			testCase.assertFn(t, sess, err, assertionParams{
 				tenant:        tenant,
 				issuer:        issuer,
@@ -334,7 +334,7 @@ func TestRPC_SendIntentV1_DropSession(t *testing.T) {
 			header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 			ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 
-			resCode, resData, err := c.SendIntentV1(ctx, intent)
+			resCode, resData, err := c.SendIntent(ctx, intent)
 			testCase.assertFn(t, resCode, resData, err, assertionParams{
 				tenant:        tenant,
 				issuer:        issuer,
@@ -417,7 +417,7 @@ func TestRPC_SendIntentV1_ListSessions(t *testing.T) {
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 	require.NoError(t, err)
 
-	resCode, resData, err := c.SendIntentV1(ctx, &intent)
+	resCode, resData, err := c.SendIntent(ctx, &intent)
 	require.NoError(t, err)
 	assert.Equal(t, "sessionsListed", resCode)
 

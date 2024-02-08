@@ -58,7 +58,7 @@ func AddressForUser(ctx context.Context, tntData *proto.TenantData, user string)
 	return address.String(), nil
 }
 
-func (s *RPC) SendIntentV1(ctx context.Context, intent *proto.Intent) (string, any, error) {
+func (s *RPC) SendIntent(ctx context.Context, intent *proto.Intent) (string, any, error) {
 	tntData := tenant.FromContext(ctx)
 
 	payload, err := proto.ParseIntent(intent)
