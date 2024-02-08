@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRPC_RegisterSession(t *testing.T) {
+func TestRPC_RegisterSessionV1(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -179,13 +179,13 @@ func TestRPC_RegisterSession(t *testing.T) {
 			}
 			intent := testCase.intentBuilderFn(t, packet)
 
-			c := proto.NewWaasAuthenticatorV1Client(srv.URL, http.DefaultClient)
+			c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 			header := make(http.Header)
 			header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 			ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 			require.NoError(t, err)
 
-			sess, _, err := c.RegisterSession(ctx, intent, "FriendlyName")
+			sess, _, err := c.RegisterSessionV1(ctx, intent, "FriendlyName")
 			testCase.assertFn(t, sess, err, assertionParams{
 				tenant:        tenant,
 				issuer:        issuer,
@@ -196,7 +196,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 	}
 }
 
-func TestRPC_SendIntent_DropSession(t *testing.T) {
+func TestRPC_SendIntentV1_DropSession(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -329,12 +329,12 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			}
 			intent := testCase.intentBuilderFn(t, packet)
 
-			c := proto.NewWaasAuthenticatorV1Client(srv.URL, http.DefaultClient)
+			c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 			header := make(http.Header)
 			header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 			ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 
-			resCode, resData, err := c.SendIntent(ctx, intent)
+			resCode, resData, err := c.SendIntentV1(ctx, intent)
 			testCase.assertFn(t, resCode, resData, err, assertionParams{
 				tenant:        tenant,
 				issuer:        issuer,
@@ -345,7 +345,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 	}
 }
 
-func TestRPC_SendIntent_ListSessions(t *testing.T) {
+func TestRPC_SendIntentV1_ListSessions(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -411,13 +411,13 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 	var intent proto.Intent
 	require.NoError(t, json.Unmarshal([]byte(intentJSON), &intent))
 
-	c := proto.NewWaasAuthenticatorV1Client(srv.URL, http.DefaultClient)
+	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
 	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 	require.NoError(t, err)
 
-	resCode, resData, err := c.SendIntent(ctx, &intent)
+	resCode, resData, err := c.SendIntentV1(ctx, &intent)
 	require.NoError(t, err)
 	assert.Equal(t, "sessionsListed", resCode)
 

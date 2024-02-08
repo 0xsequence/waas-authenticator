@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestV0_RegisterSession(t *testing.T) {
+func TestRPC_RegisterSession(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -197,7 +197,7 @@ func TestV0_RegisterSession(t *testing.T) {
 	}
 }
 
-func TestV0_DropSession(t *testing.T) {
+func TestRPC_DropSession(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -262,7 +262,7 @@ func TestV0_DropSession(t *testing.T) {
 	assert.Empty(t, walletService.registeredSessions)
 }
 
-func TestV0_ListSessions(t *testing.T) {
+func TestRPC_ListSessions(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -327,7 +327,7 @@ func TestV0_ListSessions(t *testing.T) {
 	require.Len(t, sessions, 3)
 }
 
-func TestV0_GetAddress(t *testing.T) {
+func TestRPC_GetAddress(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -383,7 +383,7 @@ func TestV0_GetAddress(t *testing.T) {
 	assert.NotEmpty(t, addr)
 }
 
-func TestV0_SendIntent_SignMessage(t *testing.T) {
+func TestRPC_SendIntent_SignMessage(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -461,7 +461,7 @@ func TestV0_SendIntent_SignMessage(t *testing.T) {
 	assert.NotEmpty(t, resData)
 }
 
-func TestV0_SendIntent_SendTransaction(t *testing.T) {
+func TestRPC_SendIntent_SendTransaction(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -540,7 +540,7 @@ func TestV0_SendIntent_SendTransaction(t *testing.T) {
 	assert.NotEmpty(t, resData)
 }
 
-func TestV0_SendIntent_GenericIntent(t *testing.T) {
+func TestRPC_SendIntent_GenericIntent(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)

@@ -13,11 +13,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 )
 
-type V0 struct {
-	*RPC
-}
-
-func (s *V0) RegisterSession(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (*proto.Session, any, error) {
+func (s *RPC) RegisterSession(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (*proto.Session, any, error) {
 	tntData := tenant.FromContext(ctx)
 
 	payload, payloadBytes, err := crypto.DecryptPayload[*proto.RegisterSessionPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
@@ -39,10 +35,10 @@ func (s *V0) RegisterSession(ctx context.Context, encryptedPayloadKey string, pa
 		return nil, nil, err
 	}
 
-	return s.RPC.RegisterSession(ctx, &intent, payload.FriendlyName)
+	return s.RegisterSessionV1(ctx, &intent, payload.FriendlyName)
 }
 
-func (s *V0) DropSession(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (bool, error) {
+func (s *RPC) DropSession(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (bool, error) {
 	tntData := tenant.FromContext(ctx)
 
 	payload, payloadBytes, err := crypto.DecryptPayload[*proto.DropSessionPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
@@ -55,23 +51,23 @@ func (s *V0) DropSession(ctx context.Context, encryptedPayloadKey string, payloa
 		return false, fmt.Errorf("verifying session: %w", err)
 	}
 
-	dbSess, found, err := s.RPC.Sessions.Get(ctx, tntData.ProjectID, payload.DropSessionID)
+	dbSess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, payload.DropSessionID)
 	if err != nil || !found || dbSess.UserID != currentSessData.UserID {
 		return false, fmt.Errorf("session not found")
 	}
 
-	if _, err := s.RPC.Wallets.InvalidateSession(waasContext(ctx), payload.DropSessionID); err != nil {
+	if _, err := s.Wallets.InvalidateSession(waasContext(ctx), payload.DropSessionID); err != nil {
 		return false, fmt.Errorf("invalidating session with WaaS API: %w", err)
 	}
 
-	if err := s.RPC.Sessions.Delete(ctx, tntData.ProjectID, dbSess.ID); err != nil {
+	if err := s.Sessions.Delete(ctx, tntData.ProjectID, dbSess.ID); err != nil {
 		return false, fmt.Errorf("deleting session: %w", err)
 	}
 
 	return true, nil
 }
 
-func (s *V0) ListSessions(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) ([]*proto.Session, error) {
+func (s *RPC) ListSessions(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) ([]*proto.Session, error) {
 	tntData := tenant.FromContext(ctx)
 
 	payload, payloadBytes, err := crypto.DecryptPayload[*proto.ListSessionsPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
@@ -84,7 +80,7 @@ func (s *V0) ListSessions(ctx context.Context, encryptedPayloadKey string, paylo
 		return nil, fmt.Errorf("verifying session: %w", err)
 	}
 
-	dbSessions, err := s.RPC.Sessions.ListByUserID(ctx, sessData.UserID)
+	dbSessions, err := s.Sessions.ListByUserID(ctx, sessData.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("listing DB sessions: %w", err)
 	}
@@ -116,7 +112,7 @@ func (s *V0) ListSessions(ctx context.Context, encryptedPayloadKey string, paylo
 	return out, nil
 }
 
-func (s *V0) GetAddress(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (string, error) {
+func (s *RPC) GetAddress(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (string, error) {
 	tntData := tenant.FromContext(ctx)
 
 	payload, payloadBytes, err := crypto.DecryptPayload[*proto.GetAddressPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
@@ -132,7 +128,7 @@ func (s *V0) GetAddress(ctx context.Context, encryptedPayloadKey string, payload
 	return AddressForUser(ctx, tntData, sessData.UserID)
 }
 
-func (s *V0) SendIntent(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (string, interface{}, error) {
+func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (string, interface{}, error) {
 	tntData := tenant.FromContext(ctx)
 
 	payload, _, err := crypto.DecryptPayload[*proto.SendIntentPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
@@ -144,17 +140,13 @@ func (s *V0) SendIntent(ctx context.Context, encryptedPayloadKey string, payload
 	if err := json.Unmarshal([]byte(payload.IntentJSON), &intent); err != nil {
 		return "", nil, err
 	}
-	return s.RPC.SendIntent(ctx, &intent)
+	return s.SendIntentV1(ctx, &intent)
 }
 
-func (s *V0) ChainList(ctx context.Context) ([]*proto.Chain, error) {
-	return s.RPC.ChainList(ctx)
-}
-
-func (s *V0) verifySession(ctx context.Context, sessionID string, payloadBytes []byte, payloadSig string) (*data.Session, *proto.SessionData, error) {
+func (s *RPC) verifySession(ctx context.Context, sessionID string, payloadBytes []byte, payloadSig string) (*data.Session, *proto.SessionData, error) {
 	tntData := tenant.FromContext(ctx)
 
-	sess, found, err := s.RPC.Sessions.Get(ctx, tntData.ProjectID, sessionID)
+	sess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, sessionID)
 	if err != nil || !found {
 		return nil, nil, fmt.Errorf("session invalid or not found")
 	}

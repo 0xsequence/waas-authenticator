@@ -15,7 +15,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 )
 
-func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendlyName string) (*proto.Session, any, error) {
+func (s *RPC) RegisterSessionV1(ctx context.Context, intent *proto.Intent, friendlyName string) (*proto.Session, any, error) {
 	att := attestation.FromContext(ctx)
 	tntData := tenant.FromContext(ctx)
 

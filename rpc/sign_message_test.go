@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRPC_SendIntent_SignMessage(t *testing.T) {
+func TestRPC_SendIntentV1_SignMessage(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -74,12 +74,12 @@ func TestRPC_SendIntent_SignMessage(t *testing.T) {
 	var intent proto.Intent
 	require.NoError(t, json.Unmarshal([]byte(intentJSON), &intent))
 
-	c := proto.NewWaasAuthenticatorV1Client(srv.URL, http.DefaultClient)
+	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
 	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 
-	resCode, resData, err := c.SendIntent(ctx, &intent)
+	resCode, resData, err := c.SendIntentV1(ctx, &intent)
 	require.NoError(t, err)
 	assert.Equal(t, "signedMessage", resCode)
 	assert.NotEmpty(t, resData)

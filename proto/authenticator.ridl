@@ -193,19 +193,18 @@ error 1000 Unauthorized "Unauthorized access" HTTP 401
 ##
 
 service WaasAuthenticator
+    - RegisterSessionV1(intent: Intent, friendlyName: string) => (session: Session, data: any)
+    - SendIntentV1(intent: Intent) => (code: string, data: any)
+
+    - ChainList() => (chains: []Chain)
+
+    # DEPRECATED:
     - RegisterSession(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (session: Session, data: any)
     - ListSessions(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (sessions: []Session)
     - DropSession(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (ok: bool)
-
     - GetAddress(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (address: string)
     - SendIntent(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (code: string, data: any)
 
-    - ChainList() => (chains: []Chain)
-
-service WaasAuthenticatorV1
-    - RegisterSession(intent: Intent, friendlyName: string) => (session: Session, data: any)
-    - SendIntent(intent: Intent) => (code: string, data: any)
-    - ChainList() => (chains: []Chain)
 
 service WaasAuthenticatorAdmin
     - Version() => (version: Version)

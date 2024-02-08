@@ -78,7 +78,6 @@ func initRPC(cfg *config.Config, enc *enclave.Enclave, dbClient *dbMock) *rpc.RP
 		Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
 		Accounts:   data.NewAccountTable(dbClient, "Accounts", data.AccountIndices{}),
 	}
-	svc.V0 = rpc.V0{RPC: svc}
 	return svc
 }
 

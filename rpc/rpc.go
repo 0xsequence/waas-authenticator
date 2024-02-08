@@ -44,8 +44,6 @@ type RPC struct {
 	Accounts   *data.AccountTable
 	Wallets    proto_wallet.Wallet
 
-	V0 V0
-
 	startTime time.Time
 	running   int32
 }
@@ -110,7 +108,6 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 		Wallets:   proto_wallet.NewWalletClient(cfg.Endpoints.WaasAPIServer, client),
 		startTime: time.Now(),
 	}
-	s.V0 = V0{RPC: s} // TODO: remove
 	return s, nil
 }
 
@@ -206,16 +203,7 @@ func (s *RPC) Handler() http.Handler {
 		// Find and decrypt tenant data
 		r.Use(tenant.Middleware(s.Tenants, s.Config.KMS.TenantKeys))
 	})
-	userRouter.Handle("/rpc/WaasAuthenticator/*", proto.NewWaasAuthenticatorServer(&s.V0))
-
-	userRouterV1 := r.Group(func(r chi.Router) {
-		// Generate attestation document
-		r.Use(attestation.Middleware(s.Enclave))
-
-		// Find and decrypt tenant data
-		r.Use(tenant.Middleware(s.Tenants, s.Config.KMS.TenantKeys))
-	})
-	userRouterV1.Handle("/rpc/WaasAuthenticatorV1/*", proto.NewWaasAuthenticatorV1Server(s))
+	userRouter.Handle("/rpc/WaasAuthenticator/*", proto.NewWaasAuthenticatorServer(s))
 
 	adminRouter := r.Group(func(r chi.Router) {
 		// Validate admin JWTs
