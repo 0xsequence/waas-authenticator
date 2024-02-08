@@ -25,11 +25,13 @@ up:
 	docker-compose up
 
 define build
-	GOGC=off GOBIN=$$PWD/bin \
+	GOBIN=$$PWD/bin \
 	go install -v \
 		-tags='$(BUILDTAGS)' \
 		-gcflags='-e' \
-		-ldflags='-X "github.com/0xsequence/waas-authenticator.VERSION=$(VERSION)" -X "github.com/0xsequence/waas-authenticator.GITBRANCH=$(GITBRANCH)" -X "github.com/0xsequence/waas-authenticator.GITCOMMIT=$(GITCOMMIT)" -X "github.com/0xsequence/waas-authenticator.GITCOMMITDATE=$(GITCOMMITDATE)" -X "github.com/0xsequence/waas-authenticator.GITCOMMITAUTHOR=$(GITCOMMITAUTHOR)"' \
+		-trimpath \
+		-buildvcs=false \
+		-ldflags="-s -w -buildid=" \
 		$(1)
 endef
 
@@ -59,3 +61,7 @@ test: test-clean
 
 test-clean:
 	GOGC=off go clean -testcache
+
+eif:
+	docker build --platform linux/amd64 -t waas-authenticator-builder .
+	docker run --platform linux/amd64 -v ./bin:/out waas-authenticator-builder

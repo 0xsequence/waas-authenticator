@@ -1,0 +1,13 @@
+files:
+  - path: cmd
+    source: /workspace/cmd
+    mode: "0644"
+  - path: env
+    source: /workspace/env
+    mode: "0644"
+  - path: rootfs/app/waas-auth
+    source: /workspace/waas-auth
+    mode: "0755"
+  - path: rootfs/etc/waas-auth.conf
+    source: /workspace/waas-auth.conf
+    mode: "0644"
