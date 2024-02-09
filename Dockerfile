@@ -1,7 +1,9 @@
 #
 # Enclave base image
 #
-FROM golang:1.21-bullseye@sha256:a8712f27d9ac742e7bded8f81f7547c5635e855e8b80302e8fc0ce424f559295 AS base
+FROM golang:1.21.7-alpine3.19@sha256:163801a964d358d6450aeb51b59d5c807d43a7c97fed92cc7ff1be5bd72811ab AS base
+
+RUN apk add make bash
 
 #
 # Enclave pre-image

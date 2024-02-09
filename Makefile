@@ -25,25 +25,26 @@ up:
 	docker-compose up
 
 define build
-	GOBIN=$$PWD/bin \
-	go install -v \
-		-tags='$(BUILDTAGS)' \
-		-gcflags='-e' \
+	CGO_ENABLED=0 \
+	GOARCH=amd64 \
+	GOOS=linux \
+	go build -v \
 		-trimpath \
 		-buildvcs=false \
 		-ldflags="-s -w -buildid=" \
-		$(1)
+		-o ./bin/$(1) \
+		./cmd/$(1)
 endef
 
 build: build-utils build-waas-auth
 
 build-waas-auth:
-	$(call build, ./cmd/waas-auth)
+	$(call build,waas-auth)
 
 build-utils: build-jwt-util
 
 build-jwt-util:
-	$(call build, ./cmd/jwt-util)
+	$(call build,jwt-util)
 
 generate:
 	go generate ./...
@@ -63,5 +64,5 @@ test-clean:
 	GOGC=off go clean -testcache
 
 eif:
-	docker build --platform linux/amd64 -t waas-authenticator-builder .
+	docker build --platform linux/amd64 --build-arg ENV_ARG=next -t waas-authenticator-builder .
 	docker run --platform linux/amd64 -v ./bin:/out waas-authenticator-builder

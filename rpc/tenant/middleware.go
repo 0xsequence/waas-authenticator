@@ -34,7 +34,11 @@ func Middleware(tenants *data.TenantTable, tenantKeys []string) func(http.Handle
 
 			// Find tenant based on project id
 			tenant, found, err := tenants.GetLatest(ctx, projectID)
-			if err != nil || !found {
+			if err != nil {
+				proto.RespondWithError(w, fmt.Errorf("could not retrieve tenant: %w", err))
+				return
+			}
+			if !found {
 				proto.RespondWithError(w, fmt.Errorf("invalid tenant: %v", projectID))
 				return
 			}
