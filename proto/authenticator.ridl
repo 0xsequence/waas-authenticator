@@ -53,32 +53,31 @@ struct Tenant
 struct TenantData
   - projectId: uint64
     + go.field.name = ProjectID
-    + json = proj
+    + json = projectId
   - privateKey: string
-    + json = prv
+    + json = privateKey
   - parentAddress: string
-    + json = addr
+    + json = parentAddress
     + go.field.type = common.Address
     + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
   - userSalt: string
-    + json = salt
+    + json = userSalt
     + go.field.type = hexutil.Bytes
     + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common/hexutil
   - sequenceContext: MiniSequenceContext
-    + json = seqctx
+    + json = sequenceContext
   - upgradeCode: string
-    + json = upc
+    + json = upgradeCode
   - waasAccessToken: string
-    + json = wat
+    + json = waasAccessToken
   - oidcProviders: []OpenIdProvider
     + go.field.name = OIDCProviders
-    + json = oidc
-  - transportKeys: []string
-    + json = transk
-  - sessionKeys: []string
-    + json = sessk
+    + json = oidcProviders
+  - kmsKeys: []string
+    + go.field.name = KMSKeys
+    + json = kmsKeys
   - allowedOrigins: []string
-    + json = ogns
+    + json = allowedOrigins
 
 struct MiniSequenceContext
   - factory: string
@@ -92,14 +91,14 @@ enum IdentityType: uint8
 struct AccountData
   - projectId: uint64
     + go.field.name = ProjectID
-    + json = proj
+    + json = projectId
   - userId: string
     + go.field.name = UserID
-    + json = user
+    + json = userId
   - identity: string
-    + json = ident
+    + json = identity
   - createdAt: timestamp
-    + json = iat
+    + json = createdAt
 
 struct Session
   - id: string
@@ -120,21 +119,21 @@ struct Session
 
 struct SessionData
   - address: string
-    + json = addr
+    + json = address
     + go.field.type = common.Address
     + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
   - projectId: uint64
     + go.field.name = ProjectID
-    + json = proj
+    + json = projectId
   - userId: string
     + go.field.name = UserID
-    + json = user
+    + json = userId
   - identity: string
-    + json = ident
+    + json = identity
   - createdAt: timestamp
-    + json = iat
+    + json = createdAt
   - expiresAt: timestamp
-    + json = exp
+    + json = expiresAt
 
 struct Signature
   - session: string

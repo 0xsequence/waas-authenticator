@@ -37,9 +37,8 @@ type EndpointsConfig struct {
 }
 
 type KMSConfig struct {
-	TenantKeys           []string `toml:"tenant_keys"`
-	DefaultSessionKeys   []string `toml:"default_session_keys"`
-	DefaultTransportKeys []string `toml:"default_transport_keys"`
+	TenantKeys         []string `toml:"tenant_keys"`
+	DefaultSessionKeys []string `toml:"default_session_keys"`
 }
 
 type DatabaseConfig struct {
