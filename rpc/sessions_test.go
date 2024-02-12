@@ -9,10 +9,10 @@ import (
 	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/0xsequence/ethkit/ethcoder"
 	"github.com/0xsequence/ethkit/ethwallet"
 	"github.com/0xsequence/ethkit/go-ethereum/common"
 	"github.com/0xsequence/go-sequence/intents/packets"
@@ -26,13 +26,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRPC_RegisterSessionV1(t *testing.T) {
+func TestRPC_RegisterSession(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
 
 	sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
 	require.NoError(t, err)
+	sessHash := ethcoder.Keccak256Hash(sessWallet.Address().Bytes()).String()
 
 	type assertionParams struct {
 		tenant        *data.Tenant
@@ -51,7 +52,7 @@ func TestRPC_RegisterSessionV1(t *testing.T) {
 				require.NotNil(t, sess)
 
 				assert.Equal(t, sessWallet.Address().String(), sess.ID)
-				assert.Equal(t, fmt.Sprintf("%d|%s", p.tenant.ProjectID, strings.ToLower(sess.ID)), sess.UserID)
+				assert.Equal(t, fmt.Sprintf("%d|%s", p.tenant.ProjectID, sessHash), sess.UserID)
 				assert.Equal(t, "FriendlyName", sess.FriendlyName)
 
 				assert.Contains(t, p.dbClient.sessions, sess.ID)
@@ -68,7 +69,7 @@ func TestRPC_RegisterSessionV1(t *testing.T) {
 			},
 		},
 		"WithValidNonce": {
-			tokBuilderFn: func(b *jwt.Builder) { b.Claim("nonce", sessWallet.Address().String()) },
+			tokBuilderFn: func(b *jwt.Builder) { b.Claim("nonce", sessHash) },
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				require.NoError(t, err)
 				require.NotNil(t, sess)
@@ -86,7 +87,7 @@ func TestRPC_RegisterSessionV1(t *testing.T) {
 		"WithInvalidNonceButValidSessionAddressClaim": {
 			tokBuilderFn: func(b *jwt.Builder) {
 				b.Claim("nonce", "0x1234567890abcdef").
-					Claim("sequence:session_address", sessWallet.Address().String())
+					Claim("sequence:session_hash", sessHash)
 			},
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				require.NoError(t, err)
@@ -196,7 +197,7 @@ func TestRPC_RegisterSessionV1(t *testing.T) {
 	}
 }
 
-func TestRPC_SendIntentV1_DropSession(t *testing.T) {
+func TestRPC_SendIntent_DropSession(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)
@@ -345,7 +346,7 @@ func TestRPC_SendIntentV1_DropSession(t *testing.T) {
 	}
 }
 
-func TestRPC_SendIntentV1_ListSessions(t *testing.T) {
+func TestRPC_SendIntent_ListSessions(t *testing.T) {
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	require.NoError(t, err)

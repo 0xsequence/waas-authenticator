@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRPC_SendIntentV1_SendTransaction(t *testing.T) {
+func TestRPC_SendIntent_SendTransaction(t *testing.T) {
 
 	block, _ := pem.Decode([]byte(testPrivateKey))
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
