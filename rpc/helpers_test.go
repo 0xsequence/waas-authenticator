@@ -216,14 +216,12 @@ type kmsMock struct {
 func (m *kmsMock) Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error) {
 	out := &kms.DecryptOutput{
 		EncryptionAlgorithm: kmstypes.EncryptionAlgorithmSpecSymmetricDefault,
-		KeyId:               aws.String("TransportKey"),
+		KeyId:               aws.String("TenantKey"),
 	}
 
 	switch string(params.CiphertextBlob) {
 	case "CiphertextForTenantKey":
 		out.KeyId = aws.String("TenantKey")
-	case "CiphertextForTransportKey":
-		out.KeyId = aws.String("TransportKey")
 	case "CiphertextForSessionKey":
 		out.KeyId = aws.String("SessionKey")
 	default:
@@ -241,8 +239,6 @@ func (m *kmsMock) GenerateDataKey(ctx context.Context, params *kms.GenerateDataK
 	out := &kms.GenerateDataKeyOutput{KeyId: params.KeyId}
 
 	switch *params.KeyId {
-	case "TransportKey":
-		out.CiphertextBlob = []byte("CiphertextForTransportKey")
 	case "TenantKey":
 		out.CiphertextBlob = []byte("CiphertextForTenantKey")
 	case "SessionKey":
@@ -459,8 +455,7 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 		WaasAccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVyX2lkIjozfQ.g2fWwLrKPhTUpLFc7ZM9pMm4kEHGu8haCMzMOOGiqSM",
 		OIDCProviders:   []*proto.OpenIdProvider{{Issuer: issuer}},
 		AllowedOrigins:  []string{"http://localhost"},
-		TransportKeys:   []string{"TransportKey"},
-		SessionKeys:     []string{"SessionKey"},
+		KMSKeys:         []string{"SessionKey"},
 	}
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "TenantKey", payload)

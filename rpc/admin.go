@@ -110,8 +110,7 @@ func (s *RPC) CreateTenant(
 		UpgradeCode:     base32.StdEncoding.EncodeToString(upgradeCode),
 		WaasAccessToken: waasAccessToken,
 		OIDCProviders:   oidcProviders,
-		TransportKeys:   s.Config.KMS.DefaultTransportKeys,
-		SessionKeys:     s.Config.KMS.DefaultSessionKeys,
+		KMSKeys:         s.Config.KMS.DefaultSessionKeys,
 		AllowedOrigins:  allowedOrigins,
 	}
 
