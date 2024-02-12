@@ -515,7 +515,7 @@ func newSessionFromData(t *testing.T, enc *enclave.Enclave, payload *proto.Sessi
 	require.NoError(t, err)
 
 	return &data.Session{
-		ID:           payload.Address.String(),
+		ID:           payload.ID,
 		ProjectID:    1,
 		UserID:       payload.UserID,
 		Identity:     payload.Identity,
@@ -541,7 +541,7 @@ func newSession(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwa
 		Subject: "SUBJECT",
 	}
 	payload := &proto.SessionData{
-		Address:   wallet.Address(),
+		ID:        wallet.Address().String(),
 		ProjectID: 1,
 		UserID:    "1|USER",
 		Identity:  identity.String(),
@@ -575,7 +575,7 @@ func newWalletServiceMock(registeredSessions []string) *walletServiceMock {
 	return m
 }
 
-func (w walletServiceMock) CreatePartner(ctx context.Context, name string, config *proto_wallet.PartnerWalletPreConfig, jwtAlg string, jwtSecret *string, jwtPublic *string) (*proto_wallet.Partner, error) {
+func (w walletServiceMock) CreatePartner(ctx context.Context, projectID uint64, name string, config *proto_wallet.PartnerWalletPreConfig, jwtAlg string, jwtSecret *string, jwtPublic *string) (*proto_wallet.Partner, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -694,7 +694,7 @@ func (w *walletServiceMock) RegisterSession(ctx context.Context, userID string, 
 		return nil, err
 	}
 
-	w.registeredSessions[packet.Session] = struct{}{}
+	w.registeredSessions[packet.SessionId] = struct{}{}
 	w.registeredUsers[userID] = struct{}{}
 
 	return &proto_wallet.PayloadResponse{
@@ -702,16 +702,16 @@ func (w *walletServiceMock) RegisterSession(ctx context.Context, userID string, 
 	}, nil
 }
 
-func (w walletServiceMock) StartSessionValidation(ctx context.Context, walletAddress string, sessionAddress string, deviceMetadata string, redirectUrl *string) (*proto_wallet.PayloadResponse, error) {
+func (w walletServiceMock) StartSessionValidation(ctx context.Context, walletAddress string, sessionID string, deviceMetadata string) (*proto_wallet.PayloadResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w *walletServiceMock) InvalidateSession(ctx context.Context, sessionAddress string) (bool, error) {
-	if _, ok := w.registeredSessions[sessionAddress]; !ok {
+func (w *walletServiceMock) InvalidateSession(ctx context.Context, sessionID string) (bool, error) {
+	if _, ok := w.registeredSessions[sessionID]; !ok {
 		return false, fmt.Errorf("session does not exist")
 	}
-	delete(w.registeredSessions, sessionAddress)
+	delete(w.registeredSessions, sessionID)
 	return true, nil
 }
 
@@ -725,6 +725,11 @@ func (w walletServiceMock) SendIntent(ctx context.Context, wallet *proto_wallet.
 }
 
 func (w walletServiceMock) ChainList(ctx context.Context) ([]*proto_wallet.Chain, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (w walletServiceMock) FinishValidateSession(ctx context.Context, sessionId string, salt string, challenge string) (*proto_wallet.PayloadResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
