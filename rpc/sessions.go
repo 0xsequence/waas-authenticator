@@ -3,11 +3,11 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/0xsequence/ethkit/ethcoder"
 	"github.com/0xsequence/ethkit/go-ethereum/common"
-	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
 	"github.com/0xsequence/go-sequence/intents/packets"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
@@ -29,19 +29,14 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 		return nil, nil, fmt.Errorf("signing session and session to register must match")
 	}
 
-	sessionBytes, err := hexutil.Decode(payload.Session)
-	if err != nil {
-		return nil, nil, fmt.Errorf("session is invalid: %w", err)
+	if !common.IsHexAddress(payload.Session) {
+		return nil, nil, fmt.Errorf("session is invalid")
 	}
 
-	sessionHash := ethcoder.Keccak256Hash(sessionBytes).String()
+	sessionHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(payload.Session))).String()
 	identity, err := verifyIdentity(ctx, s.HTTPClient, payload.Packet.Proof.IDToken, sessionHash)
 	if err != nil {
 		return nil, nil, fmt.Errorf("verifying identity: %w", err)
-	}
-
-	if !common.IsHexAddress(payload.Session) {
-		return nil, nil, fmt.Errorf("session is invalid")
 	}
 
 	account, accountFound, err := s.Accounts.Get(ctx, tntData.ProjectID, identity)
@@ -56,7 +51,7 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 			Identity:  identity.String(),
 			CreatedAt: time.Now(),
 		}
-		encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.SessionKeys[0], accData)
+		encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.KMSKeys[0], accData)
 		if err != nil {
 			return nil, nil, fmt.Errorf("encrypting account data: %w", err)
 		}
@@ -95,7 +90,7 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 		ExpiresAt: time.Now().Add(ttl),
 	}
 
-	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.SessionKeys[0], sessData)
+	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.KMSKeys[0], sessData)
 	if err != nil {
 		return nil, res.Data, fmt.Errorf("encrypting session data: %w", err)
 	}
@@ -162,7 +157,7 @@ func (s *RPC) listSessions(ctx context.Context, sess *data.Session, payload *pro
 
 	out := make([]*proto.Session, len(dbSessions))
 	for i, dbSess := range dbSessions {
-		sessData, _, err := crypto.DecryptData[*proto.SessionData](ctx, dbSess.EncryptedKey, dbSess.Ciphertext, tntData.SessionKeys)
+		sessData, _, err := crypto.DecryptData[*proto.SessionData](ctx, dbSess.EncryptedKey, dbSess.Ciphertext, tntData.KMSKeys)
 		if err != nil {
 			return nil, fmt.Errorf("decrypting session data: %w", err)
 		}

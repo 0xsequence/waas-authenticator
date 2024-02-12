@@ -9,6 +9,7 @@ import (
 	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,7 +34,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 
 	sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
 	require.NoError(t, err)
-	sessHash := ethcoder.Keccak256Hash(sessWallet.Address().Bytes()).String()
+	sessHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(sessWallet.Address().String()))).String()
 
 	type assertionParams struct {
 		tenant        *data.Tenant
