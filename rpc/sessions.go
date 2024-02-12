@@ -3,10 +3,11 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
+	"github.com/0xsequence/ethkit/ethcoder"
 	"github.com/0xsequence/ethkit/go-ethereum/common"
+	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
 	"github.com/0xsequence/go-sequence/intents/packets"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
@@ -28,7 +29,13 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 		return nil, nil, fmt.Errorf("signing session and session to register must match")
 	}
 
-	identity, err := verifyIdentity(ctx, s.HTTPClient, payload.Packet.Proof.IDToken, payload.Session)
+	sessionBytes, err := hexutil.Decode(payload.Session)
+	if err != nil {
+		return nil, nil, fmt.Errorf("session is invalid: %w", err)
+	}
+
+	sessionHash := ethcoder.Keccak256Hash(sessionBytes).String()
+	identity, err := verifyIdentity(ctx, s.HTTPClient, payload.Packet.Proof.IDToken, sessionHash)
 	if err != nil {
 		return nil, nil, fmt.Errorf("verifying identity: %w", err)
 	}
@@ -42,12 +49,10 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 		return nil, nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
 
-	addr := common.HexToAddress(payload.Session)
-
 	if !accountFound {
 		accData := &proto.AccountData{
 			ProjectID: tntData.ProjectID,
-			UserID:    fmt.Sprintf("%d|%s", tntData.ProjectID, strings.ToLower(addr.String())),
+			UserID:    fmt.Sprintf("%d|%s", tntData.ProjectID, sessionHash),
 			Identity:  identity.String(),
 			CreatedAt: time.Now(),
 		}
@@ -82,7 +87,7 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 
 	ttl := 100 * 365 * 24 * time.Hour // TODO: should be configured somewhere, maybe per tenant?
 	sessData := proto.SessionData{
-		Address:   addr,
+		Address:   common.HexToAddress(payload.Session),
 		ProjectID: tntData.ProjectID,
 		UserID:    account.UserID,
 		Identity:  identity.String(),
@@ -96,7 +101,7 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 	}
 
 	dbSess := &data.Session{
-		ID:           addr.String(),
+		ID:           sessData.Address.String(),
 		ProjectID:    tntData.ProjectID,
 		UserID:       account.UserID,
 		Identity:     identity.String(),

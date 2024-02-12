@@ -25,10 +25,10 @@ func withIssuer(expectedIss string) jwt.ValidatorFunc {
 	}
 }
 
-func withSessionAddress(expectedSessionAddress string) jwt.ValidatorFunc {
+func withSessionHash(expectedSessionHash string) jwt.ValidatorFunc {
 	return func(ctx context.Context, tok jwt.Token) jwt.ValidationError {
-		sessAddrClaim, ok := tok.Get("sequence:session_address")
-		if ok && sessAddrClaim == expectedSessionAddress {
+		sessAddrClaim, ok := tok.Get("sequence:session_hash")
+		if ok && sessAddrClaim == expectedSessionHash {
 			return nil
 		}
 
@@ -39,15 +39,15 @@ func withSessionAddress(expectedSessionAddress string) jwt.ValidatorFunc {
 		}
 
 		nonceVal, _ := nonceClaim.(string)
-		if nonceVal != "" && nonceVal == expectedSessionAddress {
+		if nonceVal != "" && nonceVal == expectedSessionHash {
 			return nil
 		}
 
-		return jwt.NewValidationError(fmt.Errorf("nonce not satisfied: %s != %s", nonceVal, expectedSessionAddress))
+		return jwt.NewValidationError(fmt.Errorf("nonce not satisfied: %s != %s", nonceVal, expectedSessionHash))
 	}
 }
 
-func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sessionAddress string) (proto.Identity, error) {
+func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sessionHash string) (proto.Identity, error) {
 	tok, err := jwt.Parse([]byte(idToken), jwt.WithVerify(false), jwt.WithValidate(false))
 	if err != nil {
 		return proto.Identity{}, fmt.Errorf("parse JWT: %w", err)
@@ -69,7 +69,7 @@ func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sess
 
 	validateOptions := []jwt.ValidateOption{
 		jwt.WithValidator(withIssuer(idp.Issuer)),
-		jwt.WithValidator(withSessionAddress(sessionAddress)),
+		jwt.WithValidator(withSessionHash(sessionHash)),
 		jwt.WithAcceptableSkew(10 * time.Second),
 	}
 	if idp.Audience != nil {
