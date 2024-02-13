@@ -12,7 +12,7 @@ import (
 	ethcrypto "github.com/0xsequence/ethkit/go-ethereum/crypto"
 	"github.com/0xsequence/go-sequence"
 	v2 "github.com/0xsequence/go-sequence/core/v2"
-	"github.com/0xsequence/go-sequence/intents/packets"
+	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
@@ -58,22 +58,22 @@ func AddressForUser(ctx context.Context, tntData *proto.TenantData, user string)
 	return address.String(), nil
 }
 
-func (s *RPC) SendIntent(ctx context.Context, intent *proto.Intent) (string, any, error) {
+func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto.IntentResponse, error) {
 	tntData := tenant.FromContext(ctx)
 
-	payload, err := proto.ParseIntent(intent)
+	intent, sessionID, err := parseIntent(protoIntent)
 	if err != nil {
-		return "", nil, fmt.Errorf("parse intent: %w", err)
+		return nil, err
 	}
 
-	sess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, payload.Session)
+	sess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, sessionID)
 	if err != nil || !found {
-		return "", nil, fmt.Errorf("session invalid or not found")
+		return nil, fmt.Errorf("session invalid or not found")
 	}
 
 	walletAddress, err := AddressForUser(ctx, tntData, sess.UserID)
 	if err != nil {
-		return "", nil, fmt.Errorf("computing user address: %w", err)
+		return nil, fmt.Errorf("computing user address: %w", err)
 	}
 
 	targetWallet := &proto_wallet.TargetWallet{
@@ -81,54 +81,54 @@ func (s *RPC) SendIntent(ctx context.Context, intent *proto.Intent) (string, any
 		Address: walletAddress,
 	}
 
-	switch payload.Code {
-	case packets.OpenSessionPacketCode:
-		return "", nil, fmt.Errorf("opening a session is unsupported outside of RegisterSession")
+	switch intent.Name {
+	case intents.IntentNameOpenSession:
+		return nil, fmt.Errorf("opening a session is unsupported outside of RegisterSession")
 
-	case packets.CloseSessionPacketCode:
-		payload, err := proto.ParsePacketInPayload(payload, &packets.CloseSessionPacket{})
+	case intents.IntentNameCloseSession:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataCloseSession](intent)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
-		ok, err := s.dropSession(ctx, sess, payload)
+		ok, err := s.dropSession(ctx, sess, intentTyped)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
-		return "sessionClosed", ok, nil
+		return makeIntentResponse("sessionClosed", ok), nil
 
-	case proto.ListSessionsPacketCode:
-		payload, err := proto.ParsePacketInPayload(payload, &proto.ListSessionsPacket{})
+	case intents.IntentNameListSessions:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataListSessions](intent)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
-		sessions, err := s.listSessions(ctx, sess, payload)
+		sessions, err := s.listSessions(ctx, sess, intentTyped)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
-		return "sessionsListed", sessions, nil
+		return makeIntentResponse("sessionsListed", sessions), nil
 
-	case packets.SignMessagePacketCode:
-		payload, err := proto.ParsePacketInPayload(payload, &packets.SignMessagePacket{})
+	case intents.IntentNameSignMessage:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataSignMessage](intent)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
-		return s.signMessage(ctx, sess, payload)
+		return s.signMessage(ctx, sess, intentTyped)
 
-	case packets.SendTransactionCode:
-		payload, err := proto.ParsePacketInPayload(payload, &packets.SendTransactionsPacket{})
+	case intents.IntentNameSendTransaction:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataSendTransaction](intent)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
-		return s.sendTransaction(ctx, sess, payload)
+		return s.sendTransaction(ctx, sess, intentTyped)
 	}
 
 	// Generic forwarding of intent, no special handling
-	res, err := s.Wallets.SendIntent(waasContext(ctx), targetWallet, payload.IntentJSON)
+	res, err := s.Wallets.SendIntent(waasContext(ctx), targetWallet, convertToAPIIntent(intent))
 	if err != nil {
-		return "", nil, fmt.Errorf("sending intent: %w", err)
+		return nil, fmt.Errorf("sending intent: %w", err)
 	}
 
-	return res.Code, res.Data, nil
+	return convertIntentResponse(res), nil
 }
 
 func (s *RPC) signUsingParent(wallet *ethwallet.Wallet, parentAddress common.Address, subdigest []byte, chainId *big.Int) ([]byte, []byte, error) {
