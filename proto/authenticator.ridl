@@ -58,10 +58,14 @@ struct Chain
     - isEnabled: bool
 
 struct Identity
-  - projectId: uint64
-    + go.field.name = ProjectID
+  - type: IdentityType
+    + go.field.type = IdentityType
   - issuer: string
+    + json = iss
   - subject: string
+    + json = sub
+  - email: string
+    + go.tag.json = email,omitempty
 
 struct OpenIdProvider
   - issuer: string
@@ -114,18 +118,35 @@ struct MiniSequenceContext
   - factory: string
   - mainModule: string
 
+enum IdentityType: uint8
+  - None
+  - Guest
+  - OIDC
+
+struct AccountData
+  - projectId: uint64
+    + go.field.name = ProjectID
+    + json = proj
+  - userId: string
+    + go.field.name = UserID
+    + json = user
+  - identity: string
+    + json = ident
+  - createdAt: timestamp
+    + json = iat
+
 struct Session
   - id: string
     + go.field.name = ID
   - address: string
     + go.field.type = common.Address
     + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
-  - userId: string
-    + go.field.name = UserID
   - projectId: uint64
     + go.field.name = ProjectID
-  - issuer: string
-  - subject: string
+  - userId: string
+    + go.field.name = UserID
+  - identity: Identity
+    + go.field.type = Identity
   - friendlyName: string
   - createdAt: timestamp
   - refreshedAt: timestamp
@@ -139,10 +160,11 @@ struct SessionData
   - projectId: uint64
     + go.field.name = ProjectID
     + json = proj
-  - issuer: string
-    + json = iss
-  - subject: string
-    + json = sub
+  - userId: string
+    + go.field.name = UserID
+    + json = user
+  - identity: string
+    + json = ident
   - createdAt: timestamp
     + json = iat
   - expiresAt: timestamp

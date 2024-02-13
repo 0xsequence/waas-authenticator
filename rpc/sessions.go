@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/0xsequence/ethkit/ethwallet"
@@ -28,7 +29,7 @@ func (s *RPC) RegisterSession(ctx context.Context, encryptedPayloadKey string, p
 		return nil, nil, fmt.Errorf("verifying identity: %w", err)
 	}
 
-	if payload.ProjectID != identity.ProjectID || payload.ProjectID != tntData.ProjectID {
+	if payload.ProjectID != tntData.ProjectID {
 		return nil, nil, fmt.Errorf("tenant mismatch")
 	}
 
@@ -50,19 +51,53 @@ func (s *RPC) RegisterSession(ctx context.Context, encryptedPayloadKey string, p
 		return nil, nil, err
 	}
 
-	// TODO: validate that idToken and session address from IntentJSON match the ones in payload
-	// TODO: *OR* we don't need them in payload, we can get them directly from the intent
-	res, err := s.Wallets.RegisterSession(waasCtx, identity.String(), payload.IntentJSON)
+	account, accountFound, err := s.Accounts.Get(ctx, tntData.ProjectID, identity)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to retrieve account: %w", err)
+	}
+
+	if !accountFound {
+		accData := &proto.AccountData{
+			ProjectID: tntData.ProjectID,
+			UserID:    fmt.Sprintf("%d|%s", tntData.ProjectID, strings.ToLower(addr.String())),
+			Identity:  identity.String(),
+			CreatedAt: time.Now(),
+		}
+		encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.SessionKeys[0], accData)
+		if err != nil {
+			return nil, nil, fmt.Errorf("encrypting account data: %w", err)
+		}
+
+		account = &data.Account{
+			ProjectID:          tntData.ProjectID,
+			Identity:           data.Identity(identity),
+			UserID:             accData.UserID,
+			Email:              identity.Email,
+			ProjectScopedEmail: fmt.Sprintf("%d|%s", tntData.ProjectID, identity.Email),
+			EncryptedKey:       encryptedKey,
+			Algorithm:          algorithm,
+			Ciphertext:         ciphertext,
+			CreatedAt:          accData.CreatedAt,
+		}
+	}
+
+	res, err := s.Wallets.RegisterSession(waasCtx, account.UserID, payload.IntentJSON)
 	if err != nil {
 		return nil, nil, fmt.Errorf("registering session with WaaS API: %w", err)
+	}
+
+	if !accountFound {
+		if err := s.Accounts.Put(ctx, account); err != nil {
+			return nil, nil, fmt.Errorf("save account: %w", err)
+		}
 	}
 
 	ttl := 100 * 365 * 24 * time.Hour // TODO: should be configured somewhere, maybe per tenant?
 	sessData := proto.SessionData{
 		Address:   addr,
-		ProjectID: identity.ProjectID,
-		Issuer:    identity.Issuer,
-		Subject:   identity.Subject,
+		ProjectID: tntData.ProjectID,
+		UserID:    account.UserID,
+		Identity:  identity.String(),
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(ttl),
 	}
@@ -74,8 +109,9 @@ func (s *RPC) RegisterSession(ctx context.Context, encryptedPayloadKey string, p
 
 	dbSess := &data.Session{
 		ID:           addr.String(),
-		ProjectID:    identity.ProjectID,
-		UserID:       identity.String(),
+		ProjectID:    tntData.ProjectID,
+		UserID:       account.UserID,
+		Identity:     identity.String(),
 		FriendlyName: payload.FriendlyName,
 		EncryptedKey: encryptedKey,
 		Algorithm:    algorithm,
@@ -93,8 +129,7 @@ func (s *RPC) RegisterSession(ctx context.Context, encryptedPayloadKey string, p
 		Address:      sessData.Address,
 		UserID:       dbSess.UserID,
 		ProjectID:    sessData.ProjectID,
-		Issuer:       sessData.Issuer,
-		Subject:      sessData.Subject,
+		Identity:     identity,
 		FriendlyName: dbSess.FriendlyName,
 		CreatedAt:    sessData.CreatedAt,
 		RefreshedAt:  dbSess.RefreshedAt,
@@ -117,7 +152,7 @@ func (s *RPC) DropSession(ctx context.Context, encryptedPayloadKey string, paylo
 	}
 
 	dbSess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, payload.DropSessionID)
-	if err != nil || !found || dbSess.UserID != currentSessData.Identity().String() {
+	if err != nil || !found || dbSess.UserID != currentSessData.UserID {
 		return false, fmt.Errorf("session not found")
 	}
 
@@ -150,7 +185,7 @@ func (s *RPC) ListSessions(ctx context.Context, encryptedPayloadKey string, payl
 		return nil, fmt.Errorf("verifying session: %w", err)
 	}
 
-	dbSessions, err := s.Sessions.ListByUserID(ctx, sessData.Identity().String())
+	dbSessions, err := s.Sessions.ListByUserID(ctx, sessData.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("listing DB sessions: %w", err)
 	}
@@ -162,13 +197,17 @@ func (s *RPC) ListSessions(ctx context.Context, encryptedPayloadKey string, payl
 			return nil, fmt.Errorf("decrypting session data: %w", err)
 		}
 
+		var identity proto.Identity
+		if err := identity.FromString(sessData.Identity); err != nil {
+			return nil, fmt.Errorf("parsing session identity: %w", err)
+		}
+
 		out[i] = &proto.Session{
 			ID:           dbSess.ID,
 			Address:      sessData.Address,
 			UserID:       dbSess.UserID,
 			ProjectID:    sessData.ProjectID,
-			Issuer:       sessData.Issuer,
-			Subject:      sessData.Subject,
+			Identity:     identity,
 			FriendlyName: dbSess.FriendlyName,
 			CreatedAt:    sessData.CreatedAt,
 			RefreshedAt:  dbSess.RefreshedAt,

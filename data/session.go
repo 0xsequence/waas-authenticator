@@ -16,6 +16,7 @@ type Session struct {
 	ID           string    `dynamodbav:"ID"`
 	ProjectID    uint64    `dynamodbav:"ProjectID"`
 	UserID       string    `dynamodbav:"UserID"`
+	Identity     string    `dynamodbav:"Identity"`
 	FriendlyName string    `dynamodbav:"FriendlyName"`
 	EncryptedKey []byte    `dynamodbav:"EncryptedKey"`
 	Algorithm    string    `dynamodbav:"Algorithm"`
