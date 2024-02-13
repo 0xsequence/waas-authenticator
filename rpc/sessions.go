@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/0xsequence/ethkit/ethcoder"
-	"github.com/0xsequence/ethkit/go-ethereum/common"
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
@@ -38,10 +37,6 @@ func (s *RPC) RegisterSession(
 
 	if sessionID != intentTyped.Data.SessionId {
 		return nil, nil, fmt.Errorf("signing session and session to register must match")
-	}
-
-	if !common.IsHexAddress(sessionID) {
-		return nil, nil, fmt.Errorf("session is invalid")
 	}
 
 	idToken := intentTyped.Data.IdToken
@@ -98,7 +93,7 @@ func (s *RPC) RegisterSession(
 
 	ttl := 100 * 365 * 24 * time.Hour // TODO: should be configured somewhere, maybe per tenant?
 	sessData := proto.SessionData{
-		Address:   common.HexToAddress(sessionID),
+		ID:        sessionID,
 		ProjectID: tntData.ProjectID,
 		UserID:    account.UserID,
 		Identity:  identity.String(),
@@ -112,7 +107,7 @@ func (s *RPC) RegisterSession(
 	}
 
 	dbSess := &data.Session{
-		ID:           sessData.Address.String(),
+		ID:           sessionID,
 		ProjectID:    tntData.ProjectID,
 		UserID:       account.UserID,
 		Identity:     identity.String(),
@@ -130,7 +125,6 @@ func (s *RPC) RegisterSession(
 
 	retSess := &proto.Session{
 		ID:           dbSess.ID,
-		Address:      sessData.Address,
 		UserID:       dbSess.UserID,
 		ProjectID:    sessData.ProjectID,
 		Identity:     identity,
@@ -187,7 +181,6 @@ func (s *RPC) listSessions(
 
 		out[i] = &proto.Session{
 			ID:           dbSess.ID,
-			Address:      sessData.Address,
 			UserID:       dbSess.UserID,
 			ProjectID:    sessData.ProjectID,
 			Identity:     identity,

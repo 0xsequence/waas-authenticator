@@ -15,7 +15,6 @@ import (
 
 	"github.com/0xsequence/ethkit/ethcoder"
 	"github.com/0xsequence/ethkit/ethwallet"
-	"github.com/0xsequence/ethkit/go-ethereum/common"
 	"github.com/0xsequence/go-sequence/intents/packets"
 	"github.com/0xsequence/nitrocontrol/enclave"
 	"github.com/0xsequence/waas-authenticator/data"
@@ -176,8 +175,8 @@ func TestRPC_RegisterSession(t *testing.T) {
 					Issued:  uint64(time.Now().Add(-1 * time.Second).Unix()),
 					Expires: uint64(time.Now().Add(5 * time.Minute).Unix()),
 				},
-				Session: sessWallet.Address().String(),
-				Proof:   packets.OpenSessionPacketProof{IDToken: tok},
+				SessionId: sessWallet.Address().String(),
+				Proof:     packets.OpenSessionPacketProof{IDToken: tok},
 			}
 			intent := testCase.intentBuilderFn(t, packet)
 
@@ -280,7 +279,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			session := newSession(t, enc, issuer, sessWallet)
 
 			session2 := newSessionFromData(t, enc, &proto.SessionData{
-				Address:   common.HexToAddress("0x1111111111111111111111111111111111111111"),
+				ID:        "0x1111111111111111111111111111111111111111",
 				ProjectID: 1,
 				UserID:    session.UserID,
 				Identity:  session.Identity,
@@ -289,7 +288,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			})
 
 			session3 := newSessionFromData(t, enc, &proto.SessionData{
-				Address:   common.HexToAddress("0x2222222222222222222222222222222222222222"),
+				ID:        "0x2222222222222222222222222222222222222222",
 				ProjectID: 1,
 				UserID:    "ANOTHER-USER",
 				Identity:  session.Identity,
@@ -327,7 +326,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 					},
 					Wallet: walletAddr,
 				},
-				Session: testCase.dropSessionID,
+				SessionId: testCase.dropSessionID,
 			}
 			intent := testCase.intentBuilderFn(t, packet)
 
@@ -369,13 +368,13 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 	acc := newAccount(t, enc, issuer, sessWallet)
 	sess1 := newSession(t, enc, issuer, sessWallet)
 	sess2 := newSessionFromData(t, enc, &proto.SessionData{
-		Address:   common.HexToAddress("0x1111111111111111111111111111111111111111"),
+		ID:        "0x1111111111111111111111111111111111111111",
 		ProjectID: 1,
 		UserID:    sess1.UserID,
 		Identity:  sess1.Identity,
 	})
 	sess3 := newSessionFromData(t, enc, &proto.SessionData{
-		Address:   common.HexToAddress("0x2222222222222222222222222222222222222222"),
+		ID:        "0x2222222222222222222222222222222222222222",
 		ProjectID: 1,
 		UserID:    "ANOTHER-USER",
 		Identity:  sess1.Identity,
