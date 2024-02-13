@@ -5,35 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
 	"github.com/0xsequence/nitrocontrol/aescbc"
 	"github.com/0xsequence/nitrocontrol/enclave"
-	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 )
-
-func DecryptPayload[T any](
-	ctx context.Context, tntData *proto.TenantData, encKey string, ciphertext string,
-) (T, []byte, error) {
-	var zero T
-
-	encKeyBytes, err := hexutil.Decode(encKey)
-	if err != nil {
-		return zero, nil, fmt.Errorf("hex decode encryptedPayloadKey: %w", err)
-	}
-
-	ciphertextBytes, err := hexutil.Decode(ciphertext)
-	if err != nil {
-		return zero, nil, fmt.Errorf("hex decode payloadCiphertext: %w", err)
-	}
-
-	payload, payloadBytes, err := DecryptData[T](ctx, encKeyBytes, ciphertextBytes, tntData.TransportKeys)
-	if err != nil {
-		return zero, nil, fmt.Errorf("decrypt payload: %w", err)
-	}
-
-	return payload, payloadBytes, nil
-}
 
 func EncryptData(
 	ctx context.Context, att *enclave.Attestation, keyID string, data any,

@@ -66,10 +66,7 @@ func (s *RPC) CreateTenant(
 		return nil, "", fmt.Errorf("generating wallet: %w", err)
 	}
 
-	waasCtx, err := waasContext(ctx, waasAccessToken)
-	if err != nil {
-		return nil, "", fmt.Errorf("creating waas context: %w", err)
-	}
+	waasCtx := waasContext(ctx, waasAccessToken)
 
 	// TODO: these are 4 calls to WaaS API, can we do it all in one call?
 	if _, err := s.Wallets.UseHotWallet(waasCtx, wallet.Address().String()); err != nil {
@@ -113,8 +110,7 @@ func (s *RPC) CreateTenant(
 		UpgradeCode:     base32.StdEncoding.EncodeToString(upgradeCode),
 		WaasAccessToken: waasAccessToken,
 		OIDCProviders:   oidcProviders,
-		TransportKeys:   s.Config.KMS.DefaultTransportKeys,
-		SessionKeys:     s.Config.KMS.DefaultSessionKeys,
+		KMSKeys:         s.Config.KMS.DefaultSessionKeys,
 		AllowedOrigins:  allowedOrigins,
 	}
 

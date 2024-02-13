@@ -12,15 +12,13 @@ import (
 	ethcrypto "github.com/0xsequence/ethkit/go-ethereum/crypto"
 	"github.com/0xsequence/go-sequence"
 	v2 "github.com/0xsequence/go-sequence/core/v2"
-	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/go-sequence/intents/packets"
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
-	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 )
 
-func addressForUser(ctx context.Context, tntData *proto.TenantData, user string) (string, error) {
+func AddressForUser(ctx context.Context, tntData *proto.TenantData, user string) (string, error) {
 	if len(tntData.UserSalt) != 32 {
 		return "", fmt.Errorf("invalid user salt length: %d", len(tntData.UserSalt))
 	}
@@ -60,199 +58,72 @@ func addressForUser(ctx context.Context, tntData *proto.TenantData, user string)
 	return address.String(), nil
 }
 
-func (s *RPC) GetAddress(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (string, error) {
+func (s *RPC) SendIntent(ctx context.Context, intent *proto.Intent) (string, any, error) {
 	tntData := tenant.FromContext(ctx)
 
-	payload, payloadBytes, err := crypto.DecryptPayload[*proto.GetAddressPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
+	payload, err := proto.ParseIntent(intent)
 	if err != nil {
-		return "", fmt.Errorf("decrypting payload: %w", err)
+		return "", nil, fmt.Errorf("parse intent: %w", err)
 	}
 
-	_, sessData, err := s.verifySession(ctx, payload.SessionID, payloadBytes, payloadSig)
-	if err != nil {
-		return "", fmt.Errorf("verifying session: %w", err)
+	sess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, payload.Session)
+	if err != nil || !found {
+		return "", nil, fmt.Errorf("session invalid or not found")
 	}
 
-	return addressForUser(ctx, tntData, sessData.UserID)
-}
-
-func (s *RPC) SendIntent(ctx context.Context, encryptedPayloadKey string, payloadCiphertext string, payloadSig string) (string, any, error) {
-	tntData := tenant.FromContext(ctx)
-
-	payload, payloadBytes, err := crypto.DecryptPayload[*proto.SendIntentPayload](ctx, tntData, encryptedPayloadKey, payloadCiphertext)
-	if err != nil {
-		return "", nil, fmt.Errorf("decrypting payload: %w", err)
-	}
-
-	_, sessData, err := s.verifySession(ctx, payload.SessionID, payloadBytes, payloadSig)
-	if err != nil {
-		return "", nil, fmt.Errorf("verifying session: %w", err)
-	}
-
-	var intent intents.Intent
-	if err := intent.UnmarshalJSON([]byte(payload.IntentJSON)); err != nil {
-		return "", nil, err
-	}
-
-	waasCtx, err := waasContext(ctx)
-	if err != nil {
-		return "", nil, err
-	}
-
-	parentWallet, err := ethwallet.NewWalletFromPrivateKey(tntData.PrivateKey)
-	if err != nil {
-		return "", nil, fmt.Errorf("recovering parent wallet: %w", err)
-	}
-
-	walletAddress, err := addressForUser(ctx, tntData, sessData.UserID)
+	walletAddress, err := AddressForUser(ctx, tntData, sess.UserID)
 	if err != nil {
 		return "", nil, fmt.Errorf("computing user address: %w", err)
 	}
 
 	targetWallet := &proto_wallet.TargetWallet{
-		User:    sessData.UserID,
+		User:    sess.UserID,
 		Address: walletAddress,
 	}
 
-	switch intent.PacketCode() {
+	switch payload.Code {
+	case packets.OpenSessionPacketCode:
+		return "", nil, fmt.Errorf("opening a session is unsupported outside of RegisterSession")
+
+	case packets.CloseSessionPacketCode:
+		payload, err := proto.ParsePacketInPayload(payload, &packets.CloseSessionPacket{})
+		if err != nil {
+			return "", nil, err
+		}
+		ok, err := s.dropSession(ctx, sess, payload)
+		if err != nil {
+			return "", nil, err
+		}
+		return "sessionClosed", ok, nil
+
+	case proto.ListSessionsPacketCode:
+		payload, err := proto.ParsePacketInPayload(payload, &proto.ListSessionsPacket{})
+		if err != nil {
+			return "", nil, err
+		}
+		sessions, err := s.listSessions(ctx, sess, payload)
+		if err != nil {
+			return "", nil, err
+		}
+		return "sessionsListed", sessions, nil
+
 	case packets.SignMessagePacketCode:
-		var packet packets.SignMessagePacket
-		if err := packet.Unmarshal(intent.Packet); err != nil {
-			return "", nil, fmt.Errorf("unmarshal packet: %w", err)
-		}
-
-		// Validate that message match intent
-		digest := sequence.MessageDigest(common.FromHex(packet.Message))
-
-		chainID, ok := sequence.ParseHexOrDec(packet.Network)
-		if !ok {
-			return "", nil, fmt.Errorf("invalid chain id: %s", packet.Network)
-		}
-
-		subdigest, err := sequence.SubDigest(chainID, common.HexToAddress(packet.Wallet), digest)
+		payload, err := proto.ParsePacketInPayload(payload, &packets.SignMessagePacket{})
 		if err != nil {
-			return "", nil, fmt.Errorf("calculating digest: %w", err)
+			return "", nil, err
 		}
-
-		isValid := packet.IsValidInterpretation(common.Hash(subdigest))
-		if !isValid {
-			return "", nil, fmt.Errorf("invalid sign message intent")
-		}
-
-		// Our EOA belongs to the *parent* wallet, so we need to sign the subdigest with the parent key
-		sig, parentSubdigest, err := s.signUsingParent(parentWallet, tntData.ParentAddress, subdigest, chainID)
-		if err != nil {
-			return "", nil, fmt.Errorf("signing subdigest using parent wallet: %w", err)
-		}
-
-		signMessage := &proto_wallet.SignMessage{
-			ChainID: packet.Network,
-			Message: packet.Message,
-		}
-
-		signatures := []*proto_wallet.ProvidedSignature{
-			{
-				Digest:    "0x" + common.Bytes2Hex(parentSubdigest),
-				Signature: "0x" + common.Bytes2Hex(sig),
-				Address:   parentWallet.Address().String(),
-			},
-		}
-
-		res, err := s.Wallets.SignMessage(waasCtx, targetWallet, payload.IntentJSON, signMessage, signatures)
-		if err != nil {
-			return "", nil, fmt.Errorf("signing message: %w", err)
-		}
-
-		return res.Code, res.Data, nil
+		return s.signMessage(ctx, sess, payload)
 
 	case packets.SendTransactionCode:
-		bundle, err := s.Wallets.GenTransaction(waasCtx, payload.IntentJSON)
+		payload, err := proto.ParsePacketInPayload(payload, &packets.SendTransactionsPacket{})
 		if err != nil {
-			return "", nil, fmt.Errorf("generating transaction: %w", err)
+			return "", nil, err
 		}
-
-		nonce, ok := sequence.ParseHexOrDec(bundle.Nonce)
-		if !ok {
-			return "", nil, fmt.Errorf("invalid nonce: %s", bundle.Nonce)
-		}
-
-		// Convert bundle.Transaction into sequence.Transaction
-		strans := make(sequence.Transactions, len(bundle.Transactions))
-		for i, t := range bundle.Transactions {
-			val, ok := sequence.ParseHexOrDec(t.Value)
-			if !ok {
-				return "", nil, fmt.Errorf("invalid value: %s", t.Value)
-			}
-
-			gasLimit, ok := sequence.ParseHexOrDec(t.GasLimit)
-			if !ok {
-				return "", nil, fmt.Errorf("invalid gas limit: %s", t.GasLimit)
-			}
-
-			strans[i] = &sequence.Transaction{
-				To:            common.HexToAddress(t.To),
-				Value:         val,
-				GasLimit:      gasLimit,
-				RevertOnError: t.RevertOnError,
-				DelegateCall:  t.DelegateCall,
-				Data:          common.FromHex(t.Data),
-			}
-		}
-
-		var packet packets.SendTransactionsPacket
-		if err := packet.Unmarshal(intent.Packet); err != nil {
-			return "", nil, fmt.Errorf("unmarshal packet: %w", err)
-		}
-
-		// Generate subdigest
-		sbundle := sequence.Transaction{
-			Transactions: strans,
-			Nonce:        nonce,
-		}
-		digest, err := sbundle.Digest()
-		if err != nil {
-			return "", nil, fmt.Errorf("calculating transaction bundle digest: %w", err)
-		}
-		chainID, ok := sequence.ParseHexOrDec(packet.Network)
-		if !ok {
-			return "", nil, fmt.Errorf("invalid chain id: %s", packet.Network)
-		}
-
-		subdigest, err := sequence.SubDigest(chainID, common.HexToAddress(packet.Wallet), digest)
-		if err != nil {
-			return "", nil, fmt.Errorf("calculating subdigest: %w", err)
-		}
-
-		// Validate that transactions match intent
-		isValid := packet.IsValidInterpretation(common.Hash(subdigest), strans, nonce)
-		if !isValid {
-			return "", nil, fmt.Errorf("WaaS API returned incompatible transactions")
-		}
-
-		// Our EOA belongs to the *parent* wallet, so we need to sign the subdigest with the parent key
-		sig, parentSubdigest, err := s.signUsingParent(parentWallet, tntData.ParentAddress, subdigest, chainID)
-		if err != nil {
-			return "", nil, fmt.Errorf("signing subdigest using parent wallet: %w", err)
-		}
-
-		signatures := []*proto_wallet.ProvidedSignature{
-			{
-				Digest:    "0x" + common.Bytes2Hex(parentSubdigest),
-				Signature: "0x" + common.Bytes2Hex(sig),
-				Address:   parentWallet.Address().String(),
-			},
-		}
-
-		res, err := s.Wallets.SendTransaction(waasCtx, targetWallet, payload.IntentJSON, bundle, signatures)
-		if err != nil {
-			return "", nil, fmt.Errorf("sending transaction: %w", err)
-		}
-
-		return res.Code, res.Data, nil
+		return s.sendTransaction(ctx, sess, payload)
 	}
 
 	// Generic forwarding of intent, no special handling
-	res, err := s.Wallets.SendIntent(waasCtx, targetWallet, payload.IntentJSON)
+	res, err := s.Wallets.SendIntent(waasContext(ctx), targetWallet, payload.IntentJSON)
 	if err != nil {
 		return "", nil, fmt.Errorf("sending intent: %w", err)
 	}
@@ -281,7 +152,7 @@ func (s *RPC) signUsingParent(wallet *ethwallet.Wallet, parentAddress common.Add
 	return append(sig, byte(1)), parentSubdigest, nil
 }
 
-func waasContext(ctx context.Context, optJwtToken ...string) (context.Context, error) {
+func waasContext(ctx context.Context, optJwtToken ...string) context.Context {
 	var jwtToken string
 	if len(optJwtToken) == 1 {
 		jwtToken = optJwtToken[0]
@@ -300,7 +171,7 @@ func waasContext(ctx context.Context, optJwtToken ...string) (context.Context, e
 
 	waasCtx, err := proto_wallet.WithHTTPRequestHeaders(ctx, waasHeader)
 	if err != nil {
-		return ctx, err
+		return ctx
 	}
-	return waasCtx, nil
+	return waasCtx
 }

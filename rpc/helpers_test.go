@@ -21,11 +21,13 @@ import (
 	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/go-sequence/intents/packets"
+	"github.com/0xsequence/go-sequence/lib/prototyp"
 	"github.com/0xsequence/nitrocontrol/enclave"
 	"github.com/0xsequence/waas-authenticator/config"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
+	"github.com/0xsequence/waas-authenticator/rpc"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -33,6 +35,7 @@ import (
 	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/gibson042/canonicaljson-go"
 	"github.com/jxskiss/base62"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -63,6 +66,49 @@ func getTestingCtxValue(ctx context.Context, k string) string {
 		return ""
 	}
 	return values[strings.ToLower(k)]
+}
+
+func initRPC(cfg *config.Config, enc *enclave.Enclave, dbClient *dbMock) *rpc.RPC {
+	svc := &rpc.RPC{
+		Config:     cfg,
+		HTTPClient: http.DefaultClient,
+		Enclave:    enc,
+		Wallets:    newWalletServiceMock(nil),
+		Tenants:    data.NewTenantTable(dbClient, "Tenants"),
+		Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
+		Accounts:   data.NewAccountTable(dbClient, "Accounts", data.AccountIndices{}),
+	}
+	return svc
+}
+
+func generateIntent(t *testing.T, sessWallet *ethwallet.Wallet, packet proto.Packet) string {
+	packetJSON, err := canonicaljson.Marshal(&packet)
+	require.NoError(t, err)
+
+	intent := &intents.Intent{
+		Version: "1.0.0",
+		Packet:  packetJSON,
+	}
+
+	intentHash, err := intent.Hash()
+	require.NoError(t, err)
+
+	signatureRaw, err := sessWallet.SignMessage(intentHash)
+	require.NoError(t, err)
+
+	signature := prototyp.HashFromBytes(signatureRaw)
+
+	intentJSON, err := json.Marshal(&intents.JSONIntent{
+		Version: intent.Version,
+		Packet:  intent.Packet,
+		Signatures: []intents.Signature{
+			{
+				Session:   sessWallet.Address().String(),
+				Signature: signature.String(),
+			},
+		},
+	})
+	return string(intentJSON)
 }
 
 var (
@@ -170,14 +216,12 @@ type kmsMock struct {
 func (m *kmsMock) Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error) {
 	out := &kms.DecryptOutput{
 		EncryptionAlgorithm: kmstypes.EncryptionAlgorithmSpecSymmetricDefault,
-		KeyId:               aws.String("TransportKey"),
+		KeyId:               aws.String("TenantKey"),
 	}
 
 	switch string(params.CiphertextBlob) {
 	case "CiphertextForTenantKey":
 		out.KeyId = aws.String("TenantKey")
-	case "CiphertextForTransportKey":
-		out.KeyId = aws.String("TransportKey")
 	case "CiphertextForSessionKey":
 		out.KeyId = aws.String("SessionKey")
 	default:
@@ -195,8 +239,6 @@ func (m *kmsMock) GenerateDataKey(ctx context.Context, params *kms.GenerateDataK
 	out := &kms.GenerateDataKeyOutput{KeyId: params.KeyId}
 
 	switch *params.KeyId {
-	case "TransportKey":
-		out.CiphertextBlob = []byte("CiphertextForTransportKey")
 	case "TenantKey":
 		out.CiphertextBlob = []byte("CiphertextForTenantKey")
 	case "SessionKey":
@@ -334,8 +376,16 @@ func (d *dbMock) Query(ctx context.Context, params *dynamodb.QueryInput, optFns 
 
 	switch *params.TableName {
 	case "Sessions":
-		out := &dynamodb.QueryOutput{Items: make([]map[string]dynamodbtypes.AttributeValue, 0, len(d.sessions))}
+		userID, err := getDynamoAttribute[*dynamodbtypes.AttributeValueMemberS](params.ExpressionAttributeValues, ":userID")
+		if err != nil {
+			return nil, err
+		}
+
+		out := &dynamodb.QueryOutput{Items: make([]map[string]dynamodbtypes.AttributeValue, 0)}
 		for _, sess := range d.sessions {
+			if sess.UserID != userID.Value {
+				continue
+			}
 			item, err := attributevalue.MarshalMap(sess)
 			if err != nil {
 				return nil, err
@@ -384,7 +434,7 @@ func getDynamoAttribute[T dynamodbtypes.AttributeValue](attrVals map[string]dyna
 	return value, nil
 }
 
-func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) *data.Tenant {
+func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant, *proto.TenantData) {
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
 
@@ -405,8 +455,7 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) *data.Tenant {
 		WaasAccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVyX2lkIjozfQ.g2fWwLrKPhTUpLFc7ZM9pMm4kEHGu8haCMzMOOGiqSM",
 		OIDCProviders:   []*proto.OpenIdProvider{{Issuer: issuer}},
 		AllowedOrigins:  []string{"http://localhost"},
-		TransportKeys:   []string{"TransportKey"},
-		SessionKeys:     []string{"SessionKey"},
+		KMSKeys:         []string{"SessionKey"},
 	}
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "TenantKey", payload)
@@ -419,14 +468,69 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) *data.Tenant {
 		Algorithm:    algorithm,
 		Ciphertext:   ciphertext,
 		CreatedAt:    time.Now(),
+	}, payload
+}
+
+func newAccount(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwallet.Wallet) *data.Account {
+	att, err := enc.GetAttestation(context.Background(), nil)
+	require.NoError(t, err)
+
+	identity := proto.Identity{
+		Type:    proto.IdentityType_OIDC,
+		Issuer:  issuer,
+		Subject: "SUBJECT",
+	}
+	payload := &proto.AccountData{
+		ProjectID: 1,
+		UserID:    fmt.Sprintf("%d|%s", 1, wallet.Address()),
+		Identity:  identity.String(),
+		CreatedAt: time.Now(),
+	}
+
+	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "SessionKey", payload)
+	require.NoError(t, err)
+
+	return &data.Account{
+		ProjectID:          1,
+		Identity:           data.Identity(identity),
+		UserID:             payload.UserID,
+		Email:              "user@example.com",
+		ProjectScopedEmail: "1|user@example.com",
+		EncryptedKey:       encryptedKey,
+		Algorithm:          algorithm,
+		Ciphertext:         ciphertext,
+		CreatedAt:          payload.CreatedAt,
+	}
+
+}
+
+func newSessionFromData(t *testing.T, enc *enclave.Enclave, payload *proto.SessionData) *data.Session {
+	att, err := enc.GetAttestation(context.Background(), nil)
+	require.NoError(t, err)
+
+	var identity proto.Identity
+	require.NoError(t, identity.FromString(payload.Identity))
+
+	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "SessionKey", payload)
+	require.NoError(t, err)
+
+	return &data.Session{
+		ID:           payload.Address.String(),
+		ProjectID:    1,
+		UserID:       payload.UserID,
+		Identity:     payload.Identity,
+		FriendlyName: "FriendlyName",
+		EncryptedKey: encryptedKey,
+		Algorithm:    algorithm,
+		Ciphertext:   ciphertext,
+		RefreshedAt:  time.Now(),
+		CreatedAt:    time.Now(),
 	}
 }
 
 func newSession(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwallet.Wallet) *data.Session {
-	att, err := enc.GetAttestation(context.Background(), nil)
-	require.NoError(t, err)
-
 	if wallet == nil {
+		var err error
 		wallet, err = ethwallet.NewWalletFromRandomEntropy()
 		require.NoError(t, err)
 	}
@@ -439,27 +543,13 @@ func newSession(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwa
 	payload := &proto.SessionData{
 		Address:   wallet.Address(),
 		ProjectID: 1,
-		UserID:    fmt.Sprintf("%d|%s", 1, wallet.Address()),
+		UserID:    "1|USER",
 		Identity:  identity.String(),
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
 
-	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "SessionKey", payload)
-	require.NoError(t, err)
-
-	return &data.Session{
-		ID:           wallet.Address().String(),
-		ProjectID:    1,
-		UserID:       payload.UserID,
-		Identity:     payload.Identity,
-		FriendlyName: "FriendlyName",
-		EncryptedKey: encryptedKey,
-		Algorithm:    algorithm,
-		Ciphertext:   ciphertext,
-		RefreshedAt:  time.Now(),
-		CreatedAt:    time.Now(),
-	}
+	return newSessionFromData(t, enc, payload)
 }
 
 func newRandAccessKey(projectID uint64) string {

@@ -4,7 +4,7 @@ go 1.21.5
 
 require (
 	github.com/0xsequence/ethkit v1.22.4
-	github.com/0xsequence/go-sequence v0.25.1-0.20231213112230-04373039d46b
+	github.com/0xsequence/go-sequence v0.25.1-0.20240205212803-f217dc04b873
 	github.com/0xsequence/nitrocontrol v0.2.0
 	github.com/BurntSushi/toml v1.3.2
 	github.com/aws/aws-sdk-go-v2 v1.24.1
@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.12.14
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.26.8
 	github.com/aws/aws-sdk-go-v2/service/kms v1.27.9
+	github.com/gibson042/canonicaljson-go v1.0.3
 	github.com/go-chi/chi/v5 v5.0.11
 	github.com/go-chi/cors v1.2.1
 	github.com/go-chi/httplog v0.3.2
@@ -55,7 +56,6 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.5.0 // indirect
-	github.com/gibson042/canonicaljson-go v1.0.3 // indirect
 	github.com/gliderlabs/ssh v0.3.5 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect

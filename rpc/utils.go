@@ -7,12 +7,7 @@ import (
 )
 
 func (s *RPC) ChainList(ctx context.Context) ([]*proto.Chain, error) {
-	waasCtx, err := waasContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	chains, err := s.Wallets.ChainList(waasCtx)
+	chains, err := s.Wallets.ChainList(waasContext(ctx))
 	if err != nil {
 		return nil, err
 	}

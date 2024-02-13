@@ -12,7 +12,6 @@ import (
 	"github.com/0xsequence/nitrocontrol/enclave"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
-	"github.com/0xsequence/waas-authenticator/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,18 +33,12 @@ func TestRPC_GetTenant(t *testing.T) {
 	enc, err := enclave.New(context.Background(), enclave.DummyProvider, kmsClient, privKey)
 	require.NoError(t, err)
 
-	tenant := newTenant(t, enc, issuer)
+	tenant, _ := newTenant(t, enc, issuer)
 	dbClient := &dbMock{
 		sessions: map[string]*data.Session{},
 		tenants:  map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
 	}
-	svc := &rpc.RPC{
-		Config:     cfg,
-		HTTPClient: http.DefaultClient,
-		Enclave:    enc,
-		Tenants:    data.NewTenantTable(dbClient, "Tenants"),
-		Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
-	}
+	svc := initRPC(cfg, enc, dbClient)
 
 	srv := httptest.NewServer(svc.Handler())
 	defer srv.Close()
@@ -85,19 +78,12 @@ func TestRPC_CreateTenant(t *testing.T) {
 	enc, err := enclave.New(context.Background(), enclave.DummyProvider, kmsClient, privKey)
 	require.NoError(t, err)
 
-	tenant := newTenant(t, enc, issuer)
+	tenant, _ := newTenant(t, enc, issuer)
 	dbClient := &dbMock{
 		sessions: map[string]*data.Session{},
 		tenants:  map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
 	}
-	svc := &rpc.RPC{
-		Config:     cfg,
-		HTTPClient: http.DefaultClient,
-		Enclave:    enc,
-		Wallets:    &walletServiceMock{},
-		Tenants:    data.NewTenantTable(dbClient, "Tenants"),
-		Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
-	}
+	svc := initRPC(cfg, enc, dbClient)
 
 	srv := httptest.NewServer(svc.Handler())
 	defer srv.Close()

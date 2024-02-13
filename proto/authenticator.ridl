@@ -18,40 +18,6 @@ struct RuntimeStatus
   - branch: string
   - commitHash: string
 
-struct RegisterSessionPayload
-  - projectId: uint64
-    + go.field.name = ProjectID
-  - idToken: string
-    + go.field.name = IDToken
-  - sessionAddress: string
-  - friendlyName: string
-  - intentJSON: string
-    + go.field.name = IntentJSON
-
-struct RefreshSessionPayload
-  - sessionId: string
-    + go.field.name = SessionID
-
-struct DropSessionPayload
-  - sessionId: string
-    + go.field.name = SessionID
-  - dropSessionId: string
-    + go.field.name = DropSessionID
-
-struct ListSessionsPayload
-  - sessionId: string
-    + go.field.name = SessionID
-
-struct GetAddressPayload
-  - sessionId: string
-    + go.field.name = SessionID
-
-struct SendIntentPayload
-  - sessionId: string
-    + go.field.name = SessionID
-  - intentJson: string
-    + go.field.name = IntentJSON
-
 struct Chain
     - id: uint64
     - name: string
@@ -87,32 +53,31 @@ struct Tenant
 struct TenantData
   - projectId: uint64
     + go.field.name = ProjectID
-    + json = proj
+    + json = projectId
   - privateKey: string
-    + json = prv
+    + json = privateKey
   - parentAddress: string
-    + json = addr
+    + json = parentAddress
     + go.field.type = common.Address
     + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
   - userSalt: string
-    + json = salt
+    + json = userSalt
     + go.field.type = hexutil.Bytes
     + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common/hexutil
   - sequenceContext: MiniSequenceContext
-    + json = seqctx
+    + json = sequenceContext
   - upgradeCode: string
-    + json = upc
+    + json = upgradeCode
   - waasAccessToken: string
-    + json = wat
+    + json = waasAccessToken
   - oidcProviders: []OpenIdProvider
     + go.field.name = OIDCProviders
-    + json = oidc
-  - transportKeys: []string
-    + json = transk
-  - sessionKeys: []string
-    + json = sessk
+    + json = oidcProviders
+  - kmsKeys: []string
+    + go.field.name = KMSKeys
+    + json = kmsKeys
   - allowedOrigins: []string
-    + json = ogns
+    + json = allowedOrigins
 
 struct MiniSequenceContext
   - factory: string
@@ -126,14 +91,14 @@ enum IdentityType: uint8
 struct AccountData
   - projectId: uint64
     + go.field.name = ProjectID
-    + json = proj
+    + json = projectId
   - userId: string
     + go.field.name = UserID
-    + json = user
+    + json = userId
   - identity: string
-    + json = ident
+    + json = identity
   - createdAt: timestamp
-    + json = iat
+    + json = createdAt
 
 struct Session
   - id: string
@@ -154,21 +119,31 @@ struct Session
 
 struct SessionData
   - address: string
-    + json = addr
+    + json = address
     + go.field.type = common.Address
     + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
   - projectId: uint64
     + go.field.name = ProjectID
-    + json = proj
+    + json = projectId
   - userId: string
     + go.field.name = UserID
-    + json = user
+    + json = userId
   - identity: string
-    + json = ident
+    + json = identity
   - createdAt: timestamp
-    + json = iat
+    + json = createdAt
   - expiresAt: timestamp
-    + json = exp
+    + json = expiresAt
+
+struct Signature
+  - session: string
+  - signature: string
+
+struct Intent
+  - version: string
+  - packet: any
+    + go.field.type = json.RawMessage
+  - signatures: []Signature
 
 
 ##
@@ -183,13 +158,8 @@ error 1000 Unauthorized "Unauthorized access" HTTP 401
 ##
 
 service WaasAuthenticator
-    - RegisterSession(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (session: Session, data: any)
-    - ListSessions(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (sessions: []Session)
-    - DropSession(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (ok: bool)
-
-    - GetAddress(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (address: string)
-    - SendIntent(encryptedPayloadKey: string, payloadCiphertext: string, payloadSig: string) => (code: string, data: any)
-
+    - RegisterSession(intent: Intent, friendlyName: string) => (session: Session, data: any)
+    - SendIntent(intent: Intent) => (code: string, data: any)
     - ChainList() => (chains: []Chain)
 
 service WaasAuthenticatorAdmin
