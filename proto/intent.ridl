@@ -10,9 +10,11 @@ struct Intent
   - issuedAt: uint64
   - data: any
   - signatures: []Signature
+    + go.tag.json = ,omitempty
 
 struct Signature
   - sessionId: string
+     + go.field.name = SessionID
   - signature: string
 
 # no way to generate string enums
@@ -28,19 +30,25 @@ struct Signature
 
 struct IntentDataOpenSession
   - sessionId: string
+    + go.field.name = SessionID
   - email?: string
+    + go.tag.json = ,omitempty
   - idToken?: string
+    + go.tag.json = ,omitempty
 
 struct IntentDataCloseSession
   - sessionId: string
+    + go.field.name = SessionID
 
 struct IntentDataValidateSession
   - sessionId: string
+    + go.field.name = SessionID
   - wallet: string
   - deviceMetadata: string
 
 struct IntentDataFinishValidateSession
   - sessionId: string
+    + go.field.name = SessionID
   - wallet:  string
   - salt: string
   - challenge: string
@@ -51,6 +59,7 @@ struct IntentDataListSessions
 
 struct IntentDataGetSession
   - sessionId: string
+    + go.field.name = SessionID
   - wallet: string
 
 struct IntentDataSignMessage
@@ -95,6 +104,7 @@ struct TransactionERC721
 
 struct TransactionERC1155Value
   - id: string
+    + go.field.name = ID
   - amount: string
 
 struct TransactionDelayedEncode
@@ -128,6 +138,7 @@ struct IntentResponse
 
 struct IntentResponseSessionOpened
   - sessionId: string
+    + go.field.name = SessionID
   - wallet: string
 
 struct IntentResponseSessionClosed
@@ -136,6 +147,7 @@ struct IntentResponseValidateSession
 
 struct IntentResponseValidationRequired
   - sessionId: string
+    + go.field.name = SessionID
 
 struct IntentResponseValidationStarted
   - salt: string
@@ -148,6 +160,7 @@ struct IntentResponseListSessions
 
 struct IntentResponseGetSession
   - sessionId: string
+    + go.field.name = SessionID
   - wallet: string
   - validated: bool
 

@@ -20,7 +20,6 @@ import (
 	"github.com/0xsequence/ethkit/go-ethereum/common"
 	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
 	"github.com/0xsequence/go-sequence/intents"
-	"github.com/0xsequence/go-sequence/intents/packets"
 	"github.com/0xsequence/go-sequence/lib/prototyp"
 	"github.com/0xsequence/nitrocontrol/enclave"
 	"github.com/0xsequence/waas-authenticator/config"

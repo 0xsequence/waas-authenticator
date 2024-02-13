@@ -35,7 +35,7 @@ func (s *RPC) RegisterSession(
 		return nil, nil, err
 	}
 
-	if sessionID != intentTyped.Data.SessionId {
+	if sessionID != intentTyped.Data.SessionID {
 		return nil, nil, fmt.Errorf("signing session and session to register must match")
 	}
 
@@ -141,7 +141,7 @@ func (s *RPC) dropSession(
 ) (bool, error) {
 	tntData := tenant.FromContext(ctx)
 
-	dropSess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, intent.Data.SessionId)
+	dropSess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, intent.Data.SessionID)
 	if err != nil || !found || dropSess.UserID != sess.UserID {
 		return false, fmt.Errorf("session not found")
 	}

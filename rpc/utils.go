@@ -36,13 +36,13 @@ func parseIntent(pi *proto.Intent) (*intents.Intent, string, error) {
 		Signatures: convertProtoSignaturesToSignatures(pi.Signatures),
 	}
 
+	if err := intent.IsValid(); err != nil {
+		return nil, "", fmt.Errorf("intent is invalid: %w", err)
+	}
+
 	signers := intent.Signers()
 	if len(signers) != 1 {
 		return nil, "", fmt.Errorf("expected exactly one valid signature")
-	}
-
-	if err := intent.IsValid(); err != nil {
-		return nil, "", fmt.Errorf("intent is invalid: %w", err)
 	}
 
 	return intent, signers[0], nil
@@ -52,7 +52,7 @@ func convertProtoSignaturesToSignatures(signatures []*proto.Signature) []*intent
 	result := make([]*intents.Signature, len(signatures))
 	for i, s := range signatures {
 		result[i] = &intents.Signature{
-			SessionId: s.SessionId,
+			SessionID: s.SessionID,
 			Signature: s.Signature,
 		}
 	}
@@ -63,7 +63,7 @@ func convertToAPIIntent(intent *intents.Intent) *api.Intent {
 	signatures := make([]*api.Signature, len(intent.Signatures))
 	for i, s := range intent.Signatures {
 		signatures[i] = &api.Signature{
-			SessionId: s.SessionId,
+			SessionID: s.SessionID,
 			Signature: s.Signature,
 		}
 	}
