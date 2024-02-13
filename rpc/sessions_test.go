@@ -3,24 +3,21 @@ package rpc_test
 import (
 	"context"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/0xsequence/ethkit/ethcoder"
 	"github.com/0xsequence/ethkit/ethwallet"
-	"github.com/0xsequence/go-sequence/intents/packets"
+	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/nitrocontrol/enclave"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc"
-	"github.com/gibson042/canonicaljson-go"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +30,8 @@ func TestRPC_RegisterSession(t *testing.T) {
 
 	sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
 	require.NoError(t, err)
-	sessHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(sessWallet.Address().String()))).String()
+	signingSession := intents.NewSessionP256K1(sessWallet)
+	sessHash := ethcoder.Keccak256Hash([]byte(signingSession.SessionID())).String()
 
 	type assertionParams struct {
 		tenant        *data.Tenant
@@ -44,14 +42,14 @@ func TestRPC_RegisterSession(t *testing.T) {
 	testCases := map[string]struct {
 		assertFn        func(t *testing.T, sess *proto.Session, err error, p assertionParams)
 		tokBuilderFn    func(b *jwt.Builder)
-		intentBuilderFn func(t *testing.T, packet proto.Packet) *proto.Intent
+		intentBuilderFn func(t *testing.T, data intents.IntentDataOpenSession) *proto.Intent
 	}{
 		"Basic": {
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				require.NoError(t, err)
 				require.NotNil(t, sess)
 
-				assert.Equal(t, sessWallet.Address().String(), sess.ID)
+				assert.Equal(t, signingSession.SessionID(), sess.ID)
 				assert.Equal(t, fmt.Sprintf("%d|%s", p.tenant.ProjectID, sessHash), sess.UserID)
 				assert.Equal(t, "FriendlyName", sess.FriendlyName)
 
@@ -74,7 +72,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, sess)
 
-				assert.Equal(t, sessWallet.Address().String(), sess.ID)
+				assert.Equal(t, signingSession.SessionID(), sess.ID)
 			},
 		},
 		"WithInvalidNonce": {
@@ -93,7 +91,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, sess)
 
-				assert.Equal(t, sessWallet.Address().String(), sess.ID)
+				assert.Equal(t, signingSession.SessionID(), sess.ID)
 			},
 		},
 		"WithVerifiedEmail": {
@@ -119,17 +117,18 @@ func TestRPC_RegisterSession(t *testing.T) {
 			},
 		},
 		"MissingSignature": {
-			intentBuilderFn: func(t *testing.T, packet proto.Packet) *proto.Intent {
-				packetJSON, err := canonicaljson.Marshal(&packet)
-				require.NoError(t, err)
-
+			intentBuilderFn: func(t *testing.T, data intents.IntentDataOpenSession) *proto.Intent {
 				return &proto.Intent{
-					Version: "1.0.0",
-					Packet:  packetJSON,
+					Version:    "1.0.0",
+					Name:       intents.IntentNameOpenSession,
+					ExpiresAt:  uint64(time.Now().Add(1 * time.Minute).Unix()),
+					IssuedAt:   uint64(time.Now().Unix()),
+					Data:       data,
+					Signatures: nil,
 				}
 			},
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
-				assert.ErrorContains(t, err, "expected exactly one valid signature")
+				assert.ErrorContains(t, err, "intent is invalid: no signatures")
 			},
 		},
 	}
@@ -137,11 +136,8 @@ func TestRPC_RegisterSession(t *testing.T) {
 	for label, testCase := range testCases {
 		t.Run(label, func(t *testing.T) {
 			if testCase.intentBuilderFn == nil {
-				testCase.intentBuilderFn = func(t *testing.T, packet proto.Packet) *proto.Intent {
-					intentJSON := generateIntent(t, sessWallet, packet)
-					var intent proto.Intent
-					require.NoError(t, json.Unmarshal([]byte(intentJSON), &intent))
-					return &intent
+				testCase.intentBuilderFn = func(t *testing.T, data intents.IntentDataOpenSession) *proto.Intent {
+					return generateSignedIntent(t, intents.IntentNameOpenSession, data, signingSession)
 				}
 			}
 
@@ -169,16 +165,11 @@ func TestRPC_RegisterSession(t *testing.T) {
 			srv := httptest.NewServer(svc.Handler())
 			defer srv.Close()
 
-			packet := &packets.OpenSessionPacket{
-				BasePacket: packets.BasePacket{
-					Code:    packets.OpenSessionPacketCode,
-					Issued:  uint64(time.Now().Add(-1 * time.Second).Unix()),
-					Expires: uint64(time.Now().Add(5 * time.Minute).Unix()),
-				},
-				SessionId: sessWallet.Address().String(),
-				Proof:     packets.OpenSessionPacketProof{IDToken: tok},
+			intentData := intents.IntentDataOpenSession{
+				SessionID: signingSession.SessionID(),
+				IdToken:   &tok,
 			}
-			intent := testCase.intentBuilderFn(t, packet)
+			intent := testCase.intentBuilderFn(t, intentData)
 
 			c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 			header := make(http.Header)
@@ -204,6 +195,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 
 	sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
 	require.NoError(t, err)
+	signingSession := intents.NewSessionP256K1(sessWallet)
 
 	type assertionParams struct {
 		tenant        *data.Tenant
@@ -212,27 +204,29 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 		walletService *walletServiceMock
 	}
 	testCases := map[string]struct {
-		assertFn        func(t *testing.T, code string, data any, err error, p assertionParams)
-		intentBuilderFn func(t *testing.T, packet proto.Packet) *proto.Intent
+		assertFn        func(t *testing.T, res *proto.IntentResponse, err error, p assertionParams)
+		intentBuilderFn func(t *testing.T, data intents.IntentDataCloseSession) *proto.Intent
 		dropSessionID   string
 	}{
 		"SameSession": {
-			assertFn: func(t *testing.T, code string, data any, err error, p assertionParams) {
+			assertFn: func(t *testing.T, res *proto.IntentResponse, err error, p assertionParams) {
 				require.NoError(t, err)
-				require.Equal(t, "sessionClosed", code)
-				require.Equal(t, true, data)
+				require.NotNil(t, res)
+				require.Equal(t, "sessionClosed", res.Code)
+				require.Equal(t, true, res.Data)
 
-				dropSession := sessWallet.Address().String()
+				dropSession := signingSession.SessionID()
 				assert.NotContains(t, p.dbClient.sessions, dropSession)
 				assert.NotContains(t, p.walletService.registeredSessions, dropSession)
 			},
-			dropSessionID: sessWallet.Address().String(),
+			dropSessionID: signingSession.SessionID(),
 		},
 		"SameUser": {
-			assertFn: func(t *testing.T, code string, data any, err error, p assertionParams) {
+			assertFn: func(t *testing.T, res *proto.IntentResponse, err error, p assertionParams) {
 				require.NoError(t, err)
-				require.Equal(t, "sessionClosed", code)
-				require.Equal(t, true, data)
+				require.NotNil(t, res)
+				require.Equal(t, "sessionClosed", res.Code)
+				require.Equal(t, true, res.Data)
 
 				dropSession := "0x1111111111111111111111111111111111111111"
 				assert.NotContains(t, p.dbClient.sessions, dropSession)
@@ -241,9 +235,9 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			dropSessionID: "0x1111111111111111111111111111111111111111",
 		},
 		"OtherUser": {
-			assertFn: func(t *testing.T, code string, data any, err error, p assertionParams) {
+			assertFn: func(t *testing.T, res *proto.IntentResponse, err error, p assertionParams) {
 				assert.ErrorContains(t, err, "session not found")
-				assert.Empty(t, data)
+				assert.Nil(t, res)
 
 				dropSession := "0x2222222222222222222222222222222222222222"
 				assert.Contains(t, p.dbClient.sessions, dropSession)
@@ -256,11 +250,8 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 	for label, testCase := range testCases {
 		t.Run(label, func(t *testing.T) {
 			if testCase.intentBuilderFn == nil {
-				testCase.intentBuilderFn = func(t *testing.T, packet proto.Packet) *proto.Intent {
-					intentJSON := generateIntent(t, sessWallet, packet)
-					var intent proto.Intent
-					require.NoError(t, json.Unmarshal([]byte(intentJSON), &intent))
-					return &intent
+				testCase.intentBuilderFn = func(t *testing.T, data intents.IntentDataCloseSession) *proto.Intent {
+					return generateSignedIntent(t, intents.IntentNameCloseSession, data, signingSession)
 				}
 			}
 
@@ -274,9 +265,9 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			enc, err := enclave.New(context.Background(), enclave.DummyProvider, kmsClient, privKey)
 			require.NoError(t, err)
 
-			tenant, tntData := newTenant(t, enc, issuer)
+			tenant, _ := newTenant(t, enc, issuer)
 			acc := newAccount(t, enc, issuer, sessWallet)
-			session := newSession(t, enc, issuer, sessWallet)
+			session := newSession(t, enc, issuer, signingSession)
 
 			session2 := newSessionFromData(t, enc, &proto.SessionData{
 				ID:        "0x1111111111111111111111111111111111111111",
@@ -296,9 +287,6 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 				ExpiresAt: time.Now().Add(1 * time.Minute),
 			})
 
-			walletAddr, err := rpc.AddressForUser(context.Background(), tntData, acc.UserID)
-			require.NoError(t, err)
-
 			dbClient := &dbMock{
 				sessions: map[string]*data.Session{
 					session.ID:  session,
@@ -317,26 +305,18 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			srv := httptest.NewServer(svc.Handler())
 			defer srv.Close()
 
-			packet := &packets.CloseSessionPacket{
-				BasePacketForWallet: packets.BasePacketForWallet{
-					BasePacket: packets.BasePacket{
-						Code:    packets.CloseSessionPacketCode,
-						Issued:  uint64(time.Now().Add(-1 * time.Second).Unix()),
-						Expires: uint64(time.Now().Add(5 * time.Minute).Unix()),
-					},
-					Wallet: walletAddr,
-				},
-				SessionId: testCase.dropSessionID,
+			intentData := intents.IntentDataCloseSession{
+				SessionID: testCase.dropSessionID,
 			}
-			intent := testCase.intentBuilderFn(t, packet)
+			intent := testCase.intentBuilderFn(t, intentData)
 
 			c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 			header := make(http.Header)
 			header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
 			ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 
-			resCode, resData, err := c.SendIntent(ctx, intent)
-			testCase.assertFn(t, resCode, resData, err, assertionParams{
+			res, err := c.SendIntent(ctx, intent)
+			testCase.assertFn(t, res, err, assertionParams{
 				tenant:        tenant,
 				issuer:        issuer,
 				dbClient:      dbClient,
@@ -363,10 +343,11 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 
 	sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
 	require.NoError(t, err)
+	signingSession := intents.NewSessionP256K1(sessWallet)
 
 	tenant, tntData := newTenant(t, enc, issuer)
 	acc := newAccount(t, enc, issuer, sessWallet)
-	sess1 := newSession(t, enc, issuer, sessWallet)
+	sess1 := newSession(t, enc, issuer, signingSession)
 	sess2 := newSessionFromData(t, enc, &proto.SessionData{
 		ID:        "0x1111111111111111111111111111111111111111",
 		ProjectID: 1,
@@ -398,19 +379,10 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 	srv := httptest.NewServer(svc.Handler())
 	defer srv.Close()
 
-	packet := &proto.ListSessionsPacket{
-		BasePacketForWallet: packets.BasePacketForWallet{
-			BasePacket: packets.BasePacket{
-				Code:    proto.ListSessionsPacketCode,
-				Issued:  uint64(time.Now().Add(-1 * time.Second).Unix()),
-				Expires: uint64(time.Now().Add(5 * time.Minute).Unix()),
-			},
-			Wallet: walletAddr,
-		},
+	intentData := &intents.IntentDataListSessions{
+		Wallet: walletAddr,
 	}
-	intentJSON := generateIntent(t, sessWallet, packet)
-	var intent proto.Intent
-	require.NoError(t, json.Unmarshal([]byte(intentJSON), &intent))
+	intent := generateSignedIntent(t, intents.IntentNameListSessions, intentData, signingSession)
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
@@ -418,11 +390,11 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 	require.NoError(t, err)
 
-	resCode, resData, err := c.SendIntent(ctx, &intent)
+	res, err := c.SendIntent(ctx, intent)
 	require.NoError(t, err)
-	assert.Equal(t, "sessionsListed", resCode)
+	assert.Equal(t, "sessionsListed", res.Code)
 
-	sessions, ok := resData.([]any)
+	sessions, ok := res.Data.([]any)
 	require.True(t, ok)
 	require.Len(t, sessions, 2)
 }
