@@ -4,6 +4,11 @@ name = sequence-waas-authenticator
 version = v0.1.0
 
 
+import ./intent.ridl
+  - Intent
+  - IntentResponse
+  - Signature
+
 struct Version
   - webrpcVersion: string
   - schemaVersion: string
@@ -135,16 +140,6 @@ struct SessionData
   - expiresAt: timestamp
     + json = expiresAt
 
-struct Signature
-  - session: string
-  - signature: string
-
-struct Intent
-  - version: string
-  - packet: any
-    + go.field.type = json.RawMessage
-  - signatures: []Signature
-
 
 ##
 ## Errors
@@ -158,8 +153,8 @@ error 1000 Unauthorized "Unauthorized access" HTTP 401
 ##
 
 service WaasAuthenticator
-    - RegisterSession(intent: Intent, friendlyName: string) => (session: Session, data: any)
-    - SendIntent(intent: Intent) => (code: string, data: any)
+    - RegisterSession(intent: Intent, friendlyName: string) => (session: Session, response: IntentResponse)
+    - SendIntent(intent: Intent) => (response: IntentResponse)
     - ChainList() => (chains: []Chain)
 
 service WaasAuthenticatorAdmin
