@@ -135,16 +135,6 @@ struct SessionData
   - expiresAt: timestamp
     + json = expiresAt
 
-struct Signature
-  - sessionId: string
-  - signature: string
-
-struct Intent
-  - version: string
-  - packet: any
-    + go.field.type = json.RawMessage
-  - signatures: []Signature
-
 
 ##
 ## Errors
