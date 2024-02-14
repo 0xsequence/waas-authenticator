@@ -13,6 +13,8 @@ github.com/0xsequence/go-sequence v0.25.1-0.20240213145457-9d89454f02e9 h1:DEXlN
 github.com/0xsequence/go-sequence v0.25.1-0.20240213145457-9d89454f02e9/go.mod h1:De76GvRmR+zFnbpe8c5l9iTe9Hgs1Bc7WIZem4XdEq8=
 github.com/0xsequence/go-sequence v0.25.1-0.20240213160257-7610fed612a9 h1:PjnKYfqpJDJA16dDKQseQs0LwO7jAYlu9nwQNmiebOI=
 github.com/0xsequence/go-sequence v0.25.1-0.20240213160257-7610fed612a9/go.mod h1:De76GvRmR+zFnbpe8c5l9iTe9Hgs1Bc7WIZem4XdEq8=
+github.com/0xsequence/go-sequence v0.25.1-0.20240214083703-1bc8c1ab865a h1:+VqAv46qf6m43JvoXnh9WALhr3TMzWMQvYfXMH5rVVU=
+github.com/0xsequence/go-sequence v0.25.1-0.20240214083703-1bc8c1ab865a/go.mod h1:De76GvRmR+zFnbpe8c5l9iTe9Hgs1Bc7WIZem4XdEq8=
 github.com/0xsequence/nitrocontrol v0.2.0 h1:y42q3loyTgOGldaWq6KR5uK3XIrMolvYx7Bg781ve1Q=
 github.com/0xsequence/nitrocontrol v0.2.0/go.mod h1:sTG5akVPzoVr3unv/7h9aZGaT+BVGmvUMOdwXFeIEEA=
 github.com/0xsequence/nsm v0.1.0 h1:gVOViRWPUW/c5VEmGy2gCw1az/nqP3gY7VD9V2+069k=

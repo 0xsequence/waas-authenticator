@@ -34,7 +34,7 @@ func (s *RPC) sendTransaction(
 		return nil, fmt.Errorf("recovering parent wallet: %w", err)
 	}
 
-	apiIntent := convertToAPIIntent(intent.AsIntent())
+	apiIntent := convertToAPIIntent(intent.ToIntent())
 	bundle, err := s.Wallets.GenTransaction(waasContext(ctx), apiIntent)
 	if err != nil {
 		return nil, fmt.Errorf("generating transaction: %w", err)

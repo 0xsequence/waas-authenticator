@@ -70,7 +70,7 @@ func (s *RPC) signMessage(
 		},
 	}
 
-	apiIntent := convertToAPIIntent(intent.AsIntent())
+	apiIntent := convertToAPIIntent(intent.ToIntent())
 	res, err := s.Wallets.SignMessage(waasContext(ctx), targetWallet, apiIntent, signMessage, signatures)
 	if err != nil {
 		return nil, fmt.Errorf("signing message: %w", err)
