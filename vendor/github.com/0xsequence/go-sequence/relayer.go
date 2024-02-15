@@ -15,7 +15,17 @@ import (
 	"github.com/0xsequence/ethkit/go-ethereum/core/types"
 	"github.com/0xsequence/go-sequence/contracts"
 	"github.com/0xsequence/go-sequence/core"
+	"github.com/0xsequence/go-sequence/relayer/proto"
 )
+
+type RelayerSimulateResult struct {
+	Executed  bool
+	Succeeded bool
+	Result    *string
+	Reason    *string
+	GasUsed   uint
+	GasLimit  uint
+}
 
 type Relayer interface {
 	// ..
@@ -23,6 +33,9 @@ type Relayer interface {
 
 	// ..
 	EstimateGasLimits(ctx context.Context, walletConfig core.WalletConfig, walletContext WalletContext, txns Transactions) (Transactions, error)
+
+	// ..
+	Simulate(ctx context.Context, txs *SignedTransactions) ([]*RelayerSimulateResult, error)
 
 	// NOTE: nonce space is 160 bits wide
 	GetNonce(ctx context.Context, walletConfig core.WalletConfig, walletContext WalletContext, space *big.Int, blockNum *big.Int) (*big.Int, error)
@@ -34,6 +47,9 @@ type Relayer interface {
 
 	// ..
 	Wait(ctx context.Context, metaTxnID MetaTxnID, optTimeout ...time.Duration) (MetaTxnStatus, *types.Receipt, error)
+
+	// ..
+	Client() proto.Relayer
 
 	// TODO, in future when needed..
 	// GasRefundOptions()

@@ -12,7 +12,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.12.14
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.26.8
 	github.com/aws/aws-sdk-go-v2/service/kms v1.27.9
-	github.com/gibson042/canonicaljson-go v1.0.3
 	github.com/go-chi/chi/v5 v5.0.11
 	github.com/go-chi/cors v1.2.1
 	github.com/go-chi/httplog v0.3.2
@@ -56,6 +55,7 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.5.0 // indirect
+	github.com/gibson042/canonicaljson-go v1.0.3 // indirect
 	github.com/gliderlabs/ssh v0.3.5 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect

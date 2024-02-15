@@ -35,7 +35,7 @@ github.com/0xsequence/ethkit/go-ethereum/rpc
 # github.com/0xsequence/go-ethauth v0.13.0
 ## explicit; go 1.17
 github.com/0xsequence/go-ethauth
-# github.com/0xsequence/go-sequence v0.25.1-0.20231213112230-04373039d46b
+# github.com/0xsequence/go-sequence v0.25.1-0.20240215085151-03a5ef4a2143
 ## explicit; go 1.18
 github.com/0xsequence/go-sequence
 github.com/0xsequence/go-sequence/contracts
@@ -60,12 +60,9 @@ github.com/0xsequence/go-sequence/core/v1
 github.com/0xsequence/go-sequence/core/v2
 github.com/0xsequence/go-sequence/eip6492
 github.com/0xsequence/go-sequence/intents
-github.com/0xsequence/go-sequence/intents/packets
 github.com/0xsequence/go-sequence/lib/prototyp
 github.com/0xsequence/go-sequence/relayer/proto
 github.com/0xsequence/go-sequence/sessions/proto
-github.com/0xsequence/go-sequence/signing_service
-github.com/0xsequence/go-sequence/signing_service/proto
 # github.com/0xsequence/nitrocontrol v0.2.0
 ## explicit; go 1.21
 github.com/0xsequence/nitrocontrol/aescbc
