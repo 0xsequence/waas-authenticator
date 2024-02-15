@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -47,6 +48,19 @@ func withSessionHash(expectedSessionHash string) jwt.ValidatorFunc {
 	}
 }
 
+func withAudience(expectedAudience []string) jwt.ValidatorFunc {
+	return func(ctx context.Context, tok jwt.Token) jwt.ValidationError {
+		tokAudiences := tok.Audience()
+		for _, aud := range expectedAudience {
+			if slices.Contains(tokAudiences, aud) {
+				return nil
+			}
+		}
+
+		return jwt.NewValidationError(fmt.Errorf("aud not satisfied"))
+	}
+}
+
 func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sessionHash string) (proto.Identity, error) {
 	tok, err := jwt.Parse([]byte(idToken), jwt.WithVerify(false), jwt.WithValidate(false))
 	if err != nil {
@@ -71,12 +85,7 @@ func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sess
 		jwt.WithValidator(withIssuer(idp.Issuer)),
 		jwt.WithValidator(withSessionHash(sessionHash)),
 		jwt.WithAcceptableSkew(10 * time.Second),
-	}
-	if idp.Audience != nil {
-		validateOptions = append(validateOptions, jwt.WithAudience(*idp.Audience))
-	}
-	if idp.AuthorizedParty != nil {
-		validateOptions = append(validateOptions, jwt.WithClaimValue("azp", idp.AuthorizedParty))
+		jwt.WithValidator(withAudience(idp.Audience)),
 	}
 
 	if err := jwt.Validate(tok, validateOptions...); err != nil {

@@ -200,6 +200,7 @@ func issueAccessTokenAndRunJwksServer(t *testing.T, optTokenBuilderFn ...func(*j
 
 	tokBuilder := jwt.NewBuilder().
 		Issuer(jwksServer.URL).
+		Audience([]string{"audience"}).
 		Subject("subject")
 
 	if len(optTokenBuilderFn) > 0 && optTokenBuilderFn[0] != nil {
@@ -458,7 +459,7 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 		},
 		UpgradeCode:     "CHANGEME",
 		WaasAccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVyX2lkIjozfQ.g2fWwLrKPhTUpLFc7ZM9pMm4kEHGu8haCMzMOOGiqSM",
-		OIDCProviders:   []*proto.OpenIdProvider{{Issuer: issuer}},
+		OIDCProviders:   []*proto.OpenIdProvider{{Issuer: issuer, Audience: []string{"audience"}}},
 		AllowedOrigins:  []string{"http://localhost"},
 		KMSKeys:         []string{"SessionKey"},
 	}

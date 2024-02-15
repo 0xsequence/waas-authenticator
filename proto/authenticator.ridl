@@ -41,9 +41,7 @@ struct Identity
 struct OpenIdProvider
   - issuer: string
     + json = iss
-  - authorizedParty?: string
-    + json = azp
-  - audience?: string
+  - audience: []string
     + json = aud
 
 struct Tenant

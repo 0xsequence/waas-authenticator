@@ -210,8 +210,8 @@ func validateOIDCProviders(ctx context.Context, client HTTPClient, providers []*
 			return fmt.Errorf("provider %d: empty issuer", i)
 		}
 
-		if provider.Audience == nil {
-			return fmt.Errorf("provider %d: audience is required", i)
+		if len(provider.Audience) < 1 {
+			return fmt.Errorf("provider %d: at least one audience is required", i)
 		}
 
 		wg.Go(func() error {

@@ -93,8 +93,8 @@ func TestRPC_CreateTenant(t *testing.T) {
 	header.Set("Authorization", "Bearer "+adminJWT)
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 
-	audience := "audience"
-	validOidcProviders := []*proto.OpenIdProvider{{Issuer: issuer, Audience: &audience}}
+	audience := []string{"audience"}
+	validOidcProviders := []*proto.OpenIdProvider{{Issuer: issuer, Audience: audience}}
 	allowedOrigins := []string{"http://localhost"}
 
 	t.Run("TenantAlreadyExists", func(t *testing.T) {
@@ -106,8 +106,8 @@ func TestRPC_CreateTenant(t *testing.T) {
 
 	t.Run("InvalidProvider", func(t *testing.T) {
 		invalidOidcProviders := []*proto.OpenIdProvider{
-			{Issuer: issuer, Audience: &audience},
-			{Issuer: "INVALID", Audience: &audience},
+			{Issuer: issuer, Audience: audience},
+			{Issuer: "INVALID", Audience: audience},
 		}
 		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", invalidOidcProviders, allowedOrigins)
 		assert.Nil(t, tnt)
