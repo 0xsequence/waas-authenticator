@@ -42,7 +42,7 @@ type RPC struct {
 	Tenants    *data.TenantTable
 	Sessions   *data.SessionTable
 	Accounts   *data.AccountTable
-	Wallets    proto_wallet.Wallet
+	Wallets    proto_wallet.WaaS
 
 	startTime time.Time
 	running   int32
@@ -105,7 +105,7 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 			ByUserID: "UserID-Index",
 			ByEmail:  "Email-Index",
 		}),
-		Wallets:   proto_wallet.NewWalletClient(cfg.Endpoints.WaasAPIServer, client),
+		Wallets:   proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, client),
 		startTime: time.Now(),
 	}
 	return s, nil

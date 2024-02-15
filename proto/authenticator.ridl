@@ -4,6 +4,11 @@ name = sequence-waas-authenticator
 version = v0.1.0
 
 
+import ./intent.ridl
+  - Intent
+  - IntentResponse
+  - Signature
+
 struct Version
   - webrpcVersion: string
   - schemaVersion: string
@@ -36,9 +41,7 @@ struct Identity
 struct OpenIdProvider
   - issuer: string
     + json = iss
-  - authorizedParty?: string
-    + json = azp
-  - audience?: string
+  - audience: []string
     + json = aud
 
 struct Tenant
@@ -103,9 +106,6 @@ struct AccountData
 struct Session
   - id: string
     + go.field.name = ID
-  - address: string
-    + go.field.type = common.Address
-    + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
   - projectId: uint64
     + go.field.name = ProjectID
   - userId: string
@@ -118,10 +118,8 @@ struct Session
   - expiresAt: timestamp
 
 struct SessionData
-  - address: string
-    + json = address
-    + go.field.type = common.Address
-    + go.type.import = github.com/0xsequence/ethkit/go-ethereum/common
+  - id: string
+    + go.field.name = ID
   - projectId: uint64
     + go.field.name = ProjectID
     + json = projectId
@@ -134,16 +132,6 @@ struct SessionData
     + json = createdAt
   - expiresAt: timestamp
     + json = expiresAt
-
-struct Signature
-  - session: string
-  - signature: string
-
-struct Intent
-  - version: string
-  - packet: any
-    + go.field.type = json.RawMessage
-  - signatures: []Signature
 
 
 ##
@@ -158,8 +146,8 @@ error 1000 Unauthorized "Unauthorized access" HTTP 401
 ##
 
 service WaasAuthenticator
-    - RegisterSession(intent: Intent, friendlyName: string) => (session: Session, data: any)
-    - SendIntent(intent: Intent) => (code: string, data: any)
+    - RegisterSession(intent: Intent, friendlyName: string) => (session: Session, response: IntentResponse)
+    - SendIntent(intent: Intent) => (response: IntentResponse)
     - ChainList() => (chains: []Chain)
 
 service WaasAuthenticatorAdmin

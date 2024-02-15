@@ -20,8 +20,6 @@ import (
 	"github.com/0xsequence/ethkit/go-ethereum/common"
 	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
 	"github.com/0xsequence/go-sequence/intents"
-	"github.com/0xsequence/go-sequence/intents/packets"
-	"github.com/0xsequence/go-sequence/lib/prototyp"
 	"github.com/0xsequence/nitrocontrol/enclave"
 	"github.com/0xsequence/waas-authenticator/config"
 	"github.com/0xsequence/waas-authenticator/data"
@@ -35,7 +33,6 @@ import (
 	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/gibson042/canonicaljson-go"
 	"github.com/jxskiss/base62"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -81,34 +78,42 @@ func initRPC(cfg *config.Config, enc *enclave.Enclave, dbClient *dbMock) *rpc.RP
 	return svc
 }
 
-func generateIntent(t *testing.T, sessWallet *ethwallet.Wallet, packet proto.Packet) string {
-	packetJSON, err := canonicaljson.Marshal(&packet)
-	require.NoError(t, err)
-
-	intent := &intents.Intent{
-		Version: "1.0.0",
-		Packet:  packetJSON,
+func generateIntent(t *testing.T, name string, data any) *proto.Intent {
+	return &proto.Intent{
+		Version:    "1.0.0",
+		Name:       name,
+		ExpiresAt:  uint64(time.Now().Add(1 * time.Minute).Unix()),
+		IssuedAt:   uint64(time.Now().Unix()),
+		Data:       data,
+		Signatures: nil,
 	}
+}
 
-	intentHash, err := intent.Hash()
-	require.NoError(t, err)
-
-	signatureRaw, err := sessWallet.SignMessage(intentHash)
-	require.NoError(t, err)
-
-	signature := prototyp.HashFromBytes(signatureRaw)
-
-	intentJSON, err := json.Marshal(&intents.JSONIntent{
-		Version: intent.Version,
-		Packet:  intent.Packet,
-		Signatures: []intents.Signature{
-			{
-				Session:   sessWallet.Address().String(),
-				Signature: signature.String(),
-			},
-		},
-	})
-	return string(intentJSON)
+func generateSignedIntent(t *testing.T, name string, data any, session intents.Session) *proto.Intent {
+	intent := &intents.Intent{
+		Version:    "1.0.0",
+		Name:       name,
+		ExpiresAt:  uint64(time.Now().Add(1 * time.Minute).Unix()),
+		IssuedAt:   uint64(time.Now().Unix()),
+		Data:       data,
+		Signatures: nil,
+	}
+	require.NoError(t, session.Sign(intent))
+	signatures := make([]*proto.Signature, len(intent.Signatures))
+	for i, s := range intent.Signatures {
+		signatures[i] = &proto.Signature{
+			SessionID: s.SessionID,
+			Signature: s.Signature,
+		}
+	}
+	return &proto.Intent{
+		Version:    intent.Version,
+		Name:       intent.Name,
+		ExpiresAt:  intent.ExpiresAt,
+		IssuedAt:   intent.IssuedAt,
+		Data:       intent.Data,
+		Signatures: signatures,
+	}
 }
 
 var (
@@ -195,6 +200,7 @@ func issueAccessTokenAndRunJwksServer(t *testing.T, optTokenBuilderFn ...func(*j
 
 	tokBuilder := jwt.NewBuilder().
 		Issuer(jwksServer.URL).
+		Audience([]string{"audience"}).
 		Subject("subject")
 
 	if len(optTokenBuilderFn) > 0 && optTokenBuilderFn[0] != nil {
@@ -453,7 +459,7 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 		},
 		UpgradeCode:     "CHANGEME",
 		WaasAccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVyX2lkIjozfQ.g2fWwLrKPhTUpLFc7ZM9pMm4kEHGu8haCMzMOOGiqSM",
-		OIDCProviders:   []*proto.OpenIdProvider{{Issuer: issuer}},
+		OIDCProviders:   []*proto.OpenIdProvider{{Issuer: issuer, Audience: []string{"audience"}}},
 		AllowedOrigins:  []string{"http://localhost"},
 		KMSKeys:         []string{"SessionKey"},
 	}
@@ -515,7 +521,7 @@ func newSessionFromData(t *testing.T, enc *enclave.Enclave, payload *proto.Sessi
 	require.NoError(t, err)
 
 	return &data.Session{
-		ID:           payload.Address.String(),
+		ID:           payload.ID,
 		ProjectID:    1,
 		UserID:       payload.UserID,
 		Identity:     payload.Identity,
@@ -528,11 +534,12 @@ func newSessionFromData(t *testing.T, enc *enclave.Enclave, payload *proto.Sessi
 	}
 }
 
-func newSession(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwallet.Wallet) *data.Session {
-	if wallet == nil {
+func newSession(t *testing.T, enc *enclave.Enclave, issuer string, signingSession intents.Session) *data.Session {
+	if signingSession == nil {
 		var err error
-		wallet, err = ethwallet.NewWalletFromRandomEntropy()
+		wallet, err := ethwallet.NewWalletFromRandomEntropy()
 		require.NoError(t, err)
+		signingSession = intents.NewSessionP256K1(wallet)
 	}
 
 	identity := proto.Identity{
@@ -541,7 +548,7 @@ func newSession(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwa
 		Subject: "SUBJECT",
 	}
 	payload := &proto.SessionData{
-		Address:   wallet.Address(),
+		ID:        signingSession.SessionID(),
 		ProjectID: 1,
 		UserID:    "1|USER",
 		Identity:  identity.String(),
@@ -575,37 +582,37 @@ func newWalletServiceMock(registeredSessions []string) *walletServiceMock {
 	return m
 }
 
-func (w walletServiceMock) CreatePartner(ctx context.Context, name string, config *proto_wallet.PartnerWalletPreConfig, jwtAlg string, jwtSecret *string, jwtPublic *string) (*proto_wallet.Partner, error) {
+func (w walletServiceMock) CreateProject(ctx context.Context, projectID uint64, name string, config *proto_wallet.ProjectWalletPreConfig, jwtAlg string, jwtSecret *string, jwtPublic *string) (*proto_wallet.Project, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) PartnerParentConfig(ctx context.Context, partnerId uint64) (string, error) {
+func (w walletServiceMock) ProjectParentConfig(ctx context.Context, projectId uint64) (string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) PartnerParentWallet(ctx context.Context, partnerId uint64) (string, error) {
+func (w walletServiceMock) ProjectParentWallet(ctx context.Context, projectId uint64) (string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) DeployPartnerParentWallet(ctx context.Context, partnerId uint64, chainID uint64) (string, string, error) {
+func (w walletServiceMock) DeployProjectParentWallet(ctx context.Context, projectId uint64, chainID uint64) (string, string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) PartnerWallets(ctx context.Context, partnerId uint64, page *proto_wallet.Page) ([]*proto_wallet.PartnerWallet, *proto_wallet.Page, error) {
+func (w walletServiceMock) ProjectWallets(ctx context.Context, projectId uint64, page *proto_wallet.Page) ([]*proto_wallet.ProjectWallet, *proto_wallet.Page, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) PartnerUserSalt(ctx context.Context, partnerId uint64) (string, error) {
+func (w walletServiceMock) ProjectUserSalt(ctx context.Context, projectId uint64) (string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) ParentWallet(ctx context.Context) (string, error) {
+func (w walletServiceMock) ProjectWallet(ctx context.Context) (string, error) {
 	return "0x00", nil
 }
 
@@ -621,7 +628,7 @@ func (w walletServiceMock) UseHotWallet(ctx context.Context, walletAddress strin
 	return true, nil
 }
 
-func (w walletServiceMock) Wallets(ctx context.Context, page *proto_wallet.Page) ([]*proto_wallet.PartnerWallet, *proto_wallet.Page, error) {
+func (w walletServiceMock) Wallets(ctx context.Context, page *proto_wallet.Page) ([]*proto_wallet.ProjectWallet, *proto_wallet.Page, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -631,23 +638,26 @@ func (w walletServiceMock) IsValidMessageSignature(ctx context.Context, chainID 
 	panic("implement me")
 }
 
-func (w walletServiceMock) GenTransaction(ctx context.Context, payload string) (*proto_wallet.TransactionBundle, error) {
-	var intent intents.Intent
-	if err := json.Unmarshal([]byte(payload), &intent); err != nil {
-		return nil, err
+func (w walletServiceMock) GenTransaction(ctx context.Context, protoIntent *proto_wallet.Intent) (*proto_wallet.TransactionBundle, error) {
+	intent := &intents.Intent{
+		Version:   protoIntent.Version,
+		Name:      protoIntent.Name,
+		ExpiresAt: protoIntent.ExpiresAt,
+		IssuedAt:  protoIntent.IssuedAt,
+		Data:      protoIntent.Data,
 	}
-	var packet packets.SendTransactionsPacket
-	if err := json.Unmarshal(intent.Packet, &packet); err != nil {
+	intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataSendTransaction](intent)
+	if err != nil {
 		return nil, err
 	}
 
-	nonce, err := packet.Nonce()
+	nonce, err := intentTyped.Data.Nonce()
 	if err != nil {
 		return nil, err
 	}
 
 	return &proto_wallet.TransactionBundle{
-		ChainID: packet.Network,
+		ChainID: intentTyped.Data.Network,
 		Nonce:   hexutil.EncodeBig(nonce),
 		Transactions: []*proto_wallet.Transaction{
 			{
@@ -660,8 +670,8 @@ func (w walletServiceMock) GenTransaction(ctx context.Context, payload string) (
 	}, nil
 }
 
-func (w walletServiceMock) SendTransaction(ctx context.Context, wallet *proto_wallet.TargetWallet, payload string, result *proto_wallet.TransactionBundle, signatures []*proto_wallet.ProvidedSignature) (*proto_wallet.PayloadResponse, error) {
-	return &proto_wallet.PayloadResponse{
+func (w walletServiceMock) SendTransaction(ctx context.Context, intent *proto_wallet.Intent, result *proto_wallet.TransactionBundle, signatures []*proto_wallet.ProvidedSignature) (*proto_wallet.IntentResponse, error) {
+	return &proto_wallet.IntentResponse{
 		Code: "transactionReceipt",
 		Data: map[string]any{
 			"txHash": "0x123456",
@@ -669,8 +679,8 @@ func (w walletServiceMock) SendTransaction(ctx context.Context, wallet *proto_wa
 	}, nil
 }
 
-func (w walletServiceMock) SignMessage(ctx context.Context, wallet *proto_wallet.TargetWallet, payload string, message *proto_wallet.SignMessage, signatures []*proto_wallet.ProvidedSignature) (*proto_wallet.PayloadResponse, error) {
-	return &proto_wallet.PayloadResponse{
+func (w walletServiceMock) SignMessage(ctx context.Context, intent *proto_wallet.Intent, message *proto_wallet.SignMessage, signatures []*proto_wallet.ProvidedSignature) (*proto_wallet.IntentResponse, error) {
+	return &proto_wallet.IntentResponse{
 		Code: "signedMessage",
 		Data: map[string]any{
 			"message":   "0x6D657373616765",
@@ -679,47 +689,50 @@ func (w walletServiceMock) SignMessage(ctx context.Context, wallet *proto_wallet
 	}, nil
 }
 
-func (w walletServiceMock) GetSession(ctx context.Context, sessionAddress string) (bool, error) {
+func (w walletServiceMock) GetSession(ctx context.Context, sessionID string) (*proto_wallet.IntentResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w *walletServiceMock) RegisterSession(ctx context.Context, userID string, sessionPayload string) (*proto_wallet.PayloadResponse, error) {
-	var intent intents.Intent
-	if err := json.Unmarshal([]byte(sessionPayload), &intent); err != nil {
-		return nil, err
+func (w *walletServiceMock) RegisterSession(ctx context.Context, userID string, protoIntent *proto_wallet.Intent) (*proto_wallet.IntentResponse, error) {
+	intent := &intents.Intent{
+		Version:   protoIntent.Version,
+		Name:      protoIntent.Name,
+		ExpiresAt: protoIntent.ExpiresAt,
+		IssuedAt:  protoIntent.IssuedAt,
+		Data:      protoIntent.Data,
 	}
-	var packet packets.OpenSessionPacket
-	if err := json.Unmarshal(intent.Packet, &packet); err != nil {
+	intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataOpenSession](intent)
+	if err != nil {
 		return nil, err
 	}
 
-	w.registeredSessions[packet.Session] = struct{}{}
+	w.registeredSessions[intentTyped.Data.SessionID] = struct{}{}
 	w.registeredUsers[userID] = struct{}{}
 
-	return &proto_wallet.PayloadResponse{
+	return &proto_wallet.IntentResponse{
 		Code: "openedSession",
 	}, nil
 }
 
-func (w walletServiceMock) StartSessionValidation(ctx context.Context, walletAddress string, sessionAddress string, deviceMetadata string, redirectUrl *string) (*proto_wallet.PayloadResponse, error) {
+func (w walletServiceMock) StartSessionValidation(ctx context.Context, walletAddress string, sessionID string, deviceMetadata string) (*proto_wallet.IntentResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w *walletServiceMock) InvalidateSession(ctx context.Context, sessionAddress string) (bool, error) {
-	if _, ok := w.registeredSessions[sessionAddress]; !ok {
+func (w *walletServiceMock) InvalidateSession(ctx context.Context, sessionID string) (bool, error) {
+	if _, ok := w.registeredSessions[sessionID]; !ok {
 		return false, fmt.Errorf("session does not exist")
 	}
-	delete(w.registeredSessions, sessionAddress)
+	delete(w.registeredSessions, sessionID)
 	return true, nil
 }
 
-func (w walletServiceMock) SendIntent(ctx context.Context, wallet *proto_wallet.TargetWallet, payload string) (*proto_wallet.PayloadResponse, error) {
-	return &proto_wallet.PayloadResponse{
+func (w walletServiceMock) SendIntent(ctx context.Context, intent *proto_wallet.Intent) (*proto_wallet.IntentResponse, error) {
+	return &proto_wallet.IntentResponse{
 		Code: "sentIntent",
 		Data: map[string]any{
-			"payload": payload,
+			"intent": intent,
 		},
 	}, nil
 }
@@ -729,4 +742,9 @@ func (w walletServiceMock) ChainList(ctx context.Context) ([]*proto_wallet.Chain
 	panic("implement me")
 }
 
-var _ proto_wallet.Wallet = (*walletServiceMock)(nil)
+func (w walletServiceMock) FinishValidateSession(ctx context.Context, sessionId string, salt string, challenge string) (*proto_wallet.IntentResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+var _ proto_wallet.WaaS = (*walletServiceMock)(nil)

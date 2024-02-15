@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/0xsequence/ethkit/ethcoder"
-	"github.com/0xsequence/ethkit/go-ethereum/common"
-	"github.com/0xsequence/go-sequence/intents/packets"
+	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
@@ -16,25 +15,37 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 )
 
-func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendlyName string) (*proto.Session, any, error) {
+func (s *RPC) RegisterSession(
+	ctx context.Context, protoIntent *proto.Intent, friendlyName string,
+) (*proto.Session, *proto.IntentResponse, error) {
 	att := attestation.FromContext(ctx)
 	tntData := tenant.FromContext(ctx)
 
-	payload, err := proto.ParseIntentWithPacket(intent, &packets.OpenSessionPacket{})
+	intent, sessionID, err := parseIntent(protoIntent)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse intent: %w", err)
 	}
 
-	if payload.Session != payload.Packet.Session {
+	if intent.Name != intents.IntentNameOpenSession {
+		return nil, nil, fmt.Errorf("unexpected intent name: %q", intent.Name)
+	}
+
+	intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataOpenSession](intent)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if sessionID != intentTyped.Data.SessionID {
 		return nil, nil, fmt.Errorf("signing session and session to register must match")
 	}
 
-	if !common.IsHexAddress(payload.Session) {
-		return nil, nil, fmt.Errorf("session is invalid")
+	idToken := intentTyped.Data.IdToken
+	if idToken == nil || *idToken == "" {
+		return nil, nil, fmt.Errorf("idToken is required")
 	}
 
-	sessionHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(payload.Session))).String()
-	identity, err := verifyIdentity(ctx, s.HTTPClient, payload.Packet.Proof.IDToken, sessionHash)
+	sessionHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(sessionID))).String()
+	identity, err := verifyIdentity(ctx, s.HTTPClient, *idToken, sessionHash)
 	if err != nil {
 		return nil, nil, fmt.Errorf("verifying identity: %w", err)
 	}
@@ -69,7 +80,7 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 		}
 	}
 
-	res, err := s.Wallets.RegisterSession(waasContext(ctx), account.UserID, payload.IntentJSON)
+	res, err := s.Wallets.RegisterSession(waasContext(ctx), account.UserID, convertToAPIIntent(intent))
 	if err != nil {
 		return nil, nil, fmt.Errorf("registering session with WaaS API: %w", err)
 	}
@@ -82,7 +93,7 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 
 	ttl := 100 * 365 * 24 * time.Hour // TODO: should be configured somewhere, maybe per tenant?
 	sessData := proto.SessionData{
-		Address:   common.HexToAddress(payload.Session),
+		ID:        sessionID,
 		ProjectID: tntData.ProjectID,
 		UserID:    account.UserID,
 		Identity:  identity.String(),
@@ -92,11 +103,11 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.KMSKeys[0], sessData)
 	if err != nil {
-		return nil, res.Data, fmt.Errorf("encrypting session data: %w", err)
+		return nil, convertIntentResponse(res), fmt.Errorf("encrypting session data: %w", err)
 	}
 
 	dbSess := &data.Session{
-		ID:           sessData.Address.String(),
+		ID:           sessionID,
 		ProjectID:    tntData.ProjectID,
 		UserID:       account.UserID,
 		Identity:     identity.String(),
@@ -109,12 +120,11 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 	}
 
 	if err := s.Sessions.Put(ctx, dbSess); err != nil {
-		return nil, res.Data, fmt.Errorf("save session: %w", err)
+		return nil, convertIntentResponse(res), fmt.Errorf("save session: %w", err)
 	}
 
 	retSess := &proto.Session{
 		ID:           dbSess.ID,
-		Address:      sessData.Address,
 		UserID:       dbSess.UserID,
 		ProjectID:    sessData.ProjectID,
 		Identity:     identity,
@@ -123,15 +133,15 @@ func (s *RPC) RegisterSession(ctx context.Context, intent *proto.Intent, friendl
 		RefreshedAt:  dbSess.RefreshedAt,
 		ExpiresAt:    sessData.ExpiresAt,
 	}
-	return retSess, res.Data, nil
+	return retSess, convertIntentResponse(res), nil
 }
 
 func (s *RPC) dropSession(
-	ctx context.Context, sess *data.Session, payload *proto.Payload[*packets.CloseSessionPacket],
+	ctx context.Context, sess *data.Session, intent *intents.IntentTyped[intents.IntentDataCloseSession],
 ) (bool, error) {
 	tntData := tenant.FromContext(ctx)
 
-	dropSess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, payload.Packet.Session)
+	dropSess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, intent.Data.SessionID)
 	if err != nil || !found || dropSess.UserID != sess.UserID {
 		return false, fmt.Errorf("session not found")
 	}
@@ -147,7 +157,9 @@ func (s *RPC) dropSession(
 	return true, nil
 }
 
-func (s *RPC) listSessions(ctx context.Context, sess *data.Session, payload *proto.Payload[*proto.ListSessionsPacket]) ([]*proto.Session, error) {
+func (s *RPC) listSessions(
+	ctx context.Context, sess *data.Session, intent *intents.IntentTyped[intents.IntentDataListSessions],
+) ([]*proto.Session, error) {
 	tntData := tenant.FromContext(ctx)
 
 	dbSessions, err := s.Sessions.ListByUserID(ctx, sess.UserID)
@@ -169,7 +181,6 @@ func (s *RPC) listSessions(ctx context.Context, sess *data.Session, payload *pro
 
 		out[i] = &proto.Session{
 			ID:           dbSess.ID,
-			Address:      sessData.Address,
 			UserID:       dbSess.UserID,
 			ProjectID:    sessData.ProjectID,
 			Identity:     identity,

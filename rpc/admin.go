@@ -82,7 +82,7 @@ func (s *RPC) CreateTenant(
 		return nil, "", fmt.Errorf("decoding user salt: %w", err)
 	}
 
-	parentAddress, err := s.Wallets.ParentWallet(waasCtx)
+	parentAddress, err := s.Wallets.ProjectWallet(waasCtx)
 	if err != nil {
 		return nil, "", fmt.Errorf("retrieving parent wallet: %w", err)
 	}
@@ -210,8 +210,8 @@ func validateOIDCProviders(ctx context.Context, client HTTPClient, providers []*
 			return fmt.Errorf("provider %d: empty issuer", i)
 		}
 
-		if provider.Audience == nil {
-			return fmt.Errorf("provider %d: audience is required", i)
+		if len(provider.Audience) < 1 {
+			return fmt.Errorf("provider %d: at least one audience is required", i)
 		}
 
 		wg.Go(func() error {
