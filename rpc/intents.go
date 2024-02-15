@@ -90,11 +90,11 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		if err != nil {
 			return nil, err
 		}
-		ok, err := s.dropSession(ctx, sess, intentTyped)
+		_, err = s.dropSession(ctx, sess, intentTyped)
 		if err != nil {
 			return nil, err
 		}
-		return makeIntentResponse("sessionClosed", ok), nil
+		return makeIntentResponse("sessionClosed", intents.IntentResponseSessionClosed{}), nil
 
 	case intents.IntentNameListSessions:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataListSessions](intent)
