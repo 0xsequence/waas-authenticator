@@ -4,7 +4,7 @@ go 1.21.5
 
 require (
 	github.com/0xsequence/ethkit v1.22.4
-	github.com/0xsequence/go-sequence v0.25.1-0.20240214083703-1bc8c1ab865a
+	github.com/0xsequence/go-sequence v0.25.1-0.20240215085151-03a5ef4a2143
 	github.com/0xsequence/nitrocontrol v0.2.0
 	github.com/BurntSushi/toml v1.3.2
 	github.com/aws/aws-sdk-go-v2 v1.24.1

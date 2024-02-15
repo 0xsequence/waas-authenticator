@@ -10,7 +10,7 @@ struct Intent
   - issuedAt: uint64
   - data: any
   - signatures: []Signature
-    + go.tag.json = ,omitempty
+    + go.tag.json = signatures,omitempty
 
 struct Signature
   - sessionId: string
@@ -32,9 +32,9 @@ struct IntentDataOpenSession
   - sessionId: string
     + go.field.name = SessionID
   - email?: string
-    + go.tag.json = ,omitempty
+    + go.tag.json = email,omitempty
   - idToken?: string
-    + go.tag.json = ,omitempty
+    + go.tag.json = idToken,omitempty
 
 struct IntentDataCloseSession
   - sessionId: string
@@ -70,7 +70,7 @@ struct IntentDataSignMessage
 struct IntentDataSendTransaction
   - network: string
   - wallet:  string
-  - identifier: string
+  - identifier: string # is used to generate nonce space
   - transactions: []any
     + go.field.type = []json.RawMessage
 
