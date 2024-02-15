@@ -36,6 +36,8 @@ func (d *dummySession) Send(req request.Request) (response.Response, error) {
 	switch req := req.(type) {
 	case *request.Attestation:
 		return d.handleAttestation(req)
+	case *request.DescribePCR:
+		return d.handleDescribePCR(req)
 	default:
 		return response.Response{}, fmt.Errorf("unsupported request type: %T", req)
 	}
@@ -55,6 +57,17 @@ func (d *dummySession) handleAttestation(req *request.Attestation) (response.Res
 	res := response.Response{
 		Attestation: &response.Attestation{
 			Document: document,
+		},
+	}
+	return res, nil
+}
+
+func (d *dummySession) handleDescribePCR(req *request.DescribePCR) (response.Response, error) {
+	hash := make([]byte, 48)
+	res := response.Response{
+		DescribePCR: &response.DescribePCR{
+			Lock: true,
+			Data: hash,
 		},
 	}
 	return res, nil

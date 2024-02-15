@@ -2,6 +2,8 @@ package rpc
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"time"
 
 	waasauthenticator "github.com/0xsequence/waas-authenticator"
@@ -13,18 +15,16 @@ func (s *RPC) Version(ctx context.Context) (*proto.Version, error) {
 		WebrpcVersion: proto.WebRPCVersion(),
 		SchemaVersion: proto.WebRPCSchemaVersion(),
 		SchemaHash:    proto.WebRPCSchemaHash(),
-		AppVersion:    waasauthenticator.GITCOMMIT,
 	}, nil
 }
 
 func (s *RPC) RuntimeStatus(ctx context.Context) (*proto.RuntimeStatus, error) {
 	status := &proto.RuntimeStatus{
-		HealthOK:   true,
-		StartTime:  s.startTime,
-		Uptime:     uint64(time.Now().UTC().Sub(s.startTime).Seconds()),
-		Ver:        waasauthenticator.VERSION,
-		Branch:     waasauthenticator.GITBRANCH,
-		CommitHash: waasauthenticator.GITCOMMIT,
+		HealthOK:  true,
+		StartTime: s.startTime,
+		Uptime:    uint64(time.Now().UTC().Sub(s.startTime).Seconds()),
+		Ver:       waasauthenticator.VERSION,
+		PCR0:      s.measurements.PCR0,
 	}
 	return status, nil
 }
@@ -32,4 +32,17 @@ func (s *RPC) RuntimeStatus(ctx context.Context) (*proto.RuntimeStatus, error) {
 func (s *RPC) Clock(ctx context.Context) (time.Time, error) {
 	now := time.Now()
 	return now, nil
+}
+
+func (s *RPC) statusHandler(w http.ResponseWriter, r *http.Request) {
+	status := &proto.RuntimeStatus{
+		HealthOK:  true,
+		StartTime: s.startTime,
+		Uptime:    uint64(time.Now().UTC().Sub(s.startTime).Seconds()),
+		Ver:       waasauthenticator.VERSION,
+		PCR0:      s.measurements.PCR0,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(status)
 }

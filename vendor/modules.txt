@@ -63,7 +63,7 @@ github.com/0xsequence/go-sequence/intents
 github.com/0xsequence/go-sequence/lib/prototyp
 github.com/0xsequence/go-sequence/relayer/proto
 github.com/0xsequence/go-sequence/sessions/proto
-# github.com/0xsequence/nitrocontrol v0.2.0
+# github.com/0xsequence/nitrocontrol v0.3.0
 ## explicit; go 1.21
 github.com/0xsequence/nitrocontrol/aescbc
 github.com/0xsequence/nitrocontrol/cms

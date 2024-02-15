@@ -5,8 +5,8 @@ github.com/0xsequence/go-ethauth v0.13.0 h1:ZaqFEEqy574A2b1P7vjpcy5tb4W/izn+A3sw
 github.com/0xsequence/go-ethauth v0.13.0/go.mod h1:f3kx39S9F+W+qvZEB6bkKKbpUstmyB7goUntO3wvlhg=
 github.com/0xsequence/go-sequence v0.25.1-0.20240215085151-03a5ef4a2143 h1:gobYr+Ss6WrQkBD/8dg3Cp7OBpj6lhDVIFM/MEw8ybo=
 github.com/0xsequence/go-sequence v0.25.1-0.20240215085151-03a5ef4a2143/go.mod h1:De76GvRmR+zFnbpe8c5l9iTe9Hgs1Bc7WIZem4XdEq8=
-github.com/0xsequence/nitrocontrol v0.2.0 h1:y42q3loyTgOGldaWq6KR5uK3XIrMolvYx7Bg781ve1Q=
-github.com/0xsequence/nitrocontrol v0.2.0/go.mod h1:sTG5akVPzoVr3unv/7h9aZGaT+BVGmvUMOdwXFeIEEA=
+github.com/0xsequence/nitrocontrol v0.3.0 h1:D0/gX576zQhitrJnBfBrOFFufEOzh6f2jO/+2ynwIUA=
+github.com/0xsequence/nitrocontrol v0.3.0/go.mod h1:sTG5akVPzoVr3unv/7h9aZGaT+BVGmvUMOdwXFeIEEA=
 github.com/0xsequence/nsm v0.1.0 h1:gVOViRWPUW/c5VEmGy2gCw1az/nqP3gY7VD9V2+069k=
 github.com/0xsequence/nsm v0.1.0/go.mod h1:ETKcxsf9eirRO4mwtUMDurcb0qxyg7I4vIqgUlb4qZM=
 github.com/BurntSushi/toml v1.3.2 h1:o7IhLm0Msx3BaB+n3Ag7L8EVlByGnpq14C4YWiu/gL8=

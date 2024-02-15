@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/0xsequence/nsm/request"
@@ -79,4 +80,29 @@ func (e *Enclave) GetAttestation(ctx context.Context, nonce []byte) (*Attestatio
 		key:        e.privKey,
 	}
 	return att, nil
+}
+
+// Measurements are calculated by the Nitro supervisor at runtime based on the enclave image.
+type Measurements struct {
+	PCR0 string
+}
+
+// GetMeasurements opens an NSM session and requests the PCR0 hash that is then returned
+// as part of the Measurements struct.
+func (e *Enclave) GetMeasurements(ctx context.Context) (*Measurements, error) {
+	sess, err := e.provider(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("open NSM session: %w", err)
+	}
+	defer sess.Close()
+
+	res, err := sess.Send(&request.DescribePCR{Index: 0})
+	if err != nil {
+		return nil, fmt.Errorf("NSM DescribePCR call: %w", err)
+	}
+
+	m := &Measurements{
+		PCR0: hex.EncodeToString(res.DescribePCR.Data),
+	}
+	return m, nil
 }
