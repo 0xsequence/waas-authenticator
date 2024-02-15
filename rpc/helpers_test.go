@@ -747,4 +747,4 @@ func (w walletServiceMock) FinishValidateSession(ctx context.Context, sessionId 
 	panic("implement me")
 }
 
-var _ proto_wallet.Wallet = (*walletServiceMock)(nil)
+var _ proto_wallet.WaaS = (*walletServiceMock)(nil)
