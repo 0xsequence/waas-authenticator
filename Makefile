@@ -64,5 +64,6 @@ test-clean:
 	GOGC=off go clean -testcache
 
 eif:
+	mkdir -p bin
 	docker build --platform linux/amd64 --build-arg ENV_ARG=next -t waas-authenticator-builder .
-	docker run --platform linux/amd64 -v ./bin:/out waas-authenticator-builder
+	docker run --platform linux/amd64 -v bin:/out waas-authenticator-builder
