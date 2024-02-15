@@ -11,6 +11,8 @@ github.com/0xsequence/nitrocontrol v0.2.1-0.20240215203717-33858712ef76 h1:dGoCf
 github.com/0xsequence/nitrocontrol v0.2.1-0.20240215203717-33858712ef76/go.mod h1:sTG5akVPzoVr3unv/7h9aZGaT+BVGmvUMOdwXFeIEEA=
 github.com/0xsequence/nitrocontrol v0.2.1-0.20240215212920-7eb7d8bd651b h1:ewN7b1tizGG2wbe3/svR1kG6jPlY5gfqs52R16bSOpQ=
 github.com/0xsequence/nitrocontrol v0.2.1-0.20240215212920-7eb7d8bd651b/go.mod h1:sTG5akVPzoVr3unv/7h9aZGaT+BVGmvUMOdwXFeIEEA=
+github.com/0xsequence/nitrocontrol v0.3.0 h1:D0/gX576zQhitrJnBfBrOFFufEOzh6f2jO/+2ynwIUA=
+github.com/0xsequence/nitrocontrol v0.3.0/go.mod h1:sTG5akVPzoVr3unv/7h9aZGaT+BVGmvUMOdwXFeIEEA=
 github.com/0xsequence/nsm v0.1.0 h1:gVOViRWPUW/c5VEmGy2gCw1az/nqP3gY7VD9V2+069k=
 github.com/0xsequence/nsm v0.1.0/go.mod h1:ETKcxsf9eirRO4mwtUMDurcb0qxyg7I4vIqgUlb4qZM=
 github.com/BurntSushi/toml v1.3.2 h1:o7IhLm0Msx3BaB+n3Ag7L8EVlByGnpq14C4YWiu/gL8=
