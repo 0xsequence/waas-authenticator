@@ -20,8 +20,8 @@ struct RuntimeStatus
   - startTime: timestamp
   - uptime: uint64
   - ver: string
-  - branch: string
-  - commitHash: string
+  - pcr0: string
+    + go.field.name = PCR0
 
 struct Chain
     - id: uint64

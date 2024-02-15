@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/0xsequence/nitrocontrol/enclave"
+	waasauthenticator "github.com/0xsequence/waas-authenticator"
 	"github.com/0xsequence/waas-authenticator/config"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
@@ -44,8 +45,9 @@ type RPC struct {
 	Accounts   *data.AccountTable
 	Wallets    proto_wallet.WaaS
 
-	startTime time.Time
-	running   int32
+	measurements *enclave.Measurements
+	startTime    time.Time
+	running      int32
 }
 
 func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
@@ -89,6 +91,14 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 		enclaveProvider = enclave.NitroProvider
 	}
 	enc, err := enclave.New(context.Background(), enclaveProvider, kms.NewFromConfig(awsCfg))
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := enc.GetMeasurements(context.Background())
+	if err != nil {
+		return nil, err
+	}
 
 	db := dynamodb.NewFromConfig(awsCfg)
 	s := &RPC{
@@ -105,8 +115,9 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 			ByUserID: "UserID-Index",
 			ByEmail:  "Email-Index",
 		}),
-		Wallets:   proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, client),
-		startTime: time.Now(),
+		Wallets:      proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, client),
+		startTime:    time.Now(),
+		measurements: m,
 	}
 	return s, nil
 }
@@ -116,7 +127,10 @@ func (s *RPC) Run(ctx context.Context, l net.Listener) error {
 		return fmt.Errorf("rpc: already running")
 	}
 
-	//s.Log.Info().Str("op", "run").Msgf("-> rpc: listening on %s", s.HTTP.Addr)
+	s.Log.Info().
+		Str("op", "run").
+		Str("ver", waasauthenticator.VERSION).
+		Msgf("-> rpc: started enclave")
 
 	atomic.StoreInt32(&s.running, 1)
 	defer atomic.StoreInt32(&s.running, 0)
@@ -144,9 +158,9 @@ func (s *RPC) Stop(timeoutCtx context.Context) {
 	}
 	atomic.StoreInt32(&s.running, 2)
 
-	//s.Log.Info().Str("op", "stop").Msg("-> rpc: stopping..")
+	s.Log.Info().Str("op", "stop").Msg("-> rpc: stopping..")
 	s.Server.Shutdown(timeoutCtx)
-	//s.Log.Info().Str("op", "stop").Msg("-> rpc: stopped.")
+	s.Log.Info().Str("op", "stop").Msg("-> rpc: stopped.")
 }
 
 func (s *RPC) IsRunning() bool {
@@ -194,6 +208,7 @@ func (s *RPC) Handler() http.Handler {
 
 	// Quick pages
 	r.Use(middleware.PageRoute("/", http.HandlerFunc(indexHandler)))
+	r.Use(middleware.PageRoute("/status", http.HandlerFunc(s.statusHandler)))
 	r.Use(middleware.PageRoute("/favicon.ico", http.HandlerFunc(emptyHandler)))
 
 	userRouter := r.Group(func(r chi.Router) {
