@@ -581,37 +581,37 @@ func newWalletServiceMock(registeredSessions []string) *walletServiceMock {
 	return m
 }
 
-func (w walletServiceMock) CreatePartner(ctx context.Context, projectID uint64, name string, config *proto_wallet.PartnerWalletPreConfig, jwtAlg string, jwtSecret *string, jwtPublic *string) (*proto_wallet.Partner, error) {
+func (w walletServiceMock) CreateProject(ctx context.Context, projectID uint64, name string, config *proto_wallet.ProjectWalletPreConfig, jwtAlg string, jwtSecret *string, jwtPublic *string) (*proto_wallet.Project, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) PartnerParentConfig(ctx context.Context, partnerId uint64) (string, error) {
+func (w walletServiceMock) ProjectParentConfig(ctx context.Context, projectId uint64) (string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) PartnerParentWallet(ctx context.Context, partnerId uint64) (string, error) {
+func (w walletServiceMock) ProjectParentWallet(ctx context.Context, projectId uint64) (string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) DeployPartnerParentWallet(ctx context.Context, partnerId uint64, chainID uint64) (string, string, error) {
+func (w walletServiceMock) DeployProjectParentWallet(ctx context.Context, projectId uint64, chainID uint64) (string, string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) PartnerWallets(ctx context.Context, partnerId uint64, page *proto_wallet.Page) ([]*proto_wallet.PartnerWallet, *proto_wallet.Page, error) {
+func (w walletServiceMock) ProjectWallets(ctx context.Context, projectId uint64, page *proto_wallet.Page) ([]*proto_wallet.ProjectWallet, *proto_wallet.Page, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) PartnerUserSalt(ctx context.Context, partnerId uint64) (string, error) {
+func (w walletServiceMock) ProjectUserSalt(ctx context.Context, projectId uint64) (string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (w walletServiceMock) ParentWallet(ctx context.Context) (string, error) {
+func (w walletServiceMock) ProjectWallet(ctx context.Context) (string, error) {
 	return "0x00", nil
 }
 
@@ -627,7 +627,7 @@ func (w walletServiceMock) UseHotWallet(ctx context.Context, walletAddress strin
 	return true, nil
 }
 
-func (w walletServiceMock) Wallets(ctx context.Context, page *proto_wallet.Page) ([]*proto_wallet.PartnerWallet, *proto_wallet.Page, error) {
+func (w walletServiceMock) Wallets(ctx context.Context, page *proto_wallet.Page) ([]*proto_wallet.ProjectWallet, *proto_wallet.Page, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -669,7 +669,7 @@ func (w walletServiceMock) GenTransaction(ctx context.Context, protoIntent *prot
 	}, nil
 }
 
-func (w walletServiceMock) SendTransaction(ctx context.Context, wallet *proto_wallet.TargetWallet, intent *proto_wallet.Intent, result *proto_wallet.TransactionBundle, signatures []*proto_wallet.ProvidedSignature) (*proto_wallet.IntentResponse, error) {
+func (w walletServiceMock) SendTransaction(ctx context.Context, intent *proto_wallet.Intent, result *proto_wallet.TransactionBundle, signatures []*proto_wallet.ProvidedSignature) (*proto_wallet.IntentResponse, error) {
 	return &proto_wallet.IntentResponse{
 		Code: "transactionReceipt",
 		Data: map[string]any{
@@ -678,7 +678,7 @@ func (w walletServiceMock) SendTransaction(ctx context.Context, wallet *proto_wa
 	}, nil
 }
 
-func (w walletServiceMock) SignMessage(ctx context.Context, wallet *proto_wallet.TargetWallet, intent *proto_wallet.Intent, message *proto_wallet.SignMessage, signatures []*proto_wallet.ProvidedSignature) (*proto_wallet.IntentResponse, error) {
+func (w walletServiceMock) SignMessage(ctx context.Context, intent *proto_wallet.Intent, message *proto_wallet.SignMessage, signatures []*proto_wallet.ProvidedSignature) (*proto_wallet.IntentResponse, error) {
 	return &proto_wallet.IntentResponse{
 		Code: "signedMessage",
 		Data: map[string]any{
@@ -727,7 +727,7 @@ func (w *walletServiceMock) InvalidateSession(ctx context.Context, sessionID str
 	return true, nil
 }
 
-func (w walletServiceMock) SendIntent(ctx context.Context, wallet *proto_wallet.TargetWallet, intent *proto_wallet.Intent) (*proto_wallet.IntentResponse, error) {
+func (w walletServiceMock) SendIntent(ctx context.Context, intent *proto_wallet.Intent) (*proto_wallet.IntentResponse, error) {
 	return &proto_wallet.IntentResponse{
 		Code: "sentIntent",
 		Data: map[string]any{

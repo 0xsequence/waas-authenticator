@@ -1,3 +1,6 @@
+# NOTE: this copy is copied from go-sequence/intents/intent.ridl which is the source of truth.
+# never change this file directly, just always copy it.
+
 webrpc = v1
 
 name = sequence-waas-intents

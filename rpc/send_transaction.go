@@ -19,16 +19,6 @@ func (s *RPC) sendTransaction(
 ) (*proto.IntentResponse, error) {
 	tntData := tenant.FromContext(ctx)
 
-	walletAddress, err := AddressForUser(ctx, tntData, sess.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("computing user address: %w", err)
-	}
-
-	targetWallet := &proto_wallet.TargetWallet{
-		User:    sess.UserID,
-		Address: walletAddress,
-	}
-
 	parentWallet, err := ethwallet.NewWalletFromPrivateKey(tntData.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("recovering parent wallet: %w", err)
@@ -106,7 +96,7 @@ func (s *RPC) sendTransaction(
 		},
 	}
 
-	res, err := s.Wallets.SendTransaction(waasContext(ctx), targetWallet, apiIntent, bundle, signatures)
+	res, err := s.Wallets.SendTransaction(waasContext(ctx), apiIntent, bundle, signatures)
 	if err != nil {
 		return nil, fmt.Errorf("sending transaction: %w", err)
 	}

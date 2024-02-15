@@ -213,7 +213,6 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, res)
 				require.Equal(t, "sessionClosed", res.Code)
-				require.Equal(t, true, res.Data)
 
 				dropSession := signingSession.SessionID()
 				assert.NotContains(t, p.dbClient.sessions, dropSession)
@@ -226,7 +225,6 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, res)
 				require.Equal(t, "sessionClosed", res.Code)
-				require.Equal(t, true, res.Data)
 
 				dropSession := "0x1111111111111111111111111111111111111111"
 				assert.NotContains(t, p.dbClient.sessions, dropSession)

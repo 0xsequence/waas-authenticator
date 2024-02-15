@@ -19,16 +19,6 @@ func (s *RPC) signMessage(
 ) (*proto.IntentResponse, error) {
 	tntData := tenant.FromContext(ctx)
 
-	walletAddress, err := AddressForUser(ctx, tntData, sess.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("computing user address: %w", err)
-	}
-
-	targetWallet := &proto_wallet.TargetWallet{
-		User:    sess.UserID,
-		Address: walletAddress,
-	}
-
 	parentWallet, err := ethwallet.NewWalletFromPrivateKey(tntData.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("recovering parent wallet: %w", err)
@@ -71,7 +61,7 @@ func (s *RPC) signMessage(
 	}
 
 	apiIntent := convertToAPIIntent(intent.ToIntent())
-	res, err := s.Wallets.SignMessage(waasContext(ctx), targetWallet, apiIntent, signMessage, signatures)
+	res, err := s.Wallets.SignMessage(waasContext(ctx), apiIntent, signMessage, signatures)
 	if err != nil {
 		return nil, fmt.Errorf("signing message: %w", err)
 	}

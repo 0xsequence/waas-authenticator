@@ -82,7 +82,7 @@ func (s *RPC) CreateTenant(
 		return nil, "", fmt.Errorf("decoding user salt: %w", err)
 	}
 
-	parentAddress, err := s.Wallets.ParentWallet(waasCtx)
+	parentAddress, err := s.Wallets.ProjectWallet(waasCtx)
 	if err != nil {
 		return nil, "", fmt.Errorf("retrieving parent wallet: %w", err)
 	}

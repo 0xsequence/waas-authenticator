@@ -71,16 +71,6 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		return nil, fmt.Errorf("session invalid or not found")
 	}
 
-	walletAddress, err := AddressForUser(ctx, tntData, sess.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("computing user address: %w", err)
-	}
-
-	targetWallet := &proto_wallet.TargetWallet{
-		User:    sess.UserID,
-		Address: walletAddress,
-	}
-
 	switch intent.Name {
 	case intents.IntentNameOpenSession:
 		return nil, fmt.Errorf("opening a session is unsupported outside of RegisterSession")
@@ -123,7 +113,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 	}
 
 	// Generic forwarding of intent, no special handling
-	res, err := s.Wallets.SendIntent(waasContext(ctx), targetWallet, convertToAPIIntent(intent))
+	res, err := s.Wallets.SendIntent(waasContext(ctx), convertToAPIIntent(intent))
 	if err != nil {
 		return nil, fmt.Errorf("sending intent: %w", err)
 	}
