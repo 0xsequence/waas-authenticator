@@ -25,13 +25,10 @@ func (s *RPC) signMessage(
 	}
 
 	// Make sure the message is EIP191 encoded
-	var msgData = common.FromHex(intent.Data.Message)
-	if !sequence.IsEIP191Message(msgData) {
-		msgData = sequence.MessageToEIP191(msgData)
-	}
+	msgBytes := sequence.MessageToEIP191(common.FromHex(intent.Data.Message))
 
 	// Validate that message match intent
-	digest := sequence.MessageDigest(msgData)
+	digest := sequence.MessageDigest(msgBytes)
 
 	chainID, ok := sequence.ParseHexOrDec(intent.Data.Network)
 	if !ok {
