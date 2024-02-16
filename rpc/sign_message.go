@@ -24,8 +24,11 @@ func (s *RPC) signMessage(
 		return nil, fmt.Errorf("recovering parent wallet: %w", err)
 	}
 
+	// Make sure the message is EIP191 encoded
+	msgBytes := sequence.MessageToEIP191(common.FromHex(intent.Data.Message))
+
 	// Validate that message match intent
-	digest := sequence.MessageDigest(common.FromHex(intent.Data.Message))
+	digest := sequence.MessageDigest(msgBytes)
 
 	chainID, ok := sequence.ParseHexOrDec(intent.Data.Network)
 	if !ok {
