@@ -28,7 +28,7 @@ ENV CONFIG=./etc/waas-auth.conf
 CMD ["make", "run"]
 
 
-FROM ghcr.io/0xsequence/eiffel:v0.2.0@sha256:b696e86ce1b42c14503973a7dc2893b08dc44ce5cbf41242b8afe6abe3b12077
+FROM ghcr.io/0xsequence/eiffel:v0.3.0@sha256:d4aa946d7eb587e0554123efc3eaa5830a1428b0325ea239fe489e372f573dfe
 
 ARG ENV_ARG=dev2
 

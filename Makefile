@@ -4,14 +4,7 @@ TOP              := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 SHELL            = bash -o pipefail
 TEST_FLAGS       ?= -v
 
-GITTAG           ?= $(shell git describe --exact-match --tags HEAD 2>/dev/null || :)
-GITBRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
-LONGVERSION      ?= $(shell git describe --tags --long --abbrev=8 --always HEAD)$(echo -$GITBRANCH | tr / - | grep -v '\-master' || :)
-VERSION          ?= $(if $(GITTAG),$(GITTAG),$(LONGVERSION))
-GITCOMMIT        ?= $(shell git log -1 --date=iso --pretty=format:%H)
-GITCOMMITDATE    ?= $(shell git log -1 --date=iso --pretty=format:%cd)
-GITCOMMITAUTHOR  ?= $(shell git log -1 --date=iso --pretty="format:%an")
-
+VERSION := $(shell grep -o 'VERSION = "[^"]*' $(TOP)/version.go | cut -d'"' -f2)
 
 define run
 	@go run github.com/goware/rerun/cmd/rerun -watch ./ -ignore vendor bin tests data/schema -run \
@@ -63,7 +56,7 @@ test: test-clean
 test-clean:
 	GOGC=off go clean -testcache
 
-eif:
+eif: clean
 	mkdir -p bin
 	docker build --platform linux/amd64 --build-arg ENV_ARG=next -t waas-authenticator-builder .
-	docker run --platform linux/amd64 -v bin:/out waas-authenticator-builder
+	docker run --platform linux/amd64 -v $(TOP)/bin:/out waas-authenticator-builder waas-auth.$(VERSION)
