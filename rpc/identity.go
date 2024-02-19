@@ -67,9 +67,10 @@ func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sess
 		return proto.Identity{}, fmt.Errorf("parse JWT: %w", err)
 	}
 
-	idp := getOIDCProvider(ctx, normalizeIssuer(tok.Issuer()))
+	issuer := normalizeIssuer(tok.Issuer())
+	idp := getOIDCProvider(ctx, issuer)
 	if idp == nil {
-		return proto.Identity{}, fmt.Errorf("issuer %q not valid for this tenant", tok.Issuer())
+		return proto.Identity{}, fmt.Errorf("issuer %q not valid for this tenant", issuer)
 	}
 
 	keySet, err := getProviderKeySet(ctx, client, normalizeIssuer(idp.Issuer))
@@ -94,7 +95,7 @@ func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sess
 
 	identity := proto.Identity{
 		Type:    proto.IdentityType_OIDC,
-		Issuer:  tok.Issuer(),
+		Issuer:  issuer,
 		Subject: tok.Subject(),
 		Email:   getEmailFromToken(tok),
 	}
