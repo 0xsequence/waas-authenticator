@@ -8,6 +8,7 @@ import (
 	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -41,7 +42,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 	}
 	testCases := map[string]struct {
 		assertFn        func(t *testing.T, sess *proto.Session, err error, p assertionParams)
-		tokBuilderFn    func(b *jwt.Builder)
+		tokBuilderFn    func(b *jwt.Builder, url string)
 		intentBuilderFn func(t *testing.T, data intents.IntentDataOpenSession) *proto.Intent
 	}{
 		"Basic": {
@@ -60,14 +61,14 @@ func TestRPC_RegisterSession(t *testing.T) {
 			},
 		},
 		"WithInvalidIssuer": {
-			tokBuilderFn: func(b *jwt.Builder) { b.Issuer("https://id.example.com") },
+			tokBuilderFn: func(b *jwt.Builder, url string) { b.Issuer("https://id.example.com") },
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				require.Nil(t, sess)
 				require.ErrorContains(t, err, `issuer "https://id.example.com" not valid for this tenant`)
 			},
 		},
 		"WithValidNonce": {
-			tokBuilderFn: func(b *jwt.Builder) { b.Claim("nonce", sessHash) },
+			tokBuilderFn: func(b *jwt.Builder, url string) { b.Claim("nonce", sessHash) },
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				require.NoError(t, err)
 				require.NotNil(t, sess)
@@ -76,14 +77,14 @@ func TestRPC_RegisterSession(t *testing.T) {
 			},
 		},
 		"WithInvalidNonce": {
-			tokBuilderFn: func(b *jwt.Builder) { b.Claim("nonce", "0x1234567890abcdef") },
+			tokBuilderFn: func(b *jwt.Builder, url string) { b.Claim("nonce", "0x1234567890abcdef") },
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				require.Nil(t, sess)
 				require.ErrorContains(t, err, "JWT validation: nonce not satisfied")
 			},
 		},
 		"WithInvalidNonceButValidSessionAddressClaim": {
-			tokBuilderFn: func(b *jwt.Builder) {
+			tokBuilderFn: func(b *jwt.Builder, url string) {
 				b.Claim("nonce", "0x1234567890abcdef").
 					Claim("sequence:session_hash", sessHash)
 			},
@@ -95,7 +96,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 			},
 		},
 		"WithVerifiedEmail": {
-			tokBuilderFn: func(b *jwt.Builder) {
+			tokBuilderFn: func(b *jwt.Builder, url string) {
 				b.Claim("email", "user@example.com").Claim("email_verified", "true")
 			},
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
@@ -106,7 +107,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 			},
 		},
 		"WithUnverifiedEmail": {
-			tokBuilderFn: func(b *jwt.Builder) {
+			tokBuilderFn: func(b *jwt.Builder, url string) {
 				b.Claim("email", "user@example.com").Claim("email_verified", "false")
 			},
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
@@ -129,6 +130,18 @@ func TestRPC_RegisterSession(t *testing.T) {
 			},
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				assert.ErrorContains(t, err, "intent is invalid: no signatures")
+			},
+		},
+		"IssuerMissingScheme": {
+			tokBuilderFn: func(b *jwt.Builder, url string) {
+				b.Issuer(strings.TrimPrefix(url, "http://"))
+			},
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.NoError(t, err)
+				require.NotNil(t, sess)
+
+				httpsIssuer := "https://" + strings.TrimPrefix(p.issuer, "http://")
+				assert.Equal(t, httpsIssuer, sess.Identity.Issuer)
 			},
 		},
 	}

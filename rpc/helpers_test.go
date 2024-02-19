@@ -68,7 +68,7 @@ func getTestingCtxValue(ctx context.Context, k string) string {
 func initRPC(cfg *config.Config, enc *enclave.Enclave, dbClient *dbMock) *rpc.RPC {
 	svc := &rpc.RPC{
 		Config:     cfg,
-		HTTPClient: http.DefaultClient,
+		HTTPClient: httpClient{},
 		Enclave:    enc,
 		Wallets:    newWalletServiceMock(nil),
 		Tenants:    data.NewTenantTable(dbClient, "Tenants"),
@@ -166,7 +166,7 @@ QwIDAQAB
 	}
 }
 
-func issueAccessTokenAndRunJwksServer(t *testing.T, optTokenBuilderFn ...func(*jwt.Builder)) (iss string, tok string, close func()) {
+func issueAccessTokenAndRunJwksServer(t *testing.T, optTokenBuilderFn ...func(*jwt.Builder, string)) (iss string, tok string, close func()) {
 	jwtKeyRaw, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	jwtKey, err := jwk.FromRaw(jwtKeyRaw)
@@ -204,7 +204,7 @@ func issueAccessTokenAndRunJwksServer(t *testing.T, optTokenBuilderFn ...func(*j
 		Subject("subject")
 
 	if len(optTokenBuilderFn) > 0 && optTokenBuilderFn[0] != nil {
-		optTokenBuilderFn[0](tokBuilder)
+		optTokenBuilderFn[0](tokBuilder, jwksServer.URL)
 	}
 
 	tokRaw, err := tokBuilder.Build()
@@ -459,9 +459,12 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 		},
 		UpgradeCode:     "CHANGEME",
 		WaasAccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVyX2lkIjozfQ.g2fWwLrKPhTUpLFc7ZM9pMm4kEHGu8haCMzMOOGiqSM",
-		OIDCProviders:   []*proto.OpenIdProvider{{Issuer: issuer, Audience: []string{"audience"}}},
-		AllowedOrigins:  []string{"http://localhost"},
-		KMSKeys:         []string{"SessionKey"},
+		OIDCProviders: []*proto.OpenIdProvider{
+			{Issuer: issuer, Audience: []string{"audience"}},
+			{Issuer: "https://" + strings.TrimPrefix(issuer, "http://"), Audience: []string{"audience"}},
+		},
+		AllowedOrigins: []string{"http://localhost"},
+		KMSKeys:        []string{"SessionKey"},
 	}
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "TenantKey", payload)
@@ -748,3 +751,19 @@ func (w walletServiceMock) FinishValidateSession(ctx context.Context, sessionId 
 }
 
 var _ proto_wallet.WaaS = (*walletServiceMock)(nil)
+
+type httpClient struct{}
+
+func (httpClient) Do(req *http.Request) (*http.Response, error) {
+	req.URL.Scheme = "http"
+	return http.DefaultClient.Do(req)
+}
+
+func (httpClient) Get(s string) (*http.Response, error) {
+	if strings.HasPrefix(s, "https://") {
+		s = "http://" + strings.TrimPrefix(s, "https://")
+	}
+	return http.DefaultClient.Get(s)
+}
+
+var _ rpc.HTTPClient = (*httpClient)(nil)
