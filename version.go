@@ -1,3 +1,3 @@
 package waasauthenticator
 
-const VERSION = "1.0.0-rc.3"
+const VERSION = "v1.0.0-rc.4"
