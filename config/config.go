@@ -5,16 +5,18 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"github.com/go-chi/telemetry"
 )
 
 type Config struct {
-	Mode      Mode            `toml:"-"`
-	Region    string          `toml:"region"`
-	Service   ServiceConfig   `toml:"service"`
-	Admin     AdminConfig     `toml:"admin"`
-	Endpoints EndpointsConfig `toml:"endpoints"`
-	KMS       KMSConfig       `toml:"kms"`
-	Database  DatabaseConfig  `toml:"database"`
+	Mode      Mode             `toml:"-"`
+	Region    string           `toml:"region"`
+	Service   ServiceConfig    `toml:"service"`
+	Admin     AdminConfig      `toml:"admin"`
+	Endpoints EndpointsConfig  `toml:"endpoints"`
+	KMS       KMSConfig        `toml:"kms"`
+	Database  DatabaseConfig   `toml:"database"`
+	Telemetry telemetry.Config `toml:"telemetry"`
 }
 
 type AdminConfig struct {

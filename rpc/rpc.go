@@ -26,6 +26,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httplog"
+	"github.com/go-chi/telemetry"
 	"github.com/rs/zerolog"
 )
 
@@ -77,7 +78,6 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 	if err != nil {
 		return nil, err
 	}
-	//awsv2.AWSV2Instrumentor(&awsCfg.APIOptions)
 
 	httpServer := &http.Server{
 		ReadTimeout:       45 * time.Second,
@@ -177,9 +177,8 @@ func (s *RPC) Handler() http.Handler {
 	r.Use(middleware.RealIP)
 
 	// Metrics and heartbeat
-	//r.Use(telemetry.Collector(s.Config.Telemetry, []string{"/rpc"}))
+	r.Use(telemetry.Collector(s.Config.Telemetry, []string{"/rpc"}))
 	r.Use(middleware.NoCache)
-	//r.Use(honeybadger.Handler)
 	r.Use(middleware.Heartbeat("/ping"))
 
 	// HTTP request logger
