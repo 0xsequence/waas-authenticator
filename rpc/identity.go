@@ -28,15 +28,14 @@ func withIssuer(expectedIss string) jwt.ValidatorFunc {
 
 func withSessionHash(expectedSessionHash string) jwt.ValidatorFunc {
 	return func(ctx context.Context, tok jwt.Token) jwt.ValidationError {
-		sessAddrClaim, ok := tok.Get("sequence:session_hash")
-		if ok && sessAddrClaim == expectedSessionHash {
+		sessHashClaim, ok := tok.Get("sequence:session_hash")
+		if ok && sessHashClaim == expectedSessionHash {
 			return nil
 		}
 
 		nonceClaim, ok := tok.Get("nonce")
 		if !ok {
-			// TODO: we might always want to require nonce to be present
-			return nil
+			return jwt.NewValidationError(fmt.Errorf("nonce not satisfied"))
 		}
 
 		nonceVal, _ := nonceClaim.(string)
