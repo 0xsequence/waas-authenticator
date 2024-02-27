@@ -14,7 +14,9 @@ WORKDIR /go/src/github.com/0xsequence/waas-authenticator
 
 ADD ./ ./
 
-RUN make build
+ARG VERSION
+
+RUN make VERSION=${VERSION} build
 
 #
 # Enclave dev image
