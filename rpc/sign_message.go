@@ -63,7 +63,8 @@ func (s *RPC) signMessage(
 		},
 	}
 
-	apiIntent := convertToAPIIntent(intent.ToIntent())
+	// use original intent otherwise we may experience lose of data because of outdated struct
+	apiIntent := convertToAPIIntent(&intent.Intent)
 	res, err := s.Wallets.SignMessage(waasContext(ctx), apiIntent, signMessage, signatures)
 	if err != nil {
 		return nil, fmt.Errorf("signing message: %w", err)
