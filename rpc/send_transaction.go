@@ -24,7 +24,8 @@ func (s *RPC) sendTransaction(
 		return nil, fmt.Errorf("recovering parent wallet: %w", err)
 	}
 
-	apiIntent := convertToAPIIntent(intent.ToIntent())
+	// use original intent otherwise we may experience lose of data because of outdated struct
+	apiIntent := convertToAPIIntent(&intent.Intent)
 	bundle, err := s.Wallets.GenTransaction(waasContext(ctx), apiIntent)
 	if err != nil {
 		return nil, fmt.Errorf("generating transaction: %w", err)
