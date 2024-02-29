@@ -191,10 +191,13 @@ func (s *RPC) Handler() http.Handler {
 	r.Use(middleware.PageRoute("/status", http.HandlerFunc(s.statusHandler)))
 	r.Use(middleware.PageRoute("/favicon.ico", http.HandlerFunc(emptyHandler)))
 
-	userRouter := r.Group(func(r chi.Router) {
-		// Generate attestation document
-		r.Use(attestation.Middleware(s.Enclave))
+	// Generate attestation document
+	r.Use(attestation.Middleware(s.Enclave))
 
+	// Healthcheck
+	r.Use(middleware.PageRoute("/health", http.HandlerFunc(s.healthHandler)))
+
+	userRouter := r.Group(func(r chi.Router) {
 		// Find and decrypt tenant data
 		r.Use(tenant.Middleware(s.Tenants, s.Config.KMS.TenantKeys))
 	})
@@ -203,9 +206,6 @@ func (s *RPC) Handler() http.Handler {
 	adminRouter := r.Group(func(r chi.Router) {
 		// Validate admin JWTs
 		r.Use(access.JWTAuthMiddleware(s.Config.Admin))
-
-		// Generate attestation document
-		r.Use(attestation.Middleware(s.Enclave))
 	})
 	adminRouter.Handle("/rpc/WaasAuthenticatorAdmin/*", proto.NewWaasAuthenticatorAdminServer(s))
 
