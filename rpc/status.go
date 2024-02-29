@@ -8,6 +8,7 @@ import (
 
 	waasauthenticator "github.com/0xsequence/waas-authenticator"
 	"github.com/0xsequence/waas-authenticator/proto"
+	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 )
 
 func (s *RPC) Version(ctx context.Context) (*proto.Version, error) {
@@ -45,4 +46,14 @@ func (s *RPC) statusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(status)
+}
+
+func (s *RPC) healthHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	att := attestation.FromContext(ctx)
+	if _, err := att.GenerateDataKey(ctx, s.Config.KMS.TenantKeys[0]); err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
