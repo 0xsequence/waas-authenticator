@@ -4,8 +4,6 @@ TOP              := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 SHELL            = bash -o pipefail
 TEST_FLAGS       ?= -v
 
-VERSION := $(shell grep -o 'VERSION = "[^"]*' $(TOP)/version.go | cut -d'"' -f2)
-
 define run
 	@go run github.com/goware/rerun/cmd/rerun -watch ./ -ignore vendor bin tests data/schema -run \
 		'GOGC=off go build -o ./bin/$(1) ./cmd/$(1)/main.go && CONFIG=$(CONFIG) ./bin/$(1)'
@@ -24,7 +22,7 @@ define build
 	go build -v \
 		-trimpath \
 		-buildvcs=false \
-		-ldflags="-s -w -buildid=" \
+		-ldflags='-X "github.com/0xsequence/waas-authenticator.VERSION=$(VERSION)" -s -w -buildid=' \
 		-o ./bin/$(1) \
 		./cmd/$(1)
 endef
@@ -56,7 +54,10 @@ test: test-clean
 test-clean:
 	GOGC=off go clean -testcache
 
-eif: clean
+eif: ensure-version clean
 	mkdir -p bin
-	docker build --platform linux/amd64 --build-arg ENV_ARG=next -t waas-authenticator-builder .
+	docker build --platform linux/amd64 --build-arg VERSION=$(VERSION) --build-arg ENV_ARG=next -t waas-authenticator-builder .
 	docker run --platform linux/amd64 -v $(TOP)/bin:/out waas-authenticator-builder waas-auth.$(VERSION)
+
+ensure-version:
+	test -n "$(VERSION)"
