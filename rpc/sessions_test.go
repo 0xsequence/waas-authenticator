@@ -46,6 +46,9 @@ func TestRPC_RegisterSession(t *testing.T) {
 		intentBuilderFn func(t *testing.T, data intents.IntentDataOpenSession) *proto.Intent
 	}{
 		"Basic": {
+			tokBuilderFn: func(b *jwt.Builder, url string) {
+				b.Claim("sequence:session_hash", sessHash)
+			},
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				require.NoError(t, err)
 				require.NotNil(t, sess)
@@ -83,6 +86,12 @@ func TestRPC_RegisterSession(t *testing.T) {
 				require.ErrorContains(t, err, "JWT validation: nonce not satisfied")
 			},
 		},
+		"WithMissingNonce": {
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.Nil(t, sess)
+				require.ErrorContains(t, err, "JWT validation: nonce not satisfied")
+			},
+		},
 		"WithInvalidNonceButValidSessionAddressClaim": {
 			tokBuilderFn: func(b *jwt.Builder, url string) {
 				b.Claim("nonce", "0x1234567890abcdef").
@@ -97,7 +106,9 @@ func TestRPC_RegisterSession(t *testing.T) {
 		},
 		"WithVerifiedEmail": {
 			tokBuilderFn: func(b *jwt.Builder, url string) {
-				b.Claim("email", "user@example.com").Claim("email_verified", "true")
+				b.Claim("email", "user@example.com").
+					Claim("email_verified", "true").
+					Claim("sequence:session_hash", sessHash)
 			},
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				require.NoError(t, err)
@@ -108,7 +119,9 @@ func TestRPC_RegisterSession(t *testing.T) {
 		},
 		"WithUnverifiedEmail": {
 			tokBuilderFn: func(b *jwt.Builder, url string) {
-				b.Claim("email", "user@example.com").Claim("email_verified", "false")
+				b.Claim("email", "user@example.com").
+					Claim("email_verified", "false").
+					Claim("sequence:session_hash", sessHash)
 			},
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				require.NoError(t, err)
@@ -134,7 +147,8 @@ func TestRPC_RegisterSession(t *testing.T) {
 		},
 		"IssuerMissingScheme": {
 			tokBuilderFn: func(b *jwt.Builder, url string) {
-				b.Issuer(strings.TrimPrefix(url, "http://"))
+				b.Issuer(strings.TrimPrefix(url, "http://")).
+					Claim("sequence:session_hash", sessHash)
 			},
 			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
 				require.NoError(t, err)
