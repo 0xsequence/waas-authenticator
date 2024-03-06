@@ -58,7 +58,7 @@ func TestRPC_GetTenant(t *testing.T) {
 
 	t.Run("MissingTenant", func(t *testing.T) {
 		tnt, err := c.GetTenant(ctx, 2)
-		assert.ErrorContains(t, err, "tenant not found")
+		assert.ErrorIs(t, err, proto.ErrTenantNotFound)
 		assert.Nil(t, tnt)
 	})
 }
