@@ -1,4 +1,5 @@
 CONFIG           ?= $(TOP)/etc/waas-auth.conf
+ENV              ?= prod
 
 TOP              := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 SHELL            = bash -o pipefail
@@ -56,7 +57,7 @@ test-clean:
 
 eif: ensure-version clean
 	mkdir -p bin
-	docker build --platform linux/amd64 --build-arg VERSION=$(VERSION) --build-arg ENV_ARG=next -t waas-authenticator-builder .
+	docker build --platform linux/amd64 --build-arg VERSION=$(VERSION) --build-arg ENV_ARG=$(ENV) -t waas-authenticator-builder .
 	docker run --platform linux/amd64 -v $(TOP)/bin:/out waas-authenticator-builder waas-auth.$(VERSION)
 
 ensure-version:
