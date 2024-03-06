@@ -17,6 +17,7 @@ jobs:
 
     env:
       CGO_ENABLED: 0
+      VERSION: test
 
     steps:
       - uses: actions/checkout@v3
@@ -25,6 +26,9 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
+
+      - name: Ensure version.go exists
+        run: make ensure-version
 
       - name: Vet
         run: go vet
