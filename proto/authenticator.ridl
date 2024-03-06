@@ -139,6 +139,7 @@ struct SessionData
 ##
 
 error 1000 Unauthorized "Unauthorized access" HTTP 401
+error 1001 TenantNotFound "Tenant not found" HTTP 404
 
 
 ##

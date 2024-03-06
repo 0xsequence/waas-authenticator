@@ -22,7 +22,7 @@ func (s *RPC) GetTenant(ctx context.Context, projectID uint64) (*proto.Tenant, e
 		return nil, err
 	}
 	if tnt == nil {
-		return nil, fmt.Errorf("tenant not found")
+		return nil, proto.ErrTenantNotFound
 	}
 
 	tenantData, _, err := crypto.DecryptData[*proto.TenantData](ctx, tnt.EncryptedKey, tnt.Ciphertext, s.Config.KMS.TenantKeys)
@@ -151,7 +151,7 @@ func (s *RPC) UpdateTenant(
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("tenant not found")
+		return nil, proto.ErrTenantNotFound
 	}
 
 	tntData, _, err := crypto.DecryptData[*proto.TenantData](ctx, tnt.EncryptedKey, tnt.Ciphertext, s.Config.KMS.TenantKeys)
