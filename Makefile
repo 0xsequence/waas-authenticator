@@ -23,7 +23,7 @@ define build
 	go build -v \
 		-trimpath \
 		-buildvcs=false \
-		-ldflags='-X "github.com/0xsequence/waas-authenticator.VERSION=$(VERSION)" -s -w -buildid=' \
+		-ldflags='-s -w -buildid=' \
 		-o ./bin/$(1) \
 		./cmd/$(1)
 endef
@@ -47,6 +47,7 @@ proto:
 
 clean:
 	rm -rf ./bin/*
+	rm -rf version.go
 	go clean -cache -testcache
 
 test: test-clean
@@ -55,10 +56,13 @@ test: test-clean
 test-clean:
 	GOGC=off go clean -testcache
 
-eif: ensure-version clean
+eif: clean ensure-version
 	mkdir -p bin
 	docker build --platform linux/amd64 --build-arg VERSION=$(VERSION) --build-arg ENV_ARG=$(ENV) -t waas-authenticator-builder .
 	docker run --platform linux/amd64 -v $(TOP)/bin:/out waas-authenticator-builder waas-auth.$(VERSION)
 
 ensure-version:
 	test -n "$(VERSION)"
+	rm -rf version.go
+	echo "package waasauthenticator" > version.go
+	echo "const VERSION = \"$(VERSION)\"" >> version.go
