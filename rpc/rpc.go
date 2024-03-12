@@ -26,6 +26,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httplog"
 	"github.com/go-chi/telemetry"
+	"github.com/go-chi/traceid"
 	"github.com/rs/zerolog"
 )
 
@@ -179,6 +180,9 @@ func (s *RPC) Handler() http.Handler {
 	r.Use(telemetry.Collector(s.Config.Telemetry, []string{"/rpc"}))
 	r.Use(middleware.NoCache)
 	r.Use(middleware.Heartbeat("/ping"))
+
+	// Propagate TraceId
+	r.Use(traceid.Middleware)
 
 	// HTTP request logger
 	r.Use(httplog.RequestLogger(s.Log, []string{"/", "/ping", "/status", "/favicon.ico"}))
