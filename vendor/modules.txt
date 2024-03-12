@@ -36,7 +36,7 @@ github.com/0xsequence/ethkit/util
 # github.com/0xsequence/go-ethauth v0.13.0
 ## explicit; go 1.17
 github.com/0xsequence/go-ethauth
-# github.com/0xsequence/go-sequence v0.29.0
+# github.com/0xsequence/go-sequence v0.29.2
 ## explicit; go 1.21
 github.com/0xsequence/go-sequence
 github.com/0xsequence/go-sequence/contracts
@@ -478,6 +478,9 @@ github.com/segmentio/asm/internal/unsafebytes
 # github.com/sergi/go-diff v1.3.1
 ## explicit; go 1.12
 github.com/sergi/go-diff/diffmatchpatch
+# github.com/shopspring/decimal v1.3.1
+## explicit; go 1.13
+github.com/shopspring/decimal
 # github.com/shurcooL/httpfs v0.0.0-20230704072500-f1e31cf0ba5c
 ## explicit; go 1.19
 github.com/shurcooL/httpfs/path/vfspath
@@ -511,7 +514,7 @@ github.com/tyler-smith/go-bip39/wordlists
 github.com/uber-go/tally/v4
 github.com/uber-go/tally/v4/internal/identity
 github.com/uber-go/tally/v4/prometheus
-# github.com/webrpc/webrpc v0.14.0
+# github.com/webrpc/webrpc v0.15.2
 ## explicit; go 1.16
 github.com/webrpc/webrpc
 github.com/webrpc/webrpc/cmd/webrpc-gen

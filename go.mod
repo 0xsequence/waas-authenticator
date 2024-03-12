@@ -4,7 +4,7 @@ go 1.21.5
 
 require (
 	github.com/0xsequence/ethkit v1.23.0
-	github.com/0xsequence/go-sequence v0.29.0
+	github.com/0xsequence/go-sequence v0.29.2
 	github.com/0xsequence/nitrocontrol v0.3.0
 	github.com/BurntSushi/toml v1.3.2
 	github.com/aws/aws-sdk-go-v2 v1.25.2
@@ -24,7 +24,7 @@ require (
 	github.com/mdlayher/vsock v1.2.1
 	github.com/rs/zerolog v1.32.0
 	github.com/stretchr/testify v1.8.4
-	github.com/webrpc/webrpc v0.14.0
+	github.com/webrpc/webrpc v0.15.2
 	golang.org/x/sync v0.6.0
 )
 
@@ -101,6 +101,7 @@ require (
 	github.com/redis/go-redis/v9 v9.5.1 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
+	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/shurcooL/httpfs v0.0.0-20230704072500-f1e31cf0ba5c // indirect
 	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
