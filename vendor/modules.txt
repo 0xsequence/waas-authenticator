@@ -269,6 +269,12 @@ github.com/go-chi/jwtauth/v5
 # github.com/go-chi/telemetry v0.3.3
 ## explicit; go 1.19
 github.com/go-chi/telemetry
+# github.com/go-chi/traceid v0.2.0
+## explicit; go 1.14
+github.com/go-chi/traceid
+# github.com/go-chi/transport v0.1.0
+## explicit; go 1.14
+github.com/go-chi/transport
 # github.com/go-stack/stack v1.8.1
 ## explicit; go 1.17
 github.com/go-stack/stack
@@ -691,3 +697,6 @@ gopkg.in/warnings.v0
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
+# moul.io/http2curl/v2 v2.3.0
+## explicit; go 1.13
+moul.io/http2curl/v2

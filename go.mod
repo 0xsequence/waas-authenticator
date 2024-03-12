@@ -16,6 +16,8 @@ require (
 	github.com/go-chi/httplog v0.3.2
 	github.com/go-chi/jwtauth/v5 v5.3.0
 	github.com/go-chi/telemetry v0.3.3
+	github.com/go-chi/traceid v0.2.0
+	github.com/go-chi/transport v0.1.0
 	github.com/goware/rerun v0.0.9
 	github.com/jxskiss/base62 v1.1.0
 	github.com/lestrrat-go/jwx/v2 v2.0.20
@@ -123,4 +125,5 @@ require (
 	gopkg.in/src-d/go-git.v4 v4.13.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	moul.io/http2curl/v2 v2.3.0 // indirect
 )
