@@ -8,6 +8,7 @@ import (
 	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -200,7 +201,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 
 			c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 			header := make(http.Header)
-			header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
+			header.Set("X-Sequence-Project", strconv.Itoa(int(tenant.ProjectID)))
 			ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 			require.NoError(t, err)
 
@@ -337,7 +338,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 
 			c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 			header := make(http.Header)
-			header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
+			header.Set("X-Sequence-Project", strconv.Itoa(int(tenant.ProjectID)))
 			ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 
 			res, err := c.SendIntent(ctx, intent)
@@ -411,7 +412,7 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
-	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
+	header.Set("X-Sequence-Project", strconv.Itoa(int(tenant.ProjectID)))
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 	require.NoError(t, err)
 

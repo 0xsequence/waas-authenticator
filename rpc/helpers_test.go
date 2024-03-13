@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,7 +32,6 @@ import (
 	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/jxskiss/base62"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -560,13 +558,6 @@ func newSession(t *testing.T, enc *enclave.Enclave, issuer string, signingSessio
 	}
 
 	return newSessionFromData(t, enc, payload)
-}
-
-func newRandAccessKey(projectID uint64) string {
-	buf := make([]byte, 24)
-	binary.BigEndian.PutUint64(buf, projectID)
-	rand.Read(buf[8:])
-	return base62.EncodeToString(buf)
 }
 
 type walletServiceMock struct {

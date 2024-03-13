@@ -7,6 +7,7 @@ import (
 	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/0xsequence/ethkit/ethwallet"
@@ -66,7 +67,7 @@ func TestRPC_SendIntent_SignMessage(t *testing.T) {
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
-	header.Set("X-Access-Key", newRandAccessKey(tenant.ProjectID))
+	header.Set("X-Sequence-Project", strconv.Itoa(int(tenant.ProjectID)))
 	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 
 	res, err := c.SendIntent(ctx, intent)
