@@ -19,7 +19,6 @@ require (
 	github.com/go-chi/traceid v0.2.0
 	github.com/go-chi/transport v0.1.0
 	github.com/goware/rerun v0.0.9
-	github.com/jxskiss/base62 v1.1.0
 	github.com/lestrrat-go/jwx/v2 v2.0.20
 	github.com/mdlayher/vsock v1.2.1
 	github.com/rs/zerolog v1.32.0

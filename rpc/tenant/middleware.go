@@ -2,15 +2,15 @@ package tenant
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
-	"github.com/jxskiss/base62"
 )
 
 // Middleware validates that the tenant sent in X-Access-Key header is valid and stores it in context.
@@ -19,21 +19,27 @@ func Middleware(tenants *data.TenantTable, tenantKeys []string) func(http.Handle
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			// Get projectID based on access key header which is encoded in the value
-			// and place the access key on the context.
+			// Place the access key in context as it's used by services downstream
 			accessKey := r.Header.Get("x-access-key")
 			if accessKey != "" {
 				ctx = WithAccessKey(ctx, accessKey)
 			}
 
-			projectID, err := decodeProjectIDFromAccessKey(accessKey)
+			// Get projectID from the header populated by the ingress service
+			projectHeader := r.Header.Get("x-sequence-project")
+			if projectHeader == "" {
+				proto.RespondWithError(w, fmt.Errorf("missing X-Sequence-Project header"))
+				return
+			}
+
+			projectID, err := strconv.Atoi(strings.TrimSpace(projectHeader))
 			if err != nil {
-				proto.RespondWithError(w, fmt.Errorf("invalid tenant: %v", projectID))
+				proto.RespondWithError(w, fmt.Errorf("parse project ID: %w", err))
 				return
 			}
 
 			// Find tenant based on project id
-			tenant, found, err := tenants.GetLatest(ctx, projectID)
+			tenant, found, err := tenants.GetLatest(ctx, uint64(projectID))
 			if err != nil {
 				proto.RespondWithError(w, fmt.Errorf("could not retrieve tenant: %w", err))
 				return
@@ -61,12 +67,4 @@ func Middleware(tenants *data.TenantTable, tenantKeys []string) func(http.Handle
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
-}
-
-func decodeProjectIDFromAccessKey(accessKey string) (uint64, error) {
-	buf, err := base62.DecodeString(accessKey)
-	if err != nil || len(buf) < 8 {
-		return 0, fmt.Errorf("invalid access key")
-	}
-	return binary.BigEndian.Uint64(buf[:8]), nil
 }
