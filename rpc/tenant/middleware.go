@@ -19,6 +19,12 @@ func Middleware(tenants *data.TenantTable, tenantKeys []string) func(http.Handle
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
+			// Place the access key in context as it's used by services downstream
+			accessKey := r.Header.Get("x-access-key")
+			if accessKey != "" {
+				ctx = WithAccessKey(ctx, accessKey)
+			}
+
 			// Get projectID from the header populated by the ingress service
 			projectHeader := r.Header.Get("x-sequence-project")
 			if projectHeader == "" {
