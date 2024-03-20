@@ -36,7 +36,7 @@ github.com/0xsequence/ethkit/util
 # github.com/0xsequence/go-ethauth v0.13.0
 ## explicit; go 1.17
 github.com/0xsequence/go-ethauth
-# github.com/0xsequence/go-sequence v0.29.2
+# github.com/0xsequence/go-sequence v0.29.3-0.20240320103018-3e55215de6eb
 ## explicit; go 1.21
 github.com/0xsequence/go-sequence
 github.com/0xsequence/go-sequence/contracts
