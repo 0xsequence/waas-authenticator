@@ -574,6 +574,16 @@ type walletServiceMock struct {
 	registeredSessions map[string]struct{}
 }
 
+func (w walletServiceMock) ProjectParentWalletStatus(ctx context.Context, projectID uint64) ([]*proto_wallet.ParentWalletStatus, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (w walletServiceMock) SessionAuthProof(ctx context.Context, intent *proto_wallet.Intent, proof *proto_wallet.SessionAuthProof) (*proto_wallet.IntentResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func newWalletServiceMock(registeredSessions []string) *walletServiceMock {
 	m := &walletServiceMock{
 		registeredSessions: make(map[string]struct{}),
@@ -600,7 +610,7 @@ func (w walletServiceMock) ProjectParentWallet(ctx context.Context, projectId ui
 	panic("implement me")
 }
 
-func (w walletServiceMock) DeployProjectParentWallet(ctx context.Context, projectId uint64, chainID uint64) (string, string, error) {
+func (w walletServiceMock) DeployProjectParentWallet(ctx context.Context, projectId uint64, chainID string) (string, string, error) {
 	//TODO implement me
 	panic("implement me")
 }
