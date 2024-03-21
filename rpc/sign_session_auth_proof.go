@@ -13,7 +13,6 @@ import (
 
 func (s *RPC) signSessionAuthProof(
 	ctx context.Context,
-	userWallet string,
 	proof *proto_wallet.SessionAuthProof,
 ) error {
 	tntData := tenant.FromContext(ctx)
@@ -34,7 +33,7 @@ func (s *RPC) signSessionAuthProof(
 		return fmt.Errorf("invalid chain id: %s", proof.Message.ChainID)
 	}
 
-	subdigest, err := sequence.SubDigest(chainID, common.HexToAddress(userWallet), digest)
+	subdigest, err := sequence.SubDigest(chainID, common.HexToAddress(proof.Wallet), digest)
 	if err != nil {
 		return fmt.Errorf("calculating digest: %w", err)
 	}

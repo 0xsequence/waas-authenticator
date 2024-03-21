@@ -26,7 +26,7 @@ func (s *RPC) sessionAuthProof(
 		},
 	}
 
-	err := s.signSessionAuthProof(ctx, intent.Data.Wallet, proof)
+	err := s.signSessionAuthProof(ctx, proof)
 	if err != nil {
 		return nil, fmt.Errorf("signing session register proof message: %w", err)
 	}
