@@ -12,6 +12,7 @@ import (
 	"github.com/0xsequence/nitrocontrol/enclave"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
+	"github.com/goware/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,7 +54,7 @@ func TestRPC_GetTenant(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, tnt)
 		assert.Equal(t, uint64(1), tnt.ProjectID)
-		assert.Equal(t, []string{"http://localhost"}, tnt.AllowedOrigins)
+		assert.Equal(t, validation.Origins{"http://localhost"}, tnt.AllowedOrigins)
 	})
 
 	t.Run("MissingTenant", func(t *testing.T) {
@@ -115,11 +116,12 @@ func TestRPC_CreateTenant(t *testing.T) {
 		assert.ErrorContains(t, err, "invalid oidcProviders")
 	})
 
-	t.Run("NoAllowedOrigins", func(t *testing.T) {
-		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", validOidcProviders, nil)
+	t.Run("InvalidOrigin", func(t *testing.T) {
+		invalidOrigins := []string{"localhost"}
+		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", validOidcProviders, invalidOrigins)
 		assert.Nil(t, tnt)
 		assert.Empty(t, code)
-		assert.ErrorContains(t, err, "at least one allowed origin is required")
+		assert.ErrorContains(t, err, "invalid allowedOrigins")
 	})
 
 	t.Run("Success", func(t *testing.T) {
