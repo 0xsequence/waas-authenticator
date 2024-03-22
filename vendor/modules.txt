@@ -336,6 +336,9 @@ github.com/goware/singleflight
 # github.com/goware/superr v0.0.2
 ## explicit; go 1.16
 github.com/goware/superr
+# github.com/goware/validation v0.1.2
+## explicit; go 1.22.1
+github.com/goware/validation
 # github.com/hashicorp/golang-lru/v2 v2.0.7
 ## explicit; go 1.18
 github.com/hashicorp/golang-lru/v2
@@ -495,8 +498,8 @@ github.com/src-d/gcfg
 github.com/src-d/gcfg/scanner
 github.com/src-d/gcfg/token
 github.com/src-d/gcfg/types
-# github.com/stretchr/testify v1.8.4
-## explicit; go 1.20
+# github.com/stretchr/testify v1.9.0
+## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 # github.com/twmb/murmur3 v1.1.8
