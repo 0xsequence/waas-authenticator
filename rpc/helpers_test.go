@@ -32,6 +32,7 @@ import (
 	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/goware/validation"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -461,7 +462,7 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 			{Issuer: issuer, Audience: []string{"audience"}},
 			{Issuer: "https://" + strings.TrimPrefix(issuer, "http://"), Audience: []string{"audience"}},
 		},
-		AllowedOrigins: []string{"http://localhost"},
+		AllowedOrigins: validation.Origins{"http://localhost"},
 		KMSKeys:        []string{"SessionKey"},
 	}
 

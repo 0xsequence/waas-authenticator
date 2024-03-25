@@ -1,7 +1,7 @@
 #
 # Enclave base image
 #
-FROM golang:1.21.7-alpine3.19@sha256:163801a964d358d6450aeb51b59d5c807d43a7c97fed92cc7ff1be5bd72811ab AS base
+FROM golang:1.22.1-alpine3.19@sha256:0466223b8544fb7d4ff04748acc4d75a608234bf4e79563bff208d2060c0dd79 AS base
 
 RUN apk add make bash
 

@@ -1,6 +1,6 @@
 module github.com/0xsequence/waas-authenticator
 
-go 1.21.5
+go 1.22.1
 
 require (
 	github.com/0xsequence/ethkit v1.23.0
@@ -19,10 +19,11 @@ require (
 	github.com/go-chi/traceid v0.2.0
 	github.com/go-chi/transport v0.1.0
 	github.com/goware/rerun v0.0.9
+	github.com/goware/validation v0.1.2
 	github.com/lestrrat-go/jwx/v2 v2.0.20
 	github.com/mdlayher/vsock v1.2.1
 	github.com/rs/zerolog v1.32.0
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/webrpc/webrpc v0.15.2
 	golang.org/x/sync v0.6.0
 )

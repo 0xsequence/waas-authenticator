@@ -13,6 +13,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
+	"github.com/goware/validation"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -57,8 +58,9 @@ func (s *RPC) CreateTenant(
 		return nil, "", fmt.Errorf("invalid oidcProviders: %w", err)
 	}
 
-	if len(allowedOrigins) == 0 {
-		return nil, "", fmt.Errorf("at least one allowed origin is required")
+	origins, err := validation.NewOrigins(allowedOrigins...)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid allowedOrigins: %w", err)
 	}
 
 	wallet, err := ethwallet.NewWalletFromRandomEntropy()
@@ -111,7 +113,7 @@ func (s *RPC) CreateTenant(
 		WaasAccessToken: waasAccessToken,
 		OIDCProviders:   oidcProviders,
 		KMSKeys:         s.Config.KMS.DefaultSessionKeys,
-		AllowedOrigins:  allowedOrigins,
+		AllowedOrigins:  origins,
 	}
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, s.Config.KMS.TenantKeys[0], tenantData)
@@ -168,12 +170,13 @@ func (s *RPC) UpdateTenant(
 		return nil, fmt.Errorf("invalid oidcProviders: %w", err)
 	}
 
-	if len(allowedOrigins) == 0 {
-		return nil, fmt.Errorf("at least one allowed origin is required")
+	origins, err := validation.NewOrigins(allowedOrigins...)
+	if err != nil {
+		return nil, fmt.Errorf("invalid allowedOrigins: %w", err)
 	}
 
 	tntData.OIDCProviders = oidcProviders
-	tntData.AllowedOrigins = allowedOrigins
+	tntData.AllowedOrigins = origins
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, s.Config.KMS.TenantKeys[0], tntData)
 	if err != nil {
@@ -190,10 +193,11 @@ func (s *RPC) UpdateTenant(
 	}
 
 	retTenant := &proto.Tenant{
-		ProjectID:     tnt.ProjectID,
-		Version:       tnt.Version,
-		OIDCProviders: tntData.OIDCProviders,
-		UpdatedAt:     tnt.CreatedAt,
+		ProjectID:      tnt.ProjectID,
+		Version:        tnt.Version,
+		OIDCProviders:  tntData.OIDCProviders,
+		AllowedOrigins: tntData.AllowedOrigins,
+		UpdatedAt:      tnt.CreatedAt,
 	}
 	return retTenant, nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -56,8 +55,8 @@ func Middleware(tenants *data.TenantTable, tenantKeys []string) func(http.Handle
 			}
 
 			origin := r.Header.Get("origin")
-			if origin != "" && len(tntData.AllowedOrigins) > 0 {
-				if !slices.Contains(tntData.AllowedOrigins, origin) {
+			if origin != "" {
+				if !tntData.AllowedOrigins.MatchAny(origin) {
 					proto.RespondWithError(w, fmt.Errorf("origin not allowed"))
 					return
 				}

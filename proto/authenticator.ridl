@@ -51,6 +51,8 @@ struct Tenant
   - oidcProviders: []OpenIdProvider
     + go.field.name = OIDCProviders
   - allowedOrigins: []string
+    + go.field.type = validation.Origins
+    + go.type.import = github.com/goware/validation
   - updatedAt: timestamp
 
 struct TenantData
@@ -81,6 +83,8 @@ struct TenantData
     + json = kmsKeys
   - allowedOrigins: []string
     + json = allowedOrigins
+    + go.field.type = validation.Origins
+    + go.type.import = github.com/goware/validation
 
 struct MiniSequenceContext
   - factory: string
