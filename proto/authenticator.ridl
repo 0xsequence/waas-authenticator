@@ -161,5 +161,5 @@ service WaasAuthenticatorAdmin
     - Clock() => (serverTime: timestamp)
 
     - GetTenant(projectId: uint64) => (tenant: Tenant)
-    - CreateTenant(projectId: uint64, waasAccessToken: string, oidcProviders: []OpenIdProvider, allowedOrigins: []string) => (tenant: Tenant, upgradeCode: string)
+    - CreateTenant(projectId: uint64, waasAccessToken: string, oidcProviders: []OpenIdProvider, allowedOrigins: []string, password?: string) => (tenant: Tenant, upgradeCode: string)
     - UpdateTenant(projectId: uint64, upgradeCode: string, oidcProviders: []OpenIdProvider, allowedOrigins: []string) => (tenant: Tenant)
