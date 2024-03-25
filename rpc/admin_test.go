@@ -99,7 +99,7 @@ func TestRPC_CreateTenant(t *testing.T) {
 	allowedOrigins := []string{"http://localhost"}
 
 	t.Run("TenantAlreadyExists", func(t *testing.T) {
-		tnt, code, err := c.CreateTenant(ctx, tenant.ProjectID, "WAAS_ACCESS_TOKEN", validOidcProviders, allowedOrigins)
+		tnt, code, err := c.CreateTenant(ctx, tenant.ProjectID, "WAAS_ACCESS_TOKEN", validOidcProviders, allowedOrigins, nil)
 		assert.Nil(t, tnt)
 		assert.Empty(t, code)
 		assert.ErrorContains(t, err, "tenant already exists")
@@ -110,7 +110,7 @@ func TestRPC_CreateTenant(t *testing.T) {
 			{Issuer: issuer, Audience: audience},
 			{Issuer: "INVALID", Audience: audience},
 		}
-		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", invalidOidcProviders, allowedOrigins)
+		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", invalidOidcProviders, allowedOrigins, nil)
 		assert.Nil(t, tnt)
 		assert.Empty(t, code)
 		assert.ErrorContains(t, err, "invalid oidcProviders")
@@ -118,19 +118,39 @@ func TestRPC_CreateTenant(t *testing.T) {
 
 	t.Run("InvalidOrigin", func(t *testing.T) {
 		invalidOrigins := []string{"localhost"}
-		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", validOidcProviders, invalidOrigins)
+		tnt, code, err := c.CreateTenant(ctx, 3, "WAAS_ACCESS_TOKEN", validOidcProviders, invalidOrigins, nil)
 		assert.Nil(t, tnt)
 		assert.Empty(t, code)
 		assert.ErrorContains(t, err, "invalid allowedOrigins")
 	})
 
+	t.Run("InvalidPassword", func(t *testing.T) {
+		password := "Password123"
+		tnt, code, err := c.CreateTenant(ctx, 4, "WAAS_ACCESS_TOKEN", validOidcProviders, allowedOrigins, &password)
+		assert.Nil(t, tnt)
+		assert.Empty(t, code)
+		assert.ErrorContains(t, err, "password must be at least 12 characters long")
+	})
+
 	t.Run("Success", func(t *testing.T) {
-		tnt, code, err := c.CreateTenant(ctx, 2, "WAAS_ACCESS_TOKEN", validOidcProviders, allowedOrigins)
+		tnt, code, err := c.CreateTenant(ctx, 5, "WAAS_ACCESS_TOKEN", validOidcProviders, allowedOrigins, nil)
 		require.NoError(t, err)
 		assert.NotEmpty(t, code)
 		assert.NotNil(t, tnt)
 
-		assert.Equal(t, uint64(2), tnt.ProjectID)
+		assert.Equal(t, uint64(5), tnt.ProjectID)
+
+		assert.Contains(t, dbClient.tenants, tnt.ProjectID)
+	})
+
+	t.Run("SuccessWithPassword", func(t *testing.T) {
+		password := "Password1234"
+		tnt, code, err := c.CreateTenant(ctx, 6, "WAAS_ACCESS_TOKEN", validOidcProviders, allowedOrigins, &password)
+		require.NoError(t, err)
+		assert.Equal(t, password, code)
+		assert.NotNil(t, tnt)
+
+		assert.Equal(t, uint64(6), tnt.ProjectID)
 
 		assert.Contains(t, dbClient.tenants, tnt.ProjectID)
 	})
