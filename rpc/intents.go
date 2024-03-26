@@ -97,6 +97,13 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		}
 		return makeIntentResponse("sessionsListed", sessions), nil
 
+	case intents.IntentNameSessionAuthProof:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataSessionAuthProof](intent)
+		if err != nil {
+			return nil, err
+		}
+		return s.sessionAuthProof(ctx, sess, intentTyped)
+
 	case intents.IntentNameSignMessage:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataSignMessage](intent)
 		if err != nil {

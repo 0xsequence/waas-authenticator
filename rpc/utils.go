@@ -18,9 +18,8 @@ func (s *RPC) ChainList(ctx context.Context) ([]*proto.Chain, error) {
 	var retChain []*proto.Chain
 	for _, chain := range chains {
 		retChain = append(retChain, &proto.Chain{
-			Id:        chain.Id,
-			Name:      chain.Name,
-			IsEnabled: chain.IsEnabled,
+			Id:   chain.Id,
+			Name: chain.Name,
 		})
 	}
 	return retChain, nil
