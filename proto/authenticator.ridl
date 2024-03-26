@@ -4,8 +4,10 @@ name = sequence-waas-authenticator
 version = v0.1.0
 
 
-import ./intent.ridl
+import ../vendor/github.com/0xsequence/go-sequence/intents/intent.ridl
+  - IntentName
   - Intent
+  - IntentResponseCode
   - IntentResponse
   - Signature
 

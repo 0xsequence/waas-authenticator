@@ -4,7 +4,7 @@ go 1.22.1
 
 require (
 	github.com/0xsequence/ethkit v1.23.0
-	github.com/0xsequence/go-sequence v0.29.4
+	github.com/0xsequence/go-sequence v0.29.5-0.20240326181235-8827430c0686
 	github.com/0xsequence/nitrocontrol v0.3.0
 	github.com/BurntSushi/toml v1.3.2
 	github.com/aws/aws-sdk-go-v2 v1.25.2
@@ -24,7 +24,7 @@ require (
 	github.com/mdlayher/vsock v1.2.1
 	github.com/rs/zerolog v1.32.0
 	github.com/stretchr/testify v1.9.0
-	github.com/webrpc/webrpc v0.15.2
+	github.com/webrpc/webrpc v0.15.5
 	golang.org/x/sync v0.6.0
 )
 

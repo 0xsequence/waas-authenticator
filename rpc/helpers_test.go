@@ -77,10 +77,10 @@ func initRPC(cfg *config.Config, enc *enclave.Enclave, dbClient *dbMock) *rpc.RP
 	return svc
 }
 
-func generateIntent(t *testing.T, name string, data any) *proto.Intent {
+func generateIntent(t *testing.T, name intents.IntentName, data any) *proto.Intent {
 	return &proto.Intent{
 		Version:    "1.0.0",
-		Name:       name,
+		Name:       proto.IntentName(name),
 		ExpiresAt:  uint64(time.Now().Add(1 * time.Minute).Unix()),
 		IssuedAt:   uint64(time.Now().Unix()),
 		Data:       data,
@@ -88,7 +88,7 @@ func generateIntent(t *testing.T, name string, data any) *proto.Intent {
 	}
 }
 
-func generateSignedIntent(t *testing.T, name string, data any, session intents.Session) *proto.Intent {
+func generateSignedIntent(t *testing.T, name intents.IntentName, data any, session intents.Session) *proto.Intent {
 	intent := &intents.Intent{
 		Version:    "1.0.0",
 		Name:       name,
@@ -107,7 +107,7 @@ func generateSignedIntent(t *testing.T, name string, data any, session intents.S
 	}
 	return &proto.Intent{
 		Version:    intent.Version,
-		Name:       intent.Name,
+		Name:       proto.IntentName(intent.Name),
 		ExpiresAt:  intent.ExpiresAt,
 		IssuedAt:   intent.IssuedAt,
 		Data:       intent.Data,
@@ -646,7 +646,7 @@ func (w walletServiceMock) IsValidMessageSignature(ctx context.Context, chainID 
 func (w walletServiceMock) GenTransaction(ctx context.Context, protoIntent *proto_wallet.Intent) (*proto_wallet.TransactionBundle, error) {
 	intent := &intents.Intent{
 		Version:   protoIntent.Version,
-		Name:      protoIntent.Name,
+		Name:      intents.IntentName(protoIntent.Name),
 		ExpiresAt: protoIntent.ExpiresAt,
 		IssuedAt:  protoIntent.IssuedAt,
 		Data:      protoIntent.Data,
@@ -702,7 +702,7 @@ func (w walletServiceMock) GetSession(ctx context.Context, sessionID string) (*p
 func (w *walletServiceMock) RegisterSession(ctx context.Context, userID string, protoIntent *proto_wallet.Intent) (*proto_wallet.IntentResponse, error) {
 	intent := &intents.Intent{
 		Version:   protoIntent.Version,
-		Name:      protoIntent.Name,
+		Name:      intents.IntentName(protoIntent.Name),
 		ExpiresAt: protoIntent.ExpiresAt,
 		IssuedAt:  protoIntent.IssuedAt,
 		Data:      protoIntent.Data,

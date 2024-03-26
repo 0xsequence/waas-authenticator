@@ -26,7 +26,7 @@ func (s *RPC) RegisterSession(
 		return nil, nil, fmt.Errorf("parse intent: %w", err)
 	}
 
-	if intent.Name != intents.IntentNameOpenSession {
+	if intent.Name != intents.IntentName_openSession {
 		return nil, nil, fmt.Errorf("unexpected intent name: %q", intent.Name)
 	}
 
