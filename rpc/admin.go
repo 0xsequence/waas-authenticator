@@ -42,7 +42,12 @@ func (s *RPC) GetTenant(ctx context.Context, projectID uint64) (*proto.Tenant, e
 }
 
 func (s *RPC) CreateTenant(
-	ctx context.Context, projectID uint64, waasAccessToken string, oidcProviders []*proto.OpenIdProvider, allowedOrigins []string,
+	ctx context.Context,
+	projectID uint64,
+	waasAccessToken string,
+	oidcProviders []*proto.OpenIdProvider,
+	allowedOrigins []string,
+	password *string,
 ) (*proto.Tenant, string, error) {
 	att := attestation.FromContext(ctx)
 
@@ -94,9 +99,18 @@ func (s *RPC) CreateTenant(
 		return nil, "", fmt.Errorf("retrieving Sequence context: %w", err)
 	}
 
-	upgradeCode := make([]byte, 10)
-	if _, err := att.Read(upgradeCode); err != nil {
-		return nil, "", fmt.Errorf("reading attestation: %w", err)
+	var upgradeCode string
+	if password != nil {
+		if len(*password) < 12 {
+			return nil, "", fmt.Errorf("password must be at least 12 characters long")
+		}
+		upgradeCode = *password
+	} else {
+		b := make([]byte, 10)
+		if _, err := att.Read(b); err != nil {
+			return nil, "", fmt.Errorf("reading attestation: %w", err)
+		}
+		upgradeCode = base32.StdEncoding.EncodeToString(b)
 	}
 
 	privateKey := wallet.PrivateKeyHex()[2:] // remove 0x prefix
@@ -109,7 +123,7 @@ func (s *RPC) CreateTenant(
 			Factory:    seqContext.Factory,
 			MainModule: seqContext.MainModule,
 		},
-		UpgradeCode:     base32.StdEncoding.EncodeToString(upgradeCode),
+		UpgradeCode:     upgradeCode,
 		WaasAccessToken: waasAccessToken,
 		OIDCProviders:   oidcProviders,
 		KMSKeys:         s.Config.KMS.DefaultSessionKeys,
