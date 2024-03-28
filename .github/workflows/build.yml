@@ -1,0 +1,19 @@
+name: Build EIF
+
+on:
+  push:
+    branches:
+      - dev-pipeline
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build EIF
+        run: make VERSION=${{ github.sha }} eif
