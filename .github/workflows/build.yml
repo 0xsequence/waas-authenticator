@@ -16,4 +16,10 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: Build EIF
-        run: make VERSION=${{ github.sha }} eif
+        run: make VERSION=${{ github.sha }} OUTDIR=${{ github.workspace }}/out eif
+
+      - name: Upload EIF
+        uses: actions/upload-artifact@v4
+        with:
+          path: out/waas-auth.${{ github.sha }}.eif
+          if-no-files-found: error
