@@ -33,7 +33,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 	"go.opentelemetry.io/contrib/propagators/aws/xray"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/zipkin"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
@@ -60,7 +60,7 @@ type RPC struct {
 	running      int32
 }
 
-func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
+func New(cfg *config.Config, client *http.Client) (*RPC, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -259,8 +259,8 @@ func emptyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(""))
 }
 
-func newOtelTracerProvider(ctx context.Context, client tracing.HTTPClient, cfg config.TracingConfig) (*trace.TracerProvider, error) {
-	traceExporter, err := otlptrace.New(ctx, tracing.NewExporter(client, cfg.Endpoint))
+func newOtelTracerProvider(ctx context.Context, client *http.Client, cfg config.TracingConfig) (*trace.TracerProvider, error) {
+	traceExporter, err := zipkin.New(cfg.Endpoint, zipkin.WithClient(client))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new OTLP trace exporter: %v", err)
 	}
