@@ -13,6 +13,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
+	"github.com/0xsequence/waas-authenticator/rpc/tracing"
 )
 
 func (s *RPC) RegisterSession(
@@ -29,6 +30,9 @@ func (s *RPC) RegisterSession(
 	if intent.Name != intents.IntentNameOpenSession {
 		return nil, nil, fmt.Errorf("unexpected intent name: %q", intent.Name)
 	}
+
+	ctx, span := tracing.Intent(ctx, intent)
+	defer span.End()
 
 	intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataOpenSession](intent)
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
+	"github.com/0xsequence/waas-authenticator/rpc/tracing"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -60,7 +61,15 @@ func withAudience(expectedAudience []string) jwt.ValidatorFunc {
 	}
 }
 
-func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sessionHash string) (proto.Identity, error) {
+func verifyIdentity(ctx context.Context, client HTTPClient, idToken string, sessionHash string) (ident proto.Identity, err error) {
+	ctx, span := tracing.Span(ctx, "verifyIdentity")
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+		}
+		span.End()
+	}()
+
 	tok, err := jwt.Parse([]byte(idToken), jwt.WithVerify(false), jwt.WithValidate(false))
 	if err != nil {
 		return proto.Identity{}, fmt.Errorf("parse JWT: %w", err)
@@ -117,7 +126,7 @@ func getProviderKeySet(ctx context.Context, client HTTPClient, issuer string) (j
 		return nil, fmt.Errorf("fetch issuer keys: %w", err)
 	}
 
-	keySet, err := jwk.Fetch(ctx, jwksURL, jwk.WithHTTPClient(client))
+	keySet, err := jwk.Fetch(ctx, jwksURL, jwk.WithHTTPClient(tracing.WrapClientWithContext(ctx, client)))
 	if err != nil {
 		return nil, fmt.Errorf("fetch issuer keys: %w", err)
 	}
