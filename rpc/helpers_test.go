@@ -566,6 +566,11 @@ type walletServiceMock struct {
 	registeredSessions map[string]struct{}
 }
 
+func (w walletServiceMock) GetProjectParentWalletDeployCalldata(ctx context.Context, projectID uint64, chainID string) (string, string, string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (w walletServiceMock) ProjectParentWalletStatus(ctx context.Context, projectID uint64) ([]*proto_wallet.ParentWalletStatus, error) {
 	//TODO implement me
 	panic("implement me")
