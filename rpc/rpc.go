@@ -18,6 +18,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/awscreds"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
+	"github.com/0xsequence/waas-authenticator/rpc/tracing"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -27,7 +28,15 @@ import (
 	"github.com/go-chi/httplog"
 	"github.com/go-chi/telemetry"
 	"github.com/go-chi/traceid"
+	"github.com/riandyrn/otelchi"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
+	"go.opentelemetry.io/contrib/propagators/aws/xray"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
 type HTTPClient interface {
@@ -55,11 +64,12 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
+	wrappedClient := tracing.WrapClient(client)
 
 	options := []func(options *awsconfig.LoadOptions) error{
 		awsconfig.WithRegion(cfg.Region),
-		awsconfig.WithHTTPClient(client),
-		awsconfig.WithCredentialsProvider(awscreds.NewProvider(client, cfg.Endpoints.MetadataServer)),
+		awsconfig.WithHTTPClient(wrappedClient),
+		awsconfig.WithCredentialsProvider(awscreds.NewProvider(wrappedClient, cfg.Endpoints.MetadataServer)),
 	}
 
 	if cfg.Endpoints.AWSEndpoint != "" {
@@ -78,6 +88,17 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	tp, err := newOtelTracerProvider(context.Background(), client, cfg.Tracing)
+	if err != nil {
+		return nil, err
+	}
+
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(xray.Propagator{})
+
+	// instrument all aws clients
+	otelaws.AppendMiddlewares(&awsCfg.APIOptions)
 
 	httpServer := &http.Server{
 		ReadTimeout:       45 * time.Second,
@@ -107,7 +128,7 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 		}),
 		Config:     cfg,
 		Server:     httpServer,
-		HTTPClient: client,
+		HTTPClient: wrappedClient,
 		Enclave:    enc,
 		Tenants:    data.NewTenantTable(db, cfg.Database.TenantsTable),
 		Sessions:   data.NewSessionTable(db, cfg.Database.SessionsTable, "UserID-Index"),
@@ -115,7 +136,7 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 			ByUserID: "UserID-Index",
 			ByEmail:  "Email-Index",
 		}),
-		Wallets:      proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, client),
+		Wallets:      proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, wrappedClient),
 		startTime:    time.Now(),
 		measurements: m,
 	}
@@ -195,6 +216,11 @@ func (s *RPC) Handler() http.Handler {
 	r.Use(middleware.PageRoute("/status", http.HandlerFunc(s.statusHandler)))
 	r.Use(middleware.PageRoute("/favicon.ico", http.HandlerFunc(emptyHandler)))
 
+	// TODO: replace otelchi with custom impl in the tracing pkg
+	// we need more flexibility (attach TraceId as attribute to the span)
+	r.Use(otelchi.Middleware("WaasAuthenticator"))
+	r.Use(tracing.Middleware())
+
 	// Generate attestation document
 	r.Use(attestation.Middleware(s.Enclave))
 
@@ -231,4 +257,30 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 
 func emptyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(""))
+}
+
+func newOtelTracerProvider(ctx context.Context, client tracing.HTTPClient, cfg config.TracingConfig) (*trace.TracerProvider, error) {
+	traceExporter, err := otlptrace.New(ctx, tracing.NewExporter(client, cfg.Endpoint))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new OTLP trace exporter: %v", err)
+	}
+
+	r, err := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName("WaasAuthenticator"),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tp := trace.NewTracerProvider(
+		trace.WithSampler(trace.ParentBased(trace.AlwaysSample())),
+		trace.WithBatcher(traceExporter),
+		trace.WithIDGenerator(xray.NewIDGenerator()),
+		trace.WithResource(r),
+	)
+	return tp, nil
 }
