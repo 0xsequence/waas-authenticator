@@ -17,6 +17,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/access"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/awscreds"
+	"github.com/0xsequence/waas-authenticator/rpc/identity"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -27,6 +28,7 @@ import (
 	"github.com/go-chi/httplog"
 	"github.com/go-chi/telemetry"
 	"github.com/go-chi/traceid"
+	"github.com/goware/cachestore/memlru"
 	"github.com/rs/zerolog"
 )
 
@@ -45,6 +47,7 @@ type RPC struct {
 	Sessions   *data.SessionTable
 	Accounts   *data.AccountTable
 	Wallets    proto_wallet.WaaS
+	Verifier   *identity.Verifier
 
 	measurements *enclave.Measurements
 	startTime    time.Time
@@ -100,6 +103,12 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 		return nil, err
 	}
 
+	cacheBackend := memlru.Backend(1024)
+	verifier, err := identity.NewVerifier(cacheBackend, client)
+	if err != nil {
+		return nil, err
+	}
+
 	db := dynamodb.NewFromConfig(awsCfg)
 	s := &RPC{
 		Log: httplog.NewLogger("waas-authenticator", httplog.Options{
@@ -116,6 +125,7 @@ func New(cfg *config.Config, client HTTPClient) (*RPC, error) {
 			ByEmail:  "Email-Index",
 		}),
 		Wallets:      proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, client),
+		Verifier:     verifier,
 		startTime:    time.Now(),
 		measurements: m,
 	}
