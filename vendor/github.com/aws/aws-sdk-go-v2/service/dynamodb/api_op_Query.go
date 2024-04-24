@@ -67,7 +67,8 @@ func (c *Client) Query(ctx context.Context, params *QueryInput, optFns ...func(*
 // Represents the input of a Query operation.
 type QueryInput struct {
 
-	// The name of the table containing the requested items.
+	// The name of the table containing the requested items. You can also provide the
+	// Amazon Resource Name (ARN) of the table in this parameter.
 	//
 	// This member is required.
 	TableName *string
@@ -137,7 +138,7 @@ type QueryInput struct {
 	// key attributes. You cannot define a filter expression based on a partition key
 	// or a sort key. A FilterExpression is applied after the items have already been
 	// read; the process of filtering does not consume any additional read capacity
-	// units. For more information, see Filter Expressions (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/QueryAndScan.html#Query.FilterExpression)
+	// units. For more information, see Filter Expressions (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.FilterExpression.html)
 	// in the Amazon DynamoDB Developer Guide.
 	FilterExpression *string
 

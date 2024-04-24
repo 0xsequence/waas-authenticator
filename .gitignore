@@ -1,5 +1,5 @@
-bin/
-etc/waas-auth.conf
-etc/id_rsa
-etc/id_rsa.pub
-version.go
+/bin/
+/etc/waas-auth.conf
+/etc/id_rsa
+/etc/id_rsa.pub
+/version.go
