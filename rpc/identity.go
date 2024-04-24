@@ -164,23 +164,6 @@ func normalizeIssuer(iss string) string {
 }
 
 func getEmailFromToken(tok jwt.Token) string {
-	// TODO: we might want to relax this a bit and not depend so much on the `email_verified` claim
-	emailVerifiedClaim, ok := tok.Get("email_verified")
-	if !ok {
-		return ""
-	}
-
-	verified := false
-	switch v := emailVerifiedClaim.(type) {
-	case bool:
-		verified = v
-	case string:
-		verified = strings.TrimSpace(strings.ToLower(v)) == "true"
-	}
-	if !verified {
-		return ""
-	}
-
 	emailClaim, ok := tok.Get("email")
 	if !ok {
 		return ""
