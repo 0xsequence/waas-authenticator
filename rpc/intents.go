@@ -117,6 +117,38 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 			return nil, err
 		}
 		return s.sendTransaction(ctx, sess, intentTyped)
+
+	case intents.IntentName_listAccounts:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataListAccounts](intent)
+		if err != nil {
+			return nil, err
+		}
+		accounts, err := s.listAccounts(ctx, sess, intentTyped)
+		if err != nil {
+			return nil, err
+		}
+		return makeIntentResponse(proto.IntentResponseCode_accountList, accounts), nil
+
+	case intents.IntentName_federateAccount:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataFederateAccount](intent)
+		if err != nil {
+			return nil, err
+		}
+		account, err := s.federateAccount(ctx, sess, intentTyped)
+		if err != nil {
+			return nil, err
+		}
+		return makeIntentResponse(proto.IntentResponseCode_accountFederated, account), nil
+
+	case intents.IntentName_removeAccount:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataRemoveAccount](intent)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.removeAccount(ctx, sess, intentTyped); err != nil {
+			return nil, err
+		}
+		return makeIntentResponse(proto.IntentResponseCode_accountRemoved, true), nil
 	}
 
 	// Generic forwarding of intent, no special handling
