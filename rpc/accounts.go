@@ -193,8 +193,6 @@ func (s *RPC) deleteAccountSessions(ctx context.Context, projectID uint64, userI
 			continue
 		}
 
-		fmt.Println("deleteAccountSessions: deleting", sess.Identity, identity.String())
-
 		if err := s.Sessions.Delete(ctx, projectID, sess.ID); err != nil {
 			errs = append(errs, err)
 		}
