@@ -59,7 +59,7 @@ func (s *RPC) CreateTenant(
 		return nil, "", fmt.Errorf("tenant already exists")
 	}
 
-	if err := validateOIDCProviders(ctx, s.HTTPClient, oidcProviders); err != nil {
+	if err := s.validateOIDCProviders(ctx, oidcProviders); err != nil {
 		return nil, "", fmt.Errorf("invalid oidcProviders: %w", err)
 	}
 
@@ -180,7 +180,7 @@ func (s *RPC) UpdateTenant(
 		return nil, fmt.Errorf("invalid upgrade code")
 	}
 
-	if err := validateOIDCProviders(ctx, s.HTTPClient, oidcProviders); err != nil {
+	if err := s.validateOIDCProviders(ctx, oidcProviders); err != nil {
 		return nil, fmt.Errorf("invalid oidcProviders: %w", err)
 	}
 
@@ -216,7 +216,7 @@ func (s *RPC) UpdateTenant(
 	return retTenant, nil
 }
 
-func validateOIDCProviders(ctx context.Context, client HTTPClient, providers []*proto.OpenIdProvider) error {
+func (s *RPC) validateOIDCProviders(ctx context.Context, providers []*proto.OpenIdProvider) error {
 	var wg errgroup.Group
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -233,7 +233,7 @@ func validateOIDCProviders(ctx context.Context, client HTTPClient, providers []*
 		}
 
 		wg.Go(func() error {
-			if _, err := getProviderKeySet(ctx, client, provider.Issuer); err != nil {
+			if _, err := s.Verifier.GetKeySet(ctx, provider.Issuer); err != nil {
 				return err
 			}
 			return nil
