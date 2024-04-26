@@ -49,12 +49,12 @@ func (s *RPC) RegisterSession(
 	}
 
 	sessionHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(sessionID))).String()
-	identity, err := verifyIdentity(ctx, s.HTTPClient, *idToken, sessionHash)
+	ident, err := s.Verifier.Verify(ctx, *idToken, sessionHash)
 	if err != nil {
 		return nil, nil, fmt.Errorf("verifying identity: %w", err)
 	}
 
-	account, accountFound, err := s.Accounts.Get(ctx, tntData.ProjectID, identity)
+	account, accountFound, err := s.Accounts.Get(ctx, tntData.ProjectID, ident)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
@@ -63,7 +63,7 @@ func (s *RPC) RegisterSession(
 		accData := &proto.AccountData{
 			ProjectID: tntData.ProjectID,
 			UserID:    fmt.Sprintf("%d|%s", tntData.ProjectID, sessionHash),
-			Identity:  identity.String(),
+			Identity:  ident.String(),
 			CreatedAt: time.Now(),
 		}
 		encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.KMSKeys[0], accData)
@@ -73,10 +73,10 @@ func (s *RPC) RegisterSession(
 
 		account = &data.Account{
 			ProjectID:          tntData.ProjectID,
-			Identity:           data.Identity(identity),
+			Identity:           data.Identity(ident),
 			UserID:             accData.UserID,
-			Email:              identity.Email,
-			ProjectScopedEmail: fmt.Sprintf("%d|%s", tntData.ProjectID, identity.Email),
+			Email:              ident.Email,
+			ProjectScopedEmail: fmt.Sprintf("%d|%s", tntData.ProjectID, ident.Email),
 			EncryptedKey:       encryptedKey,
 			Algorithm:          algorithm,
 			Ciphertext:         ciphertext,
@@ -100,7 +100,7 @@ func (s *RPC) RegisterSession(
 		ID:        sessionID,
 		ProjectID: tntData.ProjectID,
 		UserID:    account.UserID,
-		Identity:  identity.String(),
+		Identity:  ident.String(),
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(ttl),
 	}
@@ -114,7 +114,7 @@ func (s *RPC) RegisterSession(
 		ID:           sessionID,
 		ProjectID:    tntData.ProjectID,
 		UserID:       account.UserID,
-		Identity:     identity.String(),
+		Identity:     ident.String(),
 		FriendlyName: friendlyName,
 		EncryptedKey: encryptedKey,
 		Algorithm:    algorithm,
@@ -131,7 +131,7 @@ func (s *RPC) RegisterSession(
 		ID:           dbSess.ID,
 		UserID:       dbSess.UserID,
 		ProjectID:    sessData.ProjectID,
-		Identity:     identity,
+		Identity:     ident,
 		FriendlyName: dbSess.FriendlyName,
 		CreatedAt:    sessData.CreatedAt,
 		RefreshedAt:  dbSess.RefreshedAt,
