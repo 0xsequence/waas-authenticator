@@ -30,7 +30,6 @@ import (
 	"github.com/go-chi/telemetry"
 	"github.com/go-chi/traceid"
 	"github.com/goware/cachestore/memlru"
-	"github.com/riandyrn/otelchi"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 	"go.opentelemetry.io/contrib/propagators/aws/xray"
@@ -226,9 +225,7 @@ func (s *RPC) Handler() http.Handler {
 	r.Use(middleware.PageRoute("/status", http.HandlerFunc(s.statusHandler)))
 	r.Use(middleware.PageRoute("/favicon.ico", http.HandlerFunc(emptyHandler)))
 
-	// TODO: replace otelchi with custom impl in the tracing pkg
-	// we need more flexibility (attach TraceId as attribute to the span)
-	r.Use(otelchi.Middleware("WaasAuthenticator"))
+	// OpenTelemetry tracing
 	r.Use(tracing.Middleware())
 
 	// Generate attestation document
@@ -287,7 +284,7 @@ func newOtelTracerProvider(ctx context.Context, client *http.Client, cfg config.
 	}
 
 	tp := trace.NewTracerProvider(
-		trace.WithSampler(trace.ParentBased(trace.AlwaysSample())),
+		trace.WithSampler(trace.ParentBased(tracing.SampleRoutes("/rpc/WaasAuthenticator/*", "/rpc/WaasAuthenticatorAdmin/*"))),
 		trace.WithBatcher(traceExporter),
 		trace.WithIDGenerator(xray.NewIDGenerator()),
 		trace.WithResource(r),
