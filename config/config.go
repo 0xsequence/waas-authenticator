@@ -17,6 +17,7 @@ type Config struct {
 	KMS       KMSConfig        `toml:"kms"`
 	Database  DatabaseConfig   `toml:"database"`
 	Telemetry telemetry.Config `toml:"telemetry"`
+	Tracing   TracingConfig    `toml:"tracing"`
 }
 
 type AdminConfig struct {
@@ -47,6 +48,10 @@ type DatabaseConfig struct {
 	TenantsTable  string `toml:"tenants_table"`
 	AccountsTable string `toml:"accounts_table"`
 	SessionsTable string `toml:"sessions_table"`
+}
+
+type TracingConfig struct {
+	Endpoint string `toml:"endpoint"`
 }
 
 func New() (*Config, error) {

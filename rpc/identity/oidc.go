@@ -10,17 +10,26 @@ import (
 
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
+	"github.com/0xsequence/waas-authenticator/rpc/tracing"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
-func (v *Verifier) GetKeySet(ctx context.Context, issuer string) (jwk.Set, error) {
+func (v *Verifier) GetKeySet(ctx context.Context, issuer string) (set jwk.Set, err error) {
+	ctx, span := tracing.Span(ctx, "identity.GetKeySet")
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+		}
+		span.End()
+	}()
+
 	jwksURL, err := fetchJWKSURL(ctx, v.client, issuer)
 	if err != nil {
 		return nil, fmt.Errorf("fetch issuer keys: %w", err)
 	}
 
-	keySet, err := jwk.Fetch(ctx, jwksURL, jwk.WithHTTPClient(v.client))
+	keySet, err := jwk.Fetch(ctx, jwksURL, jwk.WithHTTPClient(tracing.WrapClientWithContext(ctx, v.client)))
 	if err != nil {
 		return nil, fmt.Errorf("fetch issuer keys: %w", err)
 	}

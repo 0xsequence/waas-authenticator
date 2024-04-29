@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0xsequence/waas-authenticator/proto"
+	"github.com/0xsequence/waas-authenticator/rpc/tracing"
 	"github.com/goware/cachestore"
 	"github.com/goware/cachestore/cachestorectl"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -39,7 +40,15 @@ func NewVerifier(cacheBackend cachestore.Backend, client HTTPClient) (*Verifier,
 	}, nil
 }
 
-func (v *Verifier) Verify(ctx context.Context, idToken string, sessionHash string) (proto.Identity, error) {
+func (v *Verifier) Verify(ctx context.Context, idToken string, sessionHash string) (ident proto.Identity, err error) {
+	ctx, span := tracing.Span(ctx, "identity.Verify")
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+		}
+		span.End()
+	}()
+
 	tok, err := jwt.Parse([]byte(idToken), jwt.WithVerify(false), jwt.WithValidate(false))
 	if err != nil {
 		return proto.Identity{}, fmt.Errorf("parse JWT: %w", err)
