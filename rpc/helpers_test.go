@@ -26,12 +26,14 @@ import (
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
+	"github.com/0xsequence/waas-authenticator/rpc/identity"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/goware/cachestore/memlru"
 	"github.com/goware/validation"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -65,14 +67,21 @@ func getTestingCtxValue(ctx context.Context, k string) string {
 }
 
 func initRPC(cfg *config.Config, enc *enclave.Enclave, dbClient *dbMock) *rpc.RPC {
+	client := httpClient{}
+	cacheBackend := memlru.Backend(1024)
+	verifier, err := identity.NewVerifier(cacheBackend, client)
+	if err != nil {
+		panic(err)
+	}
 	svc := &rpc.RPC{
 		Config:     cfg,
-		HTTPClient: httpClient{},
+		HTTPClient: client,
 		Enclave:    enc,
 		Wallets:    newWalletServiceMock(nil),
 		Tenants:    data.NewTenantTable(dbClient, "Tenants"),
 		Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
 		Accounts:   data.NewAccountTable(dbClient, "Accounts", data.AccountIndices{}),
+		Verifier:   verifier,
 	}
 	return svc
 }
@@ -590,6 +599,11 @@ func newSession(t *testing.T, enc *enclave.Enclave, issuer string, signingSessio
 type walletServiceMock struct {
 	registeredUsers    map[string]struct{}
 	registeredSessions map[string]struct{}
+}
+
+func (w walletServiceMock) GetProjectParentWalletDeployCalldata(ctx context.Context, projectID uint64, chainID string) (string, string, string, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (w walletServiceMock) FederateAccount(ctx context.Context, userID string, intent *proto_wallet.Intent) (*proto_wallet.IntentResponse, error) {

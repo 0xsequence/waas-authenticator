@@ -16,6 +16,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
+	"github.com/0xsequence/waas-authenticator/rpc/tracing"
 )
 
 func AddressForUser(ctx context.Context, tntData *proto.TenantData, user string) (string, error) {
@@ -65,6 +66,9 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 	if err != nil {
 		return nil, err
 	}
+
+	ctx, span := tracing.Intent(ctx, intent)
+	defer span.End()
 
 	sess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, sessionID)
 	if err != nil || !found {

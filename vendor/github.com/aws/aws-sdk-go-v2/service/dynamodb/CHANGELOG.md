@@ -1,3 +1,28 @@
+# v1.31.1 (2024-03-29)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.31.0 (2024-03-20)
+
+* **Feature**: This release introduces 3 new APIs ('GetResourcePolicy', 'PutResourcePolicy' and 'DeleteResourcePolicy') and modifies the existing 'CreateTable' API for the resource-based policy support. It also modifies several APIs to accept a 'TableArn' for the 'TableName' parameter.
+
+# v1.30.5 (2024-03-18)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.30.4 (2024-03-07)
+
+* **Bug Fix**: Remove dependency on go-cmp.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.30.3 (2024-03-06)
+
+* **Documentation**: Doc only updates for DynamoDB documentation
+
+# v1.30.2 (2024-03-04)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
 # v1.30.1 (2024-02-23)
 
 * **Bug Fix**: Move all common, SDK-side middleware stack ops into the service client module to prevent cross-module compatibility issues in the future.
