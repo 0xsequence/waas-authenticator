@@ -60,12 +60,12 @@ func (s *RPC) federateAccount(
 	}
 
 	sessionHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(sess.ID))).String()
-	identity, err := verifyIdentity(ctx, s.HTTPClient, intent.Data.IdToken, sessionHash)
+	ident, err := s.Verifier.Verify(ctx, intent.Data.IdToken, sessionHash)
 	if err != nil {
 		return nil, fmt.Errorf("verifying identity: %w", err)
 	}
 
-	_, found, err := s.Accounts.Get(ctx, tntData.ProjectID, identity)
+	_, found, err := s.Accounts.Get(ctx, tntData.ProjectID, ident)
 	if err != nil {
 		return nil, fmt.Errorf("retrieving account: %w", err)
 	}
@@ -76,7 +76,7 @@ func (s *RPC) federateAccount(
 	accData := &proto.AccountData{
 		ProjectID: tntData.ProjectID,
 		UserID:    sess.UserID,
-		Identity:  identity.String(),
+		Identity:  ident.String(),
 		CreatedAt: time.Now(),
 	}
 
@@ -87,10 +87,10 @@ func (s *RPC) federateAccount(
 
 	account := &data.Account{
 		ProjectID:          tntData.ProjectID,
-		Identity:           data.Identity(identity),
+		Identity:           data.Identity(ident),
 		UserID:             accData.UserID,
-		Email:              identity.Email,
-		ProjectScopedEmail: fmt.Sprintf("%d|%s", tntData.ProjectID, identity.Email),
+		Email:              ident.Email,
+		ProjectScopedEmail: fmt.Sprintf("%d|%s", tntData.ProjectID, ident.Email),
 		EncryptedKey:       encryptedKey,
 		Algorithm:          algorithm,
 		Ciphertext:         ciphertext,
@@ -106,12 +106,12 @@ func (s *RPC) federateAccount(
 	}
 
 	outAcc := &intents.Account{
-		ID:     identity.String(),
-		Type:   intents.IdentityType(identity.Type),
-		Issuer: identity.Issuer,
+		ID:     ident.String(),
+		Type:   intents.IdentityType(ident.Type),
+		Issuer: ident.Issuer,
 	}
-	if identity.Email != "" {
-		outAcc.Email = &identity.Email
+	if ident.Email != "" {
+		outAcc.Email = &ident.Email
 	}
 	return outAcc, nil
 }
