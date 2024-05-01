@@ -26,18 +26,22 @@ import (
 )
 
 var DefaultOptions = Options{
-	Logger:                   logger.NewLogger(logger.LogLevel_WARN),
-	PollingInterval:          1500 * time.Millisecond,
-	UnsubscribeOnStop:        false,
-	Timeout:                  20 * time.Second,
-	StartBlockNumber:         nil, // latest
-	TrailNumBlocksBehindHead: 0,   // latest
-	BlockRetentionLimit:      200,
-	WithLogs:                 false,
-	LogTopics:                []common.Hash{}, // all logs
-	DebugLogging:             false,
-	CacheExpiry:              300 * time.Second,
-	Alerter:                  util.NoopAlerter(),
+	Logger:                           logger.NewLogger(logger.LogLevel_WARN),
+	PollingInterval:                  1500 * time.Millisecond,
+	ExpectedBlockInterval:            15 * time.Second,
+	StreamingErrorResetInterval:      15 * time.Minute,
+	StreamingRetryAfter:              20 * time.Minute,
+	StreamingErrNumToSwitchToPolling: 3,
+	UnsubscribeOnStop:                false,
+	Timeout:                          20 * time.Second,
+	StartBlockNumber:                 nil, // latest
+	TrailNumBlocksBehindHead:         0,   // latest
+	BlockRetentionLimit:              200,
+	WithLogs:                         false,
+	LogTopics:                        []common.Hash{}, // all logs
+	DebugLogging:                     false,
+	CacheExpiry:                      300 * time.Second,
+	Alerter:                          util.NoopAlerter(),
 }
 
 type Options struct {
@@ -46,6 +50,18 @@ type Options struct {
 
 	// PollingInterval to query the chain for new blocks
 	PollingInterval time.Duration
+
+	// ExpectedBlockInterval is the expected time between blocks
+	ExpectedBlockInterval time.Duration
+
+	// StreamingErrorResetInterval is the time to reset the streaming error count
+	StreamingErrorResetInterval time.Duration
+
+	// StreamingRetryAfter is the time to wait before retrying the streaming again
+	StreamingRetryAfter time.Duration
+
+	// StreamingErrNumToSwitchToPolling is the number of errors before switching to polling
+	StreamingErrNumToSwitchToPolling int
 
 	// Auto-unsubscribe on monitor stop or error
 	UnsubscribeOnStop bool
@@ -57,7 +73,7 @@ type Options struct {
 	StartBlockNumber *big.Int
 
 	// Bootstrap flag which indicates the monitor will expect the monitor's
-	// events to be bootstrapped, and will continue from that point. This als
+	// events to be bootstrapped, and will continue from that point. This also
 	// takes precedence over StartBlockNumber when set to true.
 	Bootstrap bool
 
@@ -79,8 +95,8 @@ type Options struct {
 	LogTopics []common.Hash
 
 	// CacheBackend to use for caching block data
-	// NOTE: do not use this unless you know what you're doing. In most cases
-	// leave this nil.
+	// NOTE: do not use this unless you know what you're doing.
+	// In most cases leave this nil.
 	CacheBackend cachestore.Backend
 
 	// CacheExpiry is how long to keep each record in cache
@@ -110,9 +126,11 @@ type Monitor struct {
 	alert    util.Alerter
 	provider ethrpc.RawInterface
 
-	chain           *Chain
-	chainID         *big.Int
-	nextBlockNumber *big.Int
+	chain             *Chain
+	chainID           *big.Int
+	nextBlockNumber   *big.Int
+	nextBlockNumberMu sync.Mutex
+	pollInterval      atomic.Int64
 
 	cache cachestore.Store[[]byte]
 
@@ -148,11 +166,7 @@ func NewMonitor(provider ethrpc.RawInterface, options ...Options) (*Monitor, err
 		}
 	}
 
-	chainID, err := getChainID(provider)
-	if err != nil {
-		return nil, err
-	}
-
+	var err error
 	var cache cachestore.Store[[]byte]
 	if opts.CacheBackend != nil {
 		cache, err = cachestorectl.Open[[]byte](opts.CacheBackend, cachestore.WithLockExpiry(5*time.Second))
@@ -171,12 +185,21 @@ func NewMonitor(provider ethrpc.RawInterface, options ...Options) (*Monitor, err
 		alert:        opts.Alerter,
 		provider:     provider,
 		chain:        newChain(opts.BlockRetentionLimit, opts.Bootstrap),
-		chainID:      chainID,
+		chainID:      nil,
 		cache:        cache,
 		publishCh:    make(chan Blocks),
 		publishQueue: newQueue(opts.BlockRetentionLimit * 2),
 		subscribers:  make([]*subscriber, 0),
 	}, nil
+}
+
+func (m *Monitor) lazyInit(ctx context.Context) error {
+	var err error
+	m.chainID, err = getChainID(ctx, m.provider)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *Monitor) Run(ctx context.Context) error {
@@ -188,6 +211,10 @@ func (m *Monitor) Run(ctx context.Context) error {
 
 	atomic.StoreInt32(&m.running, 1)
 	defer atomic.StoreInt32(&m.running, 0)
+
+	if err := m.lazyInit(ctx); err != nil {
+		return err
+	}
 
 	// Check if in bootstrap mode -- in which case we expect nextBlockNumber
 	// to already be set.
@@ -270,6 +297,150 @@ func (m *Monitor) Provider() ethrpc.Interface {
 	return m.provider
 }
 
+func (m *Monitor) listenNewHead() <-chan uint64 {
+	ch := make(chan uint64)
+
+	var latestHeadBlock atomic.Uint64
+	nextBlock := make(chan uint64)
+
+	go func() {
+		var streamingErrorCount int
+		var streamingErrorLastTime time.Time
+
+	reconnect:
+		// reset the latest head block
+		latestHeadBlock.Store(0)
+
+		// if we have too many streaming errors, we'll switch to polling
+		streamingErrorCount++
+		if time.Since(streamingErrorLastTime) > m.options.StreamingErrorResetInterval {
+			streamingErrorCount = 0
+		}
+
+		// listen for new heads either via streaming or polling
+		if m.provider.IsStreamingEnabled() && streamingErrorCount < m.options.StreamingErrNumToSwitchToPolling {
+			// Streaming mode if available, where we listen for new heads
+			// and push the new block number to the nextBlock channel.
+			m.log.Info("ethmonitor: starting stream head listener")
+
+			newHeads := make(chan *types.Header)
+			sub, err := m.provider.SubscribeNewHeads(m.ctx, newHeads)
+			if err != nil {
+				m.log.Warnf("ethmonitor: websocket connect failed: %v", err)
+				m.alert.Alert(context.Background(), "ethmonitor: websocket connect failed: %v", err)
+				time.Sleep(2000 * time.Millisecond)
+
+				streamingErrorLastTime = time.Now()
+				goto reconnect
+			}
+
+			for {
+				blockTimer := time.NewTimer(3 * m.options.ExpectedBlockInterval)
+
+				select {
+				case <-m.ctx.Done():
+					// if we're done, we'll unsubscribe and close the nextBlock channel
+					sub.Unsubscribe()
+					close(nextBlock)
+					blockTimer.Stop()
+					return
+
+				case err := <-sub.Err():
+					// if we have an error, we'll reconnect
+					m.log.Warnf("ethmonitor: websocket subscription error: %v", err)
+					m.alert.Alert(context.Background(), "ethmonitor: websocket subscription error: %v", err)
+					sub.Unsubscribe()
+
+					streamingErrorLastTime = time.Now()
+					blockTimer.Stop()
+					goto reconnect
+
+				case <-blockTimer.C:
+					// if we haven't received a new block in a while, we'll reconnect.
+					m.log.Warnf("ethmonitor: haven't received block in expected time, reconnecting..")
+					sub.Unsubscribe()
+
+					streamingErrorLastTime = time.Now()
+					goto reconnect
+
+				case newHead := <-newHeads:
+					blockTimer.Stop()
+
+					latestHeadBlock.Store(newHead.Number.Uint64())
+					select {
+					case nextBlock <- newHead.Number.Uint64():
+					default:
+						// non-blocking
+					}
+				}
+			}
+		} else {
+			// We default to polling if streaming is not enabled
+			m.log.Info("ethmonitor: starting poll head listener")
+
+			retryStreamingTimer := time.NewTimer(m.options.StreamingRetryAfter)
+			for {
+				// if streaming is enabled, we'll retry streaming
+				if m.provider.IsStreamingEnabled() {
+					select {
+					case <-retryStreamingTimer.C:
+						// retry streaming
+						m.log.Info("ethmonitor: retrying streaming...")
+						streamingErrorLastTime = time.Now().Add(-m.options.StreamingErrorResetInterval * 2)
+						goto reconnect
+					default:
+						// non-blocking
+					}
+				}
+
+				// Polling mode, where we poll for the latest block number
+				select {
+				case <-m.ctx.Done():
+					// if we're done, we'll close the nextBlock channel
+					close(nextBlock)
+					retryStreamingTimer.Stop()
+					return
+
+				case <-time.After(time.Duration(m.pollInterval.Load())):
+					nextBlock <- 0
+				}
+			}
+		}
+	}()
+
+	// The main loop which notifies the monitor to continue to the next block
+	go func() {
+		for {
+			select {
+			case <-m.ctx.Done():
+				return
+			default:
+			}
+
+			var nextBlockNumber uint64
+			m.nextBlockNumberMu.Lock()
+			if m.nextBlockNumber != nil {
+				nextBlockNumber = m.nextBlockNumber.Uint64()
+			}
+			m.nextBlockNumberMu.Unlock()
+
+			latestBlockNum := latestHeadBlock.Load()
+			if nextBlockNumber == 0 || latestBlockNum > nextBlockNumber {
+				// monitor is behind, so we just push to keep going without
+				// waiting on the nextBlock channel
+				ch <- nextBlockNumber
+				continue
+			} else {
+				// wait for the next block
+				<-nextBlock
+				ch <- latestBlockNum
+			}
+		}
+	}()
+
+	return ch
+}
+
 func (m *Monitor) monitor() error {
 	ctx := m.ctx
 	events := Blocks{}
@@ -277,10 +448,10 @@ func (m *Monitor) monitor() error {
 	// minLoopInterval is time we monitor between cycles. It's a fast
 	// and fixed amount of time, as the internal method `fetchNextBlock`
 	// will actually use the poll interval while searching for the next block.
-	minLoopInterval := 100 * time.Millisecond
+	minLoopInterval := 5 * time.Millisecond
 
-	// adaptive poll interval
-	pollInterval := m.options.PollingInterval
+	// listen for new heads either via streaming or polling
+	listenNewHead := m.listenNewHead()
 
 	// monitor run loop
 	for {
@@ -289,14 +460,24 @@ func (m *Monitor) monitor() error {
 		case <-m.ctx.Done():
 			return nil
 
-		case <-time.After(pollInterval):
-			// ...
+		case newHeadNum := <-listenNewHead:
+			// ensure we have a new head number
+			m.nextBlockNumberMu.Lock()
+			if m.nextBlockNumber != nil && newHeadNum > 0 && m.nextBlockNumber.Uint64() > newHeadNum {
+				m.nextBlockNumberMu.Unlock()
+				continue
+			}
+			m.nextBlockNumberMu.Unlock()
+
+			// check if we have a head block, if not, then we set the nextBlockNumber
 			headBlock := m.chain.Head()
 			if headBlock != nil {
+				m.nextBlockNumberMu.Lock()
 				m.nextBlockNumber = big.NewInt(0).Add(headBlock.Number(), big.NewInt(1))
+				m.nextBlockNumberMu.Unlock()
 			}
 
-			// ..
+			// fetch the next block, either via the stream or via a poll
 			nextBlock, nextBlockPayload, miss, err := m.fetchNextBlock(ctx)
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
@@ -313,9 +494,9 @@ func (m *Monitor) monitor() error {
 			// if we hit a miss between calls, then we reset the pollInterval, otherwise
 			// we speed up the polling interval
 			if miss {
-				pollInterval = m.options.PollingInterval
+				m.pollInterval.Store(int64(m.options.PollingInterval))
 			} else {
-				pollInterval = clampDuration(minLoopInterval, pollInterval/4)
+				m.pollInterval.Store(int64(clampDuration(minLoopInterval, time.Duration(m.pollInterval.Load())/4)))
 			}
 
 			// build deterministic set of add/remove events which construct the canonical chain
@@ -572,7 +753,12 @@ func (m *Monitor) fetchNextBlock(ctx context.Context) (*types.Block, []byte, boo
 			nextBlockPayload, err := m.fetchRawBlockByNumber(ctx, m.nextBlockNumber)
 			if errors.Is(err, ethereum.NotFound) {
 				miss = true
-				time.Sleep(m.options.PollingInterval)
+				if m.provider.IsStreamingEnabled() {
+					// in streaming mode, we'll use a shorter time to pause before we refetch
+					time.Sleep(200 * time.Millisecond)
+				} else {
+					time.Sleep(m.options.PollingInterval)
+				}
 				continue
 			}
 			if err != nil {
@@ -586,8 +772,15 @@ func (m *Monitor) fetchNextBlock(ctx context.Context) (*types.Block, []byte, boo
 		}
 	}
 
+	var nextBlockNumber *big.Int
+	m.nextBlockNumberMu.Lock()
+	if m.nextBlockNumber != nil {
+		nextBlockNumber = big.NewInt(0).Set(m.nextBlockNumber)
+	}
+	m.nextBlockNumberMu.Unlock()
+
 	// skip cache if isn't provided, or in case when nextBlockNumber is nil (latest)
-	if m.cache == nil || m.nextBlockNumber == nil {
+	if m.cache == nil || nextBlockNumber == nil {
 		resp, err := getter(ctx, "")
 		if err != nil {
 			return nil, resp, miss, err
@@ -597,7 +790,7 @@ func (m *Monitor) fetchNextBlock(ctx context.Context) (*types.Block, []byte, boo
 	}
 
 	// fetch with distributed mutex
-	key := cacheKeyBlockNum(m.chainID, m.nextBlockNumber)
+	key := cacheKeyBlockNum(m.chainID, nextBlockNumber)
 	resp, err := m.cache.GetOrSetWithLockEx(ctx, key, getter, m.options.CacheExpiry)
 	if err != nil {
 		return nil, resp, miss, err
@@ -749,14 +942,20 @@ func (m *Monitor) broadcast(events Blocks) {
 	}
 }
 
-func (m *Monitor) Subscribe() Subscription {
+func (m *Monitor) Subscribe(optLabel ...string) Subscription {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	var label string
+	if len(optLabel) > 0 {
+		label = optLabel[0]
+	}
 
 	subscriber := &subscriber{
 		ch: channel.NewUnboundedChan[Blocks](10, 5000, channel.Options{
 			Logger:  m.log,
 			Alerter: m.alert,
+			Label:   label,
 		}),
 		done: make(chan struct{}),
 	}
@@ -872,8 +1071,11 @@ func (m *Monitor) NumSubscribers() int {
 
 func (m *Monitor) UnsubscribeAll(err error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, sub := range m.subscribers {
+	var subs []*subscriber
+	subs = append(subs, m.subscribers...)
+	m.mu.Unlock()
+
+	for _, sub := range subs {
 		sub.err = err
 		sub.Unsubscribe()
 	}
@@ -899,19 +1101,24 @@ func (m *Monitor) setPayload(value []byte) []byte {
 	}
 }
 
-func getChainID(provider ethrpc.Interface) (*big.Int, error) {
+func getChainID(ctx context.Context, provider ethrpc.Interface) (*big.Int, error) {
 	var chainID *big.Int
-	err := breaker.Do(context.Background(), func() error {
-		id, err := provider.ChainID(context.Background())
+	err := breaker.Do(ctx, func() error {
+		ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+		defer cancel()
+
+		id, err := provider.ChainID(ctx)
 		if err != nil {
 			return err
 		}
 		chainID = id
 		return nil
-	}, nil, 1*time.Second, 2, 20)
+	}, nil, 1*time.Second, 2, 3)
+
 	if err != nil {
 		return nil, err
 	}
+
 	return chainID, nil
 }
 
