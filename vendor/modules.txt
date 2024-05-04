@@ -1,4 +1,4 @@
-# github.com/0xsequence/ethkit v1.23.0
+# github.com/0xsequence/ethkit v1.24.9
 ## explicit; go 1.21
 github.com/0xsequence/ethkit
 github.com/0xsequence/ethkit/cmd/ethkit
@@ -36,7 +36,7 @@ github.com/0xsequence/ethkit/util
 # github.com/0xsequence/go-ethauth v0.13.0
 ## explicit; go 1.17
 github.com/0xsequence/go-ethauth
-# github.com/0xsequence/go-sequence v0.29.4
+# github.com/0xsequence/go-sequence v0.32.0
 ## explicit; go 1.21
 github.com/0xsequence/go-sequence
 github.com/0xsequence/go-sequence/contracts
@@ -222,7 +222,7 @@ github.com/beorn7/perks/quantile
 ## explicit; go 1.17
 github.com/btcsuite/btcd/chaincfg
 github.com/btcsuite/btcd/wire
-# github.com/btcsuite/btcd/btcec/v2 v2.3.2
+# github.com/btcsuite/btcd/btcec/v2 v2.3.3
 ## explicit; go 1.17
 github.com/btcsuite/btcd/btcec/v2
 github.com/btcsuite/btcd/btcec/v2/ecdsa
@@ -244,7 +244,7 @@ github.com/davecgh/go-spew/spew
 # github.com/deckarep/golang-set v1.8.0
 ## explicit; go 1.17
 github.com/deckarep/golang-set
-# github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0
+# github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0
 ## explicit; go 1.17
 github.com/decred/dcrd/dcrec/secp256k1/v4
 github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa
@@ -346,7 +346,7 @@ github.com/goware/cachestore/redis
 # github.com/goware/calc v0.2.0
 ## explicit; go 1.18
 github.com/goware/calc
-# github.com/goware/channel v0.4.0
+# github.com/goware/channel v0.4.1
 ## explicit; go 1.21
 github.com/goware/channel
 # github.com/goware/logger v0.3.0
