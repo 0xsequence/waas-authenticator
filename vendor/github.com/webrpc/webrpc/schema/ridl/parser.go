@@ -523,7 +523,9 @@ func parseComments(comments map[int]string, currentLine int) string {
 	for ; currentLine >= 0; currentLine-- {
 		comment, ok := comments[currentLine]
 		if ok {
-			c = append(c, comment)
+			if !strings.HasPrefix(comment, "!") {
+				c = append(c, comment)
+			}
 			delete(comments, currentLine)
 			iteration = 0
 
@@ -537,12 +539,12 @@ func parseComments(comments map[int]string, currentLine int) string {
 			break
 		}
 
+		iteration++
+
 		// if there are 2 lines of empty space => no comment we don't read more lines
 		if iteration > 1 {
 			break
 		}
-
-		iteration++
 	}
 
 	if len(c) > 0 {
