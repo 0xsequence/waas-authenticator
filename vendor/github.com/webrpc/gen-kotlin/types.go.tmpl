@@ -1,0 +1,47 @@
+{{define "types"}}
+
+{{- $typeMap := .TypeMap -}}
+{{- $types := .Types -}}
+{{- $services := .Services -}}
+
+// region Types
+
+{{- if $types -}}
+{{range $_i, $type := $types -}}
+{{if isEnumType $type }}
+@JsonClass(generateAdapter = true)
+enum class {{$type.Name}} {
+{{- range $_, $field := $type.Fields}}
+    @Json(name = "{{$field.Name}}")
+    {{toUpper (snakeCase $field.Name)}},
+{{- end}}
+    @Json(name = "UNKNOWN_DEFAULT")
+    UNKNOWN_DEFAULT,
+}
+{{end -}}
+
+{{- if isStructType $type }}
+@JsonClass(generateAdapter = true)
+data class {{$type.Name}}(
+    {{- range $_, $field := $type.Fields}}
+
+    {{- $isExportable := true -}}
+    {{- range $meta := $field.Meta -}}
+        {{- if exists $meta "json" -}}
+            {{- if eq (printf "%v" (get $meta "json")) "-" -}}
+                {{- $isExportable = false}}
+            {{- end -}}
+        {{- end -}}
+    {{- end }}
+
+    {{- if $isExportable }}
+    @Json(name = "{{template "codingKey" dict "Field" .}}") val {{template "fieldName" dict "Field" .}}: {{template "type" dict "Type" $field.Type "TypeMap" $typeMap}}{{if .Optional}}?{{end}},
+    {{- end -}}
+    {{- end}}
+)
+{{end -}}
+{{end -}}
+{{end -}}
+
+// endregion
+{{end}}

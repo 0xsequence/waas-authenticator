@@ -1,0 +1,9 @@
+{{- define "methodInputs" -}}
+
+{{- $method := .Method -}}
+{{- $typeMap := .TypeMap -}}
+
+{{- range $i, $input := $method.Inputs}}
+    {{- if $i}}, {{end}}{{camelCase $input.Name}}: {{template "type" dict "Type" $input.Type "TypeMap" $typeMap}}{{if .Optional}}?{{end}}
+{{- end -}}
+{{- end -}}

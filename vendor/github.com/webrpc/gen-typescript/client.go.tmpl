@@ -1,0 +1,63 @@
+{{define "client"}}
+
+{{- $typeMap := .TypeMap -}}
+{{- $opts := .Opts -}}
+
+{{- if .Services}}
+//
+// Client
+//
+
+{{- range .Services}}
+export class {{.Name}} implements {{.Name}} {
+  protected hostname: string
+  protected fetch: Fetch
+  protected path = '/rpc/{{.Name}}/'
+
+  constructor(hostname: string, fetch: Fetch) {
+    this.hostname = hostname
+    this.fetch = (input: RequestInfo, init?: RequestInit) => fetch(input, init)
+  }
+
+  private url(name: string): string {
+    return this.hostname + this.path + name
+  }
+  {{range $_, $method := .Methods}}
+  {{firstLetterToLower .Name}} = ({{template "methodInputs" dict "Method" . "TypeMap" $typeMap}}): Promise<{{if $method.StreamOutput}}void{{else}}{{$method.Name}}Return{{end}}> => {
+  {{- if $method.StreamOutput }}
+    const _fetch = () => this.fetch(this.url('{{.Name}}'),
+      {{- if .Inputs | len }}createHTTPRequest(args, options.headers, options.signal){{- else}}createHTTPRequest({}, options.headers, options.signal){{end }}
+      ).then(async (res) => {
+        await sseResponse(res, options, _fetch);
+    }, (error) => {
+      options.onError(error, _fetch);
+    });
+    return _fetch();
+  }
+  {{- else }}
+    return this.fetch(
+      this.url('{{.Name}}'),
+      {{ if .Inputs | len }}createHTTPRequest(args, headers, signal)).then((res) => { {{- else }}createHTTPRequest({}, headers, signal)
+      ).then((res) => { {{- end }}
+      return buildResponse(res).then(_data => {
+        {{ if .Outputs | len -}}
+        return {
+        {{- range $i, $output := .Outputs }}
+          {{$output.Name}}: <{{template "type" dict "Type" $output.Type "TypeMap" $typeMap}}>(_data.{{$output.Name}}),
+        {{- end }}
+        }
+        {{- else }}return {}{{- end }}
+      })
+    }, (error) => {
+      throw WebrpcRequestFailedError.new({ cause: `fetch(): ${error.message || ''}` })
+    })
+  }
+  {{end -}}
+  {{end}}
+}
+{{- end -}}
+{{end -}}
+{{if $opts.streaming}}
+  {{template "sse"}}
+{{end}}
+{{- end -}}

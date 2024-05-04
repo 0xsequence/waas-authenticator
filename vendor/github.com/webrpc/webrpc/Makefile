@@ -25,17 +25,17 @@ all:
 	@echo ""
 
 build:
-	go build -o ./bin/webrpc-gen ./cmd/webrpc-gen
+	go build -ldflags="-s -w -X github.com/webrpc/webrpc.VERSION=$$(git describe --tags)" -o ./bin/webrpc-gen ./cmd/webrpc-gen
 
 build-test:
-	go build -o ./bin/webrpc-test ./cmd/webrpc-test
+	go build -ldflags="-s -w -X github.com/webrpc/webrpc.VERSION=$$(git describe --tags)" -o ./bin/webrpc-test ./cmd/webrpc-test
 
 clean:
 	rm -rf ./bin
 
 install:
-	go install ./cmd/webrpc-gen
-	go install ./cmd/webrpc-test
+	go install -ldflags="-s -w -X github.com/webrpc/webrpc.VERSION=$$(git describe --tags)" ./cmd/webrpc-gen
+	go install -ldflags="-s -w -X github.com/webrpc/webrpc.VERSION=$$(git describe --tags)" ./cmd/webrpc-test
 
 generate: build
 	go generate -v -x ./...
@@ -46,13 +46,12 @@ generate: build
 		make generate || exit 1;                 \
 		cd ../../;                               \
 	done
-
-dep:
-	go mod tidy
+	# Replace webrpc version in all generated files to avoid git conflicts.
+	git grep -l "$$(git describe --tags)" | xargs sed -i -e "s/@$$(git describe --tags)//g"
+	sed -i "/$$(git describe --tags)/d" tests/schema/test.debug.gen.txt
 
 dep-upgrade-all:
-	go get -u ./...
-	@$(MAKE) dep
+	go get -u go@1.19 ./...
 
 diff:
 	git diff --color --ignore-all-space --ignore-blank-lines --exit-code

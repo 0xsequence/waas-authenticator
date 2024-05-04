@@ -1,0 +1,12 @@
+{{- define "methodInputs" -}}
+
+{{- $method := .Method -}}
+{{- $typeMap := .TypeMap -}}
+
+{{if gt (len $method.Inputs) 0}}args: {{$method.Name}}Args, {{end}}
+{{- if $method.StreamOutput -}}
+    options: WebrpcStreamOptions<{{$method.Name}}Return>
+{{- else -}}
+    headers?: object, signal?: AbortSignal
+{{- end -}}
+{{- end -}}
