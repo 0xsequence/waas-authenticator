@@ -39,11 +39,11 @@ build-jwt-util:
 	$(call build,jwt-util)
 
 generate:
-	go generate ./...
+	go generate -x ./...
 
 .PHONY: proto
 proto:
-	go generate ./proto
+	go generate -x ./proto
 
 clean:
 	rm -rf ./bin/*
