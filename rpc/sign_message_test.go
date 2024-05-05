@@ -63,7 +63,7 @@ func TestRPC_SendIntent_SignMessage(t *testing.T) {
 		Wallet:  walletAddr,
 		Message: "Test",
 	}
-	intent := generateSignedIntent(t, intents.IntentNameSignMessage, intentData, signingSession)
+	intent := generateSignedIntent(t, intents.IntentName_signMessage, intentData, signingSession)
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
