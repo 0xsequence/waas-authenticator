@@ -28,7 +28,7 @@ func (s *RPC) ChainList(ctx context.Context) ([]*proto.Chain, error) {
 func parseIntent(pi *proto.Intent) (*intents.Intent, string, error) {
 	intent := &intents.Intent{
 		Version:    pi.Version,
-		Name:       pi.Name,
+		Name:       intents.IntentName(pi.Name),
 		IssuedAt:   pi.IssuedAt,
 		ExpiresAt:  pi.ExpiresAt,
 		Data:       pi.Data,
@@ -68,7 +68,7 @@ func convertToAPIIntent(intent *intents.Intent) *api.Intent {
 	}
 	return &api.Intent{
 		Version:    intent.Version,
-		Name:       intent.Name,
+		Name:       string(intent.Name),
 		ExpiresAt:  intent.ExpiresAt,
 		IssuedAt:   intent.IssuedAt,
 		Data:       intent.Data,
