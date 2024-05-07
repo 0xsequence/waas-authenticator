@@ -8,6 +8,8 @@ import ./intent.ridl
   - Intent
   - IntentResponse
   - Signature
+  - IntentName
+  - IntentResponseCode
 
 struct Version
   - webrpcVersion: string

@@ -76,7 +76,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 	}
 
 	switch intent.Name {
-	case intents.IntentNameOpenSession:
+	case intents.IntentName_openSession:
 		return nil, fmt.Errorf("opening a session is unsupported outside of RegisterSession")
 
 	case intents.IntentNameCloseSession:

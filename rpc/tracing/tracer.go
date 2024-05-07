@@ -12,7 +12,7 @@ const tracerName = "github.com/0xsequence/waas-authenticator/rpc/tracing"
 
 func Intent(ctx context.Context, intent *intents.Intent) (context.Context, trace.Span) {
 	tracer := otel.Tracer(tracerName)
-	return tracer.Start(ctx, "Intent."+intent.Name, trace.WithSpanKind(trace.SpanKindInternal))
+	return tracer.Start(ctx, "Intent."+intent.Name.String(), trace.WithSpanKind(trace.SpanKindInternal))
 }
 
 func Span(ctx context.Context, name string) (context.Context, trace.Span) {
