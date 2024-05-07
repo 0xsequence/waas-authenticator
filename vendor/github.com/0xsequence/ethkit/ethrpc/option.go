@@ -2,6 +2,7 @@ package ethrpc
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/goware/breaker"
 	"github.com/goware/logger"
@@ -11,6 +12,15 @@ type Option func(*Provider)
 
 type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
+}
+
+func WithStreaming(nodeWebsocketURL string) Option {
+	return func(p *Provider) {
+		nodeWSURL := nodeWebsocketURL
+		nodeWSURL = strings.Replace(nodeWSURL, "http://", "ws://", 1)
+		nodeWSURL = strings.Replace(nodeWSURL, "https://", "wss://", 1)
+		p.nodeWSURL = nodeWSURL
+	}
 }
 
 func WithHTTPClient(c httpClient) Option {

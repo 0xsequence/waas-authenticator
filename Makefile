@@ -57,12 +57,12 @@ test-clean:
 	GOGC=off go clean -testcache
 
 eif: clean ensure-version
-	mkdir -p bin
+	@mkdir -p bin
 	docker build --platform linux/amd64 --build-arg VERSION=$(VERSION) --build-arg ENV_ARG=$(ENV) -t waas-authenticator-builder .
 	docker run --platform linux/amd64 -v $(TOP)/bin:/out waas-authenticator-builder waas-auth.$(VERSION)
 
 ensure-version:
-	test -n "$(VERSION)"
-	rm -rf version.go
-	echo "package waasauthenticator" > version.go
-	echo "const VERSION = \"$(VERSION)\"" >> version.go
+	@test -n "$(VERSION)" || (echo "Oops! you forgot to pass the VERSION env variable, try: make VERSION=vX.X.X eif" && exit 1)
+	@rm -rf version.go
+	@echo "package waasauthenticator" > version.go
+	@echo "const VERSION = \"$(VERSION)\"" >> version.go
