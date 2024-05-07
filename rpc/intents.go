@@ -79,7 +79,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 	case intents.IntentName_openSession:
 		return nil, fmt.Errorf("opening a session is unsupported outside of RegisterSession")
 
-	case intents.IntentNameCloseSession:
+	case intents.IntentName_closeSession:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataCloseSession](intent)
 		if err != nil {
 			return nil, err
@@ -90,7 +90,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		}
 		return makeIntentResponse("sessionClosed", intents.IntentResponseSessionClosed{}), nil
 
-	case intents.IntentNameListSessions:
+	case intents.IntentName_listSessions:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataListSessions](intent)
 		if err != nil {
 			return nil, err
@@ -101,21 +101,21 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		}
 		return makeIntentResponse("sessionsListed", sessions), nil
 
-	case intents.IntentNameSessionAuthProof:
+	case intents.IntentName_sessionAuthProof:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataSessionAuthProof](intent)
 		if err != nil {
 			return nil, err
 		}
 		return s.sessionAuthProof(ctx, sess, intentTyped)
 
-	case intents.IntentNameSignMessage:
+	case intents.IntentName_signMessage:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataSignMessage](intent)
 		if err != nil {
 			return nil, err
 		}
 		return s.signMessage(ctx, sess, intentTyped)
 
-	case intents.IntentNameSendTransaction:
+	case intents.IntentName_sendTransaction:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataSendTransaction](intent)
 		if err != nil {
 			return nil, err

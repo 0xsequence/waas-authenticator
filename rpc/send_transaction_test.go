@@ -65,7 +65,7 @@ func TestRPC_SendIntent_SendTransaction(t *testing.T) {
 			json.RawMessage(`{"data":"0x010203","to":"0x27CabC9700EE6Db2797b6AC1e1eCe81C72A2cD8D","type":"transaction","value":"0x2000000000"}`),
 		},
 	}
-	intent := generateSignedIntent(t, intents.IntentNameSendTransaction, intentData, signingSession)
+	intent := generateSignedIntent(t, intents.IntentName_sendTransaction.String(), intentData, signingSession)
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)

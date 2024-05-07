@@ -135,7 +135,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 			intentBuilderFn: func(t *testing.T, data intents.IntentDataOpenSession) *proto.Intent {
 				return &proto.Intent{
 					Version:    "1.0.0",
-					Name:       intents.IntentNameOpenSession,
+					Name:       proto.IntentName(intents.IntentName_openSession),
 					ExpiresAt:  uint64(time.Now().Add(1 * time.Minute).Unix()),
 					IssuedAt:   uint64(time.Now().Unix()),
 					Data:       data,
@@ -165,7 +165,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 		t.Run(label, func(t *testing.T) {
 			if testCase.intentBuilderFn == nil {
 				testCase.intentBuilderFn = func(t *testing.T, data intents.IntentDataOpenSession) *proto.Intent {
-					return generateSignedIntent(t, intents.IntentNameOpenSession, data, signingSession)
+					return generateSignedIntent(t, intents.IntentName_openSession.String(), data, signingSession)
 				}
 			}
 
@@ -277,7 +277,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 		t.Run(label, func(t *testing.T) {
 			if testCase.intentBuilderFn == nil {
 				testCase.intentBuilderFn = func(t *testing.T, data intents.IntentDataCloseSession) *proto.Intent {
-					return generateSignedIntent(t, intents.IntentNameCloseSession, data, signingSession)
+					return generateSignedIntent(t, intents.IntentName_closeSession.String(), data, signingSession)
 				}
 			}
 
@@ -408,7 +408,7 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 	intentData := &intents.IntentDataListSessions{
 		Wallet: walletAddr,
 	}
-	intent := generateSignedIntent(t, intents.IntentNameListSessions, intentData, signingSession)
+	intent := generateSignedIntent(t, intents.IntentName_listSessions.String(), intentData, signingSession)
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
