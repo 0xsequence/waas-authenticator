@@ -74,6 +74,6 @@ func TestRPC_SendIntent_SendTransaction(t *testing.T) {
 
 	res, err := c.SendIntent(ctx, intent)
 	require.NoError(t, err)
-	assert.Equal(t, "transactionReceipt", res.Code)
+	assert.Equal(t, proto.IntentResponseCode("transactionReceipt"), res.Code)
 	assert.NotEmpty(t, res.Data)
 }

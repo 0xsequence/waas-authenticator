@@ -240,7 +240,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			assertFn: func(t *testing.T, res *proto.IntentResponse, err error, p assertionParams) {
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, "sessionClosed", res.Code)
+				require.Equal(t, proto.IntentResponseCode("sessionClosed"), res.Code)
 
 				dropSession := signingSession.SessionID()
 				assert.NotContains(t, p.dbClient.sessions, dropSession)
@@ -252,7 +252,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			assertFn: func(t *testing.T, res *proto.IntentResponse, err error, p assertionParams) {
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, "sessionClosed", res.Code)
+				require.Equal(t, proto.IntentResponseCode("sessionClosed"), res.Code)
 
 				dropSession := "0x1111111111111111111111111111111111111111"
 				assert.NotContains(t, p.dbClient.sessions, dropSession)
@@ -418,7 +418,7 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 
 	res, err := c.SendIntent(ctx, intent)
 	require.NoError(t, err)
-	assert.Equal(t, "sessionsListed", res.Code)
+	assert.Equal(t, proto.IntentResponseCode("sessionsListed"), res.Code)
 
 	sessions, ok := res.Data.([]any)
 	require.True(t, ok)

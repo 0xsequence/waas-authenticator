@@ -72,6 +72,6 @@ func TestRPC_SendIntent_SignMessage(t *testing.T) {
 
 	res, err := c.SendIntent(ctx, intent)
 	require.NoError(t, err)
-	assert.Equal(t, "signedMessage", res.Code)
+	assert.Equal(t, proto.IntentResponseCode("signedMessage"), res.Code)
 	assert.NotEmpty(t, res.Data)
 }
