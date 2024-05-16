@@ -1,0 +1,12 @@
+{{- define "methodOutputsAsObject" -}}
+
+{{- $service := .Service -}}
+{{- $method := .Method -}}
+{{- $typeMap := .TypeMap -}}
+
+{{- if eq (len $method.Outputs) 1 -}}
+    {{template "type" dict "Type" (index $method.Outputs 0).Type "TypeMap" $typeMap}}
+{{- else if gt (len $method.Outputs) 1 -}}
+    {{$service.Name}}.{{$method.Name}}Response
+{{- end -}}
+{{- end}}

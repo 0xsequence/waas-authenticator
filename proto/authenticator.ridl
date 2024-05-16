@@ -10,6 +10,8 @@ import ../vendor/github.com/0xsequence/go-sequence/intents/intent.ridl
   - IntentResponseCode
   - IntentResponse
   - Signature
+  - IntentName
+  - IntentResponseCode
 
 struct Version
   - webrpcVersion: string

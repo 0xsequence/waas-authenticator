@@ -100,7 +100,7 @@ func generateIntent(t *testing.T, name intents.IntentName, data any) *proto.Inte
 func generateSignedIntent(t *testing.T, name intents.IntentName, data any, session intents.Session) *proto.Intent {
 	intent := &intents.Intent{
 		Version:    "1.0.0",
-		Name:       name,
+		Name:       intents.IntentName(name),
 		ExpiresAt:  uint64(time.Now().Add(1 * time.Minute).Unix()),
 		IssuedAt:   uint64(time.Now().Unix()),
 		Data:       data,

@@ -1,0 +1,60 @@
+{{- define "enum" -}}
+
+{{- $name := .Name -}}
+{{- $type := .Type -}}
+{{- $fields := .Fields -}}
+{{- $opts := .Opts -}}
+
+{{- if $opts.types -}}
+type {{$name}} {{$type}}
+{{- end }}
+
+const (
+{{- range $_, $field := $fields }}
+	{{- if gt (len $field.Comments) 0 -}}
+		{{- range $_, $comment := $field.Comments }}
+			// {{ replaceAll $comment "\"" "'" }}
+		{{- end }}
+	{{- end }}
+	{{$name}}_{{.Name}} {{$name}} = {{$field.Value}}
+{{- end}}
+)
+
+var {{$name}}_name = map[{{$type}}]string{
+{{- range $fields}}
+	{{.Value}}: "{{.Name}}",
+{{- end}}
+}
+
+var {{$name}}_value = map[string]{{$type}}{
+{{- range $fields}}
+	"{{.Name}}": {{.Value}},
+{{- end}}
+}
+
+func (x {{$name}}) String() string {
+	return {{$name}}_name[{{$type}}(x)]
+}
+
+func (x {{$name}}) MarshalText() ([]byte, error) {
+	return []byte({{$name}}_name[{{$type}}(x)]), nil
+}
+
+func (x *{{$name}}) UnmarshalText(b []byte) error {
+	*x = {{$name}}({{$name}}_value[string(b)])
+	return nil
+}
+
+func (x *{{$name}}) Is(values ...{{$name}}) bool {
+	if x == nil {
+		return false
+	}
+	for _, v := range values {
+		if *x == v {
+			return true
+		}
+	}
+	return false
+}
+
+{{- end -}}

@@ -1,0 +1,36 @@
+{{define "clientHelpers"}}
+
+{{- $webrpcErrors := .WebrpcErrors -}}
+{{- $schemaErrors := .SchemaErrors -}}
+
+// region Errors
+enum class ErrorKind(val code: Int) {
+
+    {{- range $_, $error := $webrpcErrors}}
+    {{toUpper (snakeCase $error.Name)}}({{$error.Code}}),
+    {{- end }}
+    {{- range $_, $error := $schemaErrors}}
+    {{toUpper (snakeCase $error.Name)}}({{$error.Code}}),
+    {{- end }}
+    UNKNOWN(-999);
+
+    companion object {
+        fun fromCode(code: Int): ErrorKind {
+            return ErrorKind.values().find { it.code == code } ?: UNKNOWN
+        }
+    }
+}
+
+@JsonClass(generateAdapter = true)
+data class WebRpcError(
+    @Json(name = "error") val error: String,
+    @Json(name = "code") val code: Int,
+    @Json(name = "msg") override val message: String,
+    @Json(name = "cause") val causeString: String,
+    @Json(name = "status") val status: Int,
+    @Transient val errorKind: ErrorKind = ErrorKind.fromCode(code),
+    @Transient override val cause: Throwable? = null,
+) : Throwable()
+// endregion
+
+{{end}}

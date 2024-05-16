@@ -1,0 +1,68 @@
+{{define "types"}}
+
+{{- $typeMap := .TypeMap -}}
+{{- $types := .Types -}}
+{{- $services := .Services -}}
+
+//
+// Types
+//
+
+{{if $types -}}
+{{range $_i, $type := $types -}}
+
+{{if isEnumType $type }}
+export enum {{$type.Name}} {
+{{- range $i, $field := $type.Fields}}
+  {{- if $i}},{{end}}
+  {{$field.Name}} = '{{$field.Name}}'
+{{- end}}
+}
+{{end -}}
+
+{{- if isStructType $type }}
+export interface {{$type.Name}} {
+  {{- range $_, $field := $type.Fields}}
+  {{- $isExportable := true -}}
+  {{- range $meta := $field.Meta -}}
+    {{- if exists $meta "json" -}}
+      {{- if eq (printf "%v" (get $meta "json")) "-" -}}
+        {{- $isExportable = false}}
+      {{- end -}}
+    {{- end -}}
+  {{- end }}
+  {{- if $isExportable }}
+  {{template "fieldName" dict "Field" .}}{{if .Optional}}?{{end}}: {{template "type" dict "Type" $field.Type "TypeMap" $typeMap}}
+  {{- end -}}
+  {{- end}}
+}
+{{end -}}
+{{end -}}
+{{end -}}
+
+{{if $services}}
+{{- range $_, $service := $services}}
+export interface {{$service.Name}} {
+{{- range $_, $method := $service.Methods}}
+  {{firstLetterToLower $method.Name}}({{template "methodInputs" dict "Method" $method "TypeMap" $typeMap}}): Promise<{{if $method.StreamOutput}}void{{else}}{{$method.Name}}Return{{end}}>
+{{- end}}
+}
+
+{{range $_, $method := $service.Methods -}}
+export interface {{$method.Name}}Args {
+{{- range $_, $input := $method.Inputs}}
+  {{$input.Name}}{{if $input.Optional}}?{{end}}: {{template "type" dict "Type" $input.Type "TypeMap" $typeMap}}
+{{- end}}
+}
+
+export interface {{$method.Name}}Return {
+{{- range $_, $output := $method.Outputs}}
+  {{$output.Name}}{{if $output.Optional}}?{{end}}: {{template "type" dict "Type" $output.Type "TypeMap" $typeMap}}
+{{- end}}  
+}
+{{end}}
+
+{{- end}}
+{{end -}}
+
+{{end}}

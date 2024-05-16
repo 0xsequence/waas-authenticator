@@ -68,7 +68,7 @@ func convertToAPIIntent(intent *intents.Intent) *api.Intent {
 	}
 	return &api.Intent{
 		Version:    intent.Version,
-		Name:       string(intent.Name),
+		Name:       intent.Name.String(),
 		ExpiresAt:  intent.ExpiresAt,
 		IssuedAt:   intent.IssuedAt,
 		Data:       intent.Data,

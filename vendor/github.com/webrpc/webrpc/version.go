@@ -1,15 +1,19 @@
 package webrpc
 
 import (
+	_ "embed"
 	"os/exec"
 	"strings"
 )
 
-// VERSION of webrpc tooling and webrpc-gen Template Functions API.
+// Version of webrpc-gen tooling & Template Functions API.
 // Available as {{.WebrpcGenVersion}} variable in Go templates.
 //
 // The value is injected during `go build' in the release CI step.
 var VERSION = ""
+
+//go:embed go.mod
+var GoModFile string
 
 func init() {
 	if VERSION == "" {
@@ -31,9 +35,9 @@ func getRuntimeVersion() string {
 		}
 	}
 
-	// $ git describe
+	// $ git describe --tags
 	// v0.15.1-6-g550333d\n
-	if out, _ := exec.Command("git", "describe").Output(); len(out) > 0 {
+	if out, _ := exec.Command("git", "describe", "--tags").Output(); len(out) > 0 {
 		return strings.TrimSpace(string(out))
 	}
 

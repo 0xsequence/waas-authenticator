@@ -1,0 +1,23 @@
+{{define "imports"}}
+
+{{- $opts := .Opts -}}
+
+package {{ $opts.packageName }}
+
+import com.squareup.moshi.*
+import java.time.OffsetDateTime
+{{if $opts.client }}
+import com.squareup.moshi.JsonReader.Token
+import com.squareup.moshi.adapters.EnumJsonAdapter
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import java.time.format.DateTimeFormatter
+import io.ktor.client.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.http.parsing.*
+import java.lang.reflect.Type
+import kotlin.coroutines.cancellation.CancellationException
+{{- end}}
+{{end}}
