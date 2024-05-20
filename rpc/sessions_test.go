@@ -107,7 +107,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 		},
 		"WithVerifiedEmail": {
 			tokBuilderFn: func(b *jwt.Builder, url string) {
-				b.Claim("email", "user@example.com").
+				b.Claim("email", "123@example.com").
 					Claim("email_verified", "true").
 					Claim("sequence:session_hash", sessHash)
 			},
@@ -115,27 +115,14 @@ func TestRPC_RegisterSession(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, sess)
 
-				assert.Equal(t, "user@example.com", sess.Identity.Email)
-			},
-		},
-		"WithUnverifiedEmail": {
-			tokBuilderFn: func(b *jwt.Builder, url string) {
-				b.Claim("email", "user@example.com").
-					Claim("email_verified", "false").
-					Claim("sequence:session_hash", sessHash)
-			},
-			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
-				require.NoError(t, err)
-				require.NotNil(t, sess)
-
-				assert.Equal(t, "", sess.Identity.Email)
+				assert.Equal(t, "123@example.com", sess.Identity.Email)
 			},
 		},
 		"MissingSignature": {
 			intentBuilderFn: func(t *testing.T, data intents.IntentDataOpenSession) *proto.Intent {
 				return &proto.Intent{
 					Version:    "1.0.0",
-					Name:       proto.IntentName(intents.IntentName_openSession),
+					Name:       proto.IntentName_openSession,
 					ExpiresAt:  uint64(time.Now().Add(1 * time.Minute).Unix()),
 					IssuedAt:   uint64(time.Now().Unix()),
 					Data:       data,
@@ -159,13 +146,43 @@ func TestRPC_RegisterSession(t *testing.T) {
 				assert.Equal(t, httpsIssuer, sess.Identity.Issuer)
 			},
 		},
+		"EmailAlreadyInUse": {
+			tokBuilderFn: func(b *jwt.Builder, url string) {
+				b.Claim("email", "user@example.com").
+					Claim("sequence:session_hash", sessHash)
+			},
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				assert.ErrorIs(t, err, proto.ErrEmailAlreadyInUse)
+				assert.Nil(t, sess)
+			},
+		},
+		"EmailAlreadyInUseWithForceCreateAccount": {
+			intentBuilderFn: func(t *testing.T, data intents.IntentDataOpenSession) *proto.Intent {
+				data.ForceCreateAccount = true
+				return generateSignedIntent(t, intents.IntentName_openSession, data, signingSession)
+			},
+			tokBuilderFn: func(b *jwt.Builder, url string) {
+				b.Claim("email", "user@example.com").
+					Claim("sequence:session_hash", sessHash)
+			},
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.NoError(t, err)
+				require.NotNil(t, sess)
+
+				assert.Len(t, p.dbClient.accounts[p.tenant.ProjectID], 2)
+				assert.Contains(t, p.dbClient.sessions, sess.ID)
+				assert.Contains(t, p.dbClient.accounts[p.tenant.ProjectID], sess.Identity.String())
+				assert.Contains(t, p.walletService.registeredSessions, sess.ID)
+				assert.Contains(t, p.walletService.registeredUsers, sess.UserID)
+			},
+		},
 	}
 
 	for label, testCase := range testCases {
 		t.Run(label, func(t *testing.T) {
 			if testCase.intentBuilderFn == nil {
 				testCase.intentBuilderFn = func(t *testing.T, data intents.IntentDataOpenSession) *proto.Intent {
-					return generateSignedIntent(t, intents.IntentName_openSession.String(), data, signingSession)
+					return generateSignedIntent(t, intents.IntentName_openSession, data, signingSession)
 				}
 			}
 
@@ -180,11 +197,14 @@ func TestRPC_RegisterSession(t *testing.T) {
 			require.NoError(t, err)
 
 			tenant, _ := newTenant(t, enc, issuer)
+			account := newAccount(t, enc, "http://another-issuer", nil)
 
 			dbClient := &dbMock{
 				sessions: map[string]*data.Session{},
 				tenants:  map[uint64][]*data.Tenant{tenant.ProjectID: {tenant}},
-				accounts: map[uint64]map[string]*data.Account{},
+				accounts: map[uint64]map[string]*data.Account{
+					tenant.ProjectID: {account.Identity.String(): account},
+				},
 			}
 			svc := initRPC(cfg, enc, dbClient)
 			walletService := newWalletServiceMock(nil)
@@ -240,7 +260,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			assertFn: func(t *testing.T, res *proto.IntentResponse, err error, p assertionParams) {
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, proto.IntentResponseCode("sessionClosed"), res.Code)
+				require.Equal(t, proto.IntentResponseCode_sessionClosed, res.Code)
 
 				dropSession := signingSession.SessionID()
 				assert.NotContains(t, p.dbClient.sessions, dropSession)
@@ -252,7 +272,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			assertFn: func(t *testing.T, res *proto.IntentResponse, err error, p assertionParams) {
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, proto.IntentResponseCode("sessionClosed"), res.Code)
+				require.Equal(t, proto.IntentResponseCode_sessionClosed, res.Code)
 
 				dropSession := "0x1111111111111111111111111111111111111111"
 				assert.NotContains(t, p.dbClient.sessions, dropSession)
@@ -277,7 +297,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 		t.Run(label, func(t *testing.T) {
 			if testCase.intentBuilderFn == nil {
 				testCase.intentBuilderFn = func(t *testing.T, data intents.IntentDataCloseSession) *proto.Intent {
-					return generateSignedIntent(t, intents.IntentName_closeSession.String(), data, signingSession)
+					return generateSignedIntent(t, intents.IntentName_closeSession, data, signingSession)
 				}
 			}
 
@@ -408,7 +428,7 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 	intentData := &intents.IntentDataListSessions{
 		Wallet: walletAddr,
 	}
-	intent := generateSignedIntent(t, intents.IntentName_listSessions.String(), intentData, signingSession)
+	intent := generateSignedIntent(t, intents.IntentName_listSessions, intentData, signingSession)
 
 	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
 	header := make(http.Header)
@@ -418,7 +438,7 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 
 	res, err := c.SendIntent(ctx, intent)
 	require.NoError(t, err)
-	assert.Equal(t, proto.IntentResponseCode("sessionsListed"), res.Code)
+	assert.Equal(t, proto.IntentResponseCode_sessionList, res.Code)
 
 	sessions, ok := res.Data.([]any)
 	require.True(t, ok)

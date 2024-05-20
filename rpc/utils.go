@@ -83,9 +83,9 @@ func convertIntentResponse(res *api.IntentResponse) *proto.IntentResponse {
 	}
 }
 
-func makeIntentResponse(code string, data any) *proto.IntentResponse {
+func makeIntentResponse(code proto.IntentResponseCode, data any) *proto.IntentResponse {
 	return &proto.IntentResponse{
-		Code: proto.IntentResponseCode(code),
+		Code: code,
 		Data: data,
 	}
 }

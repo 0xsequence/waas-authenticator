@@ -60,6 +60,16 @@ func (s *RPC) RegisterSession(
 	}
 
 	if !accountFound {
+		if !intentTyped.Data.ForceCreateAccount {
+			accs, err := s.Accounts.ListByEmail(ctx, tntData.ProjectID, ident.Email)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to perform email check: %w", err)
+			}
+			if len(accs) > 0 {
+				return nil, nil, proto.ErrEmailAlreadyInUse.WithCause(fmt.Errorf("%s", accs[0].Identity.Issuer))
+			}
+		}
+
 		accData := &proto.AccountData{
 			ProjectID: tntData.ProjectID,
 			UserID:    fmt.Sprintf("%d|%s", tntData.ProjectID, sessionHash),

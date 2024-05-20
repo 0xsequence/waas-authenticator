@@ -4,8 +4,10 @@ name = sequence-waas-authenticator
 version = v0.1.0
 
 
-import ./intent.ridl
+import ../vendor/github.com/0xsequence/go-sequence/intents/intent.ridl
+  - IntentName
   - Intent
+  - IntentResponseCode
   - IntentResponse
   - Signature
   - IntentName
@@ -146,6 +148,8 @@ struct SessionData
 
 error 1000 Unauthorized "Unauthorized access" HTTP 401
 error 1001 TenantNotFound "Tenant not found" HTTP 404
+
+error 2000 EmailAlreadyInUse "Could not create account as the email is already in use" HTTP 409
 
 
 ##

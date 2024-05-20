@@ -86,7 +86,7 @@ func initRPC(cfg *config.Config, enc *enclave.Enclave, dbClient *dbMock) *rpc.RP
 	return svc
 }
 
-func generateIntent(t *testing.T, name string, data any) *proto.Intent {
+func generateIntent(t *testing.T, name intents.IntentName, data any) *proto.Intent {
 	return &proto.Intent{
 		Version:    "1.0.0",
 		Name:       proto.IntentName(name),
@@ -97,7 +97,7 @@ func generateIntent(t *testing.T, name string, data any) *proto.Intent {
 	}
 }
 
-func generateSignedIntent(t *testing.T, name string, data any, session intents.Session) *proto.Intent {
+func generateSignedIntent(t *testing.T, name intents.IntentName, data any, session intents.Session) *proto.Intent {
 	intent := &intents.Intent{
 		Version:    "1.0.0",
 		Name:       intents.IntentName(name),
@@ -430,6 +430,27 @@ func (d *dbMock) Query(ctx context.Context, params *dynamodb.QueryInput, optFns 
 		}
 		out := &dynamodb.QueryOutput{Items: []map[string]dynamodbtypes.AttributeValue{item}}
 		return out, nil
+	case "Accounts":
+		pseParam, ok := params.ExpressionAttributeValues[":pse"]
+		if !ok {
+			return nil, fmt.Errorf("must include a :pse expression attribute")
+		}
+		pseParts := strings.Split(pseParam.(*dynamodbtypes.AttributeValueMemberS).Value, "|")
+		projectID, _ := strconv.Atoi(pseParts[0])
+		email := pseParts[1]
+
+		projectAccounts := d.accounts[uint64(projectID)]
+		out := &dynamodb.QueryOutput{Items: []map[string]dynamodbtypes.AttributeValue{}}
+		for _, acc := range projectAccounts {
+			if acc.Email == email {
+				item, err := attributevalue.MarshalMap(acc)
+				if err != nil {
+					return nil, err
+				}
+				out.Items = append(out.Items, item)
+			}
+		}
+		return out, nil
 	}
 
 	return nil, fmt.Errorf("invalid TableName: %q", *params.TableName)
@@ -491,6 +512,11 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 func newAccount(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwallet.Wallet) *data.Account {
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
+
+	if wallet == nil {
+		wallet, err = ethwallet.NewWalletFromRandomEntropy()
+		require.NoError(t, err)
+	}
 
 	identity := proto.Identity{
 		Type:    proto.IdentityType_OIDC,
@@ -575,7 +601,22 @@ type walletServiceMock struct {
 	registeredSessions map[string]struct{}
 }
 
+func (w walletServiceMock) UpdateProjectUserMapRules(ctx context.Context, projectID uint64, userMapRules *proto_wallet.ProjectSessionUserMapRules) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (w walletServiceMock) GetProjectParentWalletDeployCalldata(ctx context.Context, projectID uint64, chainID string) (string, string, string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (w walletServiceMock) FederateAccount(ctx context.Context, userID string, intent *proto_wallet.Intent) (*proto_wallet.IntentResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (w walletServiceMock) RemoveAccount(ctx context.Context, intent *proto_wallet.Intent) (*proto_wallet.IntentResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }

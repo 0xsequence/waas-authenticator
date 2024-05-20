@@ -161,3 +161,17 @@ func (t *AccountTable) ListByEmail(ctx context.Context, projectID uint64, email 
 
 	return accounts, nil
 }
+
+func (t *AccountTable) Delete(ctx context.Context, projectID uint64, identity proto.Identity) error {
+	acct := Account{ProjectID: projectID, Identity: Identity(identity)}
+	input := &dynamodb.DeleteItemInput{
+		TableName: &t.tableARN,
+		Key:       acct.Key(),
+	}
+
+	_, err := t.db.DeleteItem(ctx, input)
+	if err != nil {
+		return err
+	}
+	return nil
+}
