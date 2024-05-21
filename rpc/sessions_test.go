@@ -282,9 +282,12 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 		},
 		"OtherUser": {
 			assertFn: func(t *testing.T, res *proto.IntentResponse, err error, p assertionParams) {
-				assert.ErrorContains(t, err, "session not found")
-				assert.Nil(t, res)
+				// Returns no error...
+				require.NoError(t, err)
+				require.NotNil(t, res)
+				require.Equal(t, proto.IntentResponseCode_sessionClosed, res.Code)
 
+				// ...but the session is not dropped
 				dropSession := "0x2222222222222222222222222222222222222222"
 				assert.Contains(t, p.dbClient.sessions, dropSession)
 				assert.Contains(t, p.walletService.registeredSessions, dropSession)
