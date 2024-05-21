@@ -156,7 +156,7 @@ func (s *RPC) dropSession(
 	tntData := tenant.FromContext(ctx)
 
 	dropSess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, intent.Data.SessionID)
-	if err != nil || !found || dropSess.UserID != sess.UserID {
+	if err != nil || !found || sess == nil || dropSess.UserID != sess.UserID {
 		return true, nil
 	}
 
