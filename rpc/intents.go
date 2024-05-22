@@ -71,7 +71,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 	defer span.End()
 
 	sess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, sessionID)
-	if err != nil || !found {
+	if (err != nil || !found) && intent.Name != intents.IntentName_closeSession {
 		return nil, fmt.Errorf("session invalid or not found")
 	}
 

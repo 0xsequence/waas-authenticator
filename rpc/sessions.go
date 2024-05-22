@@ -156,8 +156,8 @@ func (s *RPC) dropSession(
 	tntData := tenant.FromContext(ctx)
 
 	dropSess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, intent.Data.SessionID)
-	if err != nil || !found || dropSess.UserID != sess.UserID {
-		return false, fmt.Errorf("session not found")
+	if err != nil || !found || sess == nil || dropSess.UserID != sess.UserID {
+		return true, nil
 	}
 
 	if _, err := s.Wallets.InvalidateSession(waasContext(ctx), dropSess.ID); err != nil {
