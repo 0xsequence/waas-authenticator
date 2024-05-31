@@ -8,22 +8,27 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/nitrocontrol/enclave"
 	waasauthenticator "github.com/0xsequence/waas-authenticator"
 	"github.com/0xsequence/waas-authenticator/config"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
+	"github.com/0xsequence/waas-authenticator/proto/builder"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/access"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
+	"github.com/0xsequence/waas-authenticator/rpc/auth"
+	"github.com/0xsequence/waas-authenticator/rpc/auth/email"
+	"github.com/0xsequence/waas-authenticator/rpc/auth/oidc"
 	"github.com/0xsequence/waas-authenticator/rpc/awscreds"
-	"github.com/0xsequence/waas-authenticator/rpc/identity"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/0xsequence/waas-authenticator/rpc/tracing"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httplog"
@@ -46,16 +51,17 @@ type HTTPClient interface {
 }
 
 type RPC struct {
-	Config     *config.Config
-	Log        zerolog.Logger
-	Server     *http.Server
-	HTTPClient HTTPClient
-	Enclave    *enclave.Enclave
-	Tenants    *data.TenantTable
-	Sessions   *data.SessionTable
-	Accounts   *data.AccountTable
-	Wallets    proto_wallet.WaaS
-	Verifier   *identity.Verifier
+	Config               *config.Config
+	Log                  zerolog.Logger
+	Server               *http.Server
+	HTTPClient           HTTPClient
+	Enclave              *enclave.Enclave
+	Tenants              *data.TenantTable
+	VerificationContexts *data.VerificationContextTable
+	Sessions             *data.SessionTable
+	Accounts             *data.AccountTable
+	Wallets              proto_wallet.WaaS
+	AuthProviders        map[intents.IdentityType]auth.Provider
 
 	measurements *enclave.Measurements
 	startTime    time.Time
@@ -123,8 +129,7 @@ func New(cfg *config.Config, client *http.Client) (*RPC, error) {
 		return nil, err
 	}
 
-	cacheBackend := memlru.Backend(1024)
-	verifier, err := identity.NewVerifier(cacheBackend, client)
+	authProviders, err := makeAuthProviders(wrappedClient, awsCfg, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -134,20 +139,21 @@ func New(cfg *config.Config, client *http.Client) (*RPC, error) {
 		Log: httplog.NewLogger("waas-authenticator", httplog.Options{
 			LogLevel: zerolog.LevelDebugValue,
 		}),
-		Config:     cfg,
-		Server:     httpServer,
-		HTTPClient: wrappedClient,
-		Enclave:    enc,
-		Tenants:    data.NewTenantTable(db, cfg.Database.TenantsTable),
-		Sessions:   data.NewSessionTable(db, cfg.Database.SessionsTable, "UserID-Index"),
+		Config:               cfg,
+		Server:               httpServer,
+		HTTPClient:           wrappedClient,
+		Enclave:              enc,
+		Tenants:              data.NewTenantTable(db, cfg.Database.TenantsTable),
+		Sessions:             data.NewSessionTable(db, cfg.Database.SessionsTable, "UserID-Index"),
+		VerificationContexts: data.NewVerificationContextTable(db, cfg.Database.VerificationContextsTable),
 		Accounts: data.NewAccountTable(db, cfg.Database.AccountsTable, data.AccountIndices{
 			ByUserID: "UserID-Index",
 			ByEmail:  "Email-Index",
 		}),
-		Wallets:      proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, wrappedClient),
-		Verifier:     verifier,
-		startTime:    time.Now(),
-		measurements: m,
+		Wallets:       proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, wrappedClient),
+		AuthProviders: authProviders,
+		startTime:     time.Now(),
+		measurements:  m,
 	}
 	return s, nil
 }
@@ -264,6 +270,29 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 
 func emptyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(""))
+}
+
+func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config) (map[intents.IdentityType]auth.Provider, error) {
+	cacheBackend := memlru.Backend(1024)
+	legacyVerifier, err := oidc.NewLegacyAuthProvider(cacheBackend, client)
+	if err != nil {
+		return nil, err
+	}
+
+	sm := secretsmanager.NewFromConfig(awsCfg)
+	builderClient := builder.NewBuilderClient(
+		cfg.Builder.BaseURL,
+		builder.NewAuthenticatedClient(client, sm, cfg.Builder.SecretID),
+	)
+	waasClient := proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, client)
+	sender := email.NewSESSender(awsCfg, cfg.SES)
+	emailVerifier := email.NewAuthProvider(sender, waasClient, builderClient)
+
+	verifiers := map[intents.IdentityType]auth.Provider{
+		intents.IdentityType_None:  legacyVerifier,
+		intents.IdentityType_Email: emailVerifier,
+	}
+	return verifiers, nil
 }
 
 func newOtelTracerProvider(ctx context.Context, client *http.Client, cfg config.TracingConfig) (*trace.TracerProvider, error) {

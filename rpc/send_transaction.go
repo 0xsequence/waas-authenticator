@@ -12,6 +12,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
+	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
 )
 
 func (s *RPC) sendTransaction(
@@ -25,8 +26,8 @@ func (s *RPC) sendTransaction(
 	}
 
 	// use original intent otherwise we may experience lose of data because of outdated struct
-	apiIntent := convertToAPIIntent(&intent.Intent)
-	bundle, err := s.Wallets.GenTransaction(waasContext(ctx), apiIntent)
+	apiIntent := waasapi.ConvertToAPIIntent(&intent.Intent)
+	bundle, err := s.Wallets.GenTransaction(waasapi.Context(ctx), apiIntent)
 	if err != nil {
 		return nil, fmt.Errorf("generating transaction: %w", err)
 	}
@@ -97,7 +98,7 @@ func (s *RPC) sendTransaction(
 		},
 	}
 
-	res, err := s.Wallets.SendTransaction(waasContext(ctx), apiIntent, bundle, signatures)
+	res, err := s.Wallets.SendTransaction(waasapi.Context(ctx), apiIntent, bundle, signatures)
 	if err != nil {
 		return nil, fmt.Errorf("sending transaction: %w", err)
 	}

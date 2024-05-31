@@ -13,8 +13,8 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
+	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
 	"github.com/goware/validation"
-	"golang.org/x/sync/errgroup"
 )
 
 func (s *RPC) GetTenant(ctx context.Context, projectID uint64) (*proto.Tenant, error) {
@@ -45,6 +45,7 @@ func (s *RPC) CreateTenant(
 	ctx context.Context,
 	projectID uint64,
 	waasAccessToken string,
+	emailEnabled bool,
 	oidcProviders []*proto.OpenIdProvider,
 	allowedOrigins []string,
 	password *string,
@@ -59,8 +60,11 @@ func (s *RPC) CreateTenant(
 		return nil, "", fmt.Errorf("tenant already exists")
 	}
 
-	if err := s.validateOIDCProviders(ctx, oidcProviders); err != nil {
-		return nil, "", fmt.Errorf("invalid oidcProviders: %w", err)
+	tenantData := proto.TenantData{OIDCProviders: oidcProviders}
+	for _, authProvider := range s.AuthProviders {
+		if err := authProvider.ValidateTenant(ctx, &tenantData); err != nil {
+			return nil, "", fmt.Errorf("invalid auth provider configuration: %w", err)
+		}
 	}
 
 	origins, err := validation.NewOrigins(allowedOrigins...)
@@ -73,7 +77,7 @@ func (s *RPC) CreateTenant(
 		return nil, "", fmt.Errorf("generating wallet: %w", err)
 	}
 
-	waasCtx := waasContext(ctx, waasAccessToken)
+	waasCtx := waasapi.Context(ctx, waasAccessToken)
 
 	// TODO: these are 4 calls to WaaS API, can we do it all in one call?
 	if _, err := s.Wallets.UseHotWallet(waasCtx, wallet.Address().String()); err != nil {
@@ -114,7 +118,7 @@ func (s *RPC) CreateTenant(
 	}
 
 	privateKey := wallet.PrivateKeyHex()[2:] // remove 0x prefix
-	tenantData := proto.TenantData{
+	tenantData = proto.TenantData{
 		ProjectID:     projectID,
 		PrivateKey:    privateKey,
 		ParentAddress: common.HexToAddress(parentAddress),
@@ -125,6 +129,7 @@ func (s *RPC) CreateTenant(
 		},
 		UpgradeCode:     upgradeCode,
 		WaasAccessToken: waasAccessToken,
+		EmailEnabled:    emailEnabled,
 		OIDCProviders:   oidcProviders,
 		KMSKeys:         s.Config.KMS.DefaultSessionKeys,
 		AllowedOrigins:  origins,
@@ -158,7 +163,9 @@ func (s *RPC) CreateTenant(
 }
 
 func (s *RPC) UpdateTenant(
-	ctx context.Context, projectID uint64, upgradeCode string, oidcProviders []*proto.OpenIdProvider, allowedOrigins []string,
+	ctx context.Context, projectID uint64, upgradeCode string,
+	emailEnabled bool,
+	oidcProviders []*proto.OpenIdProvider, allowedOrigins []string,
 ) (*proto.Tenant, error) {
 	att := attestation.FromContext(ctx)
 
@@ -180,17 +187,21 @@ func (s *RPC) UpdateTenant(
 		return nil, fmt.Errorf("invalid upgrade code")
 	}
 
-	if err := s.validateOIDCProviders(ctx, oidcProviders); err != nil {
-		return nil, fmt.Errorf("invalid oidcProviders: %w", err)
-	}
-
 	origins, err := validation.NewOrigins(allowedOrigins...)
 	if err != nil {
 		return nil, fmt.Errorf("invalid allowedOrigins: %w", err)
 	}
 
+	tntData.EmailEnabled = emailEnabled
 	tntData.OIDCProviders = oidcProviders
 	tntData.AllowedOrigins = origins
+
+	tenantData := proto.TenantData{OIDCProviders: oidcProviders}
+	for _, authProvider := range s.AuthProviders {
+		if err := authProvider.ValidateTenant(ctx, &tenantData); err != nil {
+			return nil, fmt.Errorf("invalid auth provider configuration: %w", err)
+		}
+	}
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, s.Config.KMS.TenantKeys[0], tntData)
 	if err != nil {
@@ -214,31 +225,4 @@ func (s *RPC) UpdateTenant(
 		UpdatedAt:      tnt.CreatedAt,
 	}
 	return retTenant, nil
-}
-
-func (s *RPC) validateOIDCProviders(ctx context.Context, providers []*proto.OpenIdProvider) error {
-	var wg errgroup.Group
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	for i, provider := range providers {
-		provider := provider
-
-		if provider.Issuer == "" {
-			return fmt.Errorf("provider %d: empty issuer", i)
-		}
-
-		if len(provider.Audience) < 1 {
-			return fmt.Errorf("provider %d: at least one audience is required", i)
-		}
-
-		wg.Go(func() error {
-			if _, err := s.Verifier.GetKeySet(ctx, provider.Issuer); err != nil {
-				return err
-			}
-			return nil
-		})
-	}
-
-	return wg.Wait()
 }

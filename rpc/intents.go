@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"net/http"
 
 	"github.com/0xsequence/ethkit/ethcoder"
 	"github.com/0xsequence/ethkit/ethwallet"
@@ -14,9 +13,9 @@ import (
 	v2 "github.com/0xsequence/go-sequence/core/v2"
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/waas-authenticator/proto"
-	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/0xsequence/waas-authenticator/rpc/tracing"
+	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
 )
 
 func AddressForUser(ctx context.Context, tntData *proto.TenantData, user string) (string, error) {
@@ -69,6 +68,18 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 
 	ctx, span := tracing.Intent(ctx, intent)
 	defer span.End()
+
+	if intent.Name == intents.IntentName_initiateAuth {
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataInitiateAuth](intent)
+		if err != nil {
+			return nil, err
+		}
+		res, err := s.initiateAuth(ctx, intentTyped)
+		if err != nil {
+			return nil, err
+		}
+		return makeIntentResponse(proto.IntentResponseCode_authInitiated, res), nil
+	}
 
 	sess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, sessionID)
 	if (err != nil || !found) && intent.Name != intents.IntentName_closeSession {
@@ -156,7 +167,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 	}
 
 	// Generic forwarding of intent, no special handling
-	res, err := s.Wallets.SendIntent(waasContext(ctx), convertToAPIIntent(intent))
+	res, err := s.Wallets.SendIntent(waasapi.Context(ctx), waasapi.ConvertToAPIIntent(intent))
 	if err != nil {
 		return nil, fmt.Errorf("sending intent: %w", err)
 	}
@@ -183,28 +194,4 @@ func (s *RPC) signUsingParent(wallet *ethwallet.Wallet, parentAddress common.Add
 
 	// The signature must end with SIG_TYPE_EIP712
 	return append(sig, byte(1)), parentSubdigest, nil
-}
-
-func waasContext(ctx context.Context, optJwtToken ...string) context.Context {
-	var jwtToken string
-	if len(optJwtToken) == 1 {
-		jwtToken = optJwtToken[0]
-	} else {
-		tntData := tenant.FromContext(ctx)
-		jwtToken = tntData.WaasAccessToken
-	}
-
-	waasHeader := http.Header{}
-	waasHeader.Set("Authorization", "BEARER "+jwtToken)
-
-	accessKey := tenant.AccessKeyFromContext(ctx)
-	if accessKey != "" {
-		waasHeader.Set("X-Access-Key", accessKey)
-	}
-
-	waasCtx, err := proto_wallet.WithHTTPRequestHeaders(ctx, waasHeader)
-	if err != nil {
-		return ctx
-	}
-	return waasCtx
 }
