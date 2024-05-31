@@ -10,8 +10,7 @@ import ../vendor/github.com/0xsequence/go-sequence/intents/intent.ridl
   - IntentResponseCode
   - IntentResponse
   - Signature
-  - IntentName
-  - IntentResponseCode
+  - IdentityType
 
 struct Version
   - webrpcVersion: string
@@ -79,6 +78,8 @@ struct TenantData
     + json = upgradeCode
   - waasAccessToken: string
     + json = waasAccessToken
+  - emailEnabled: bool
+    + json = emailEnabled
   - oidcProviders: []OpenIdProvider
     + go.field.name = OIDCProviders
     + json = oidcProviders
@@ -93,11 +94,6 @@ struct TenantData
 struct MiniSequenceContext
   - factory: string
   - mainModule: string
-
-enum IdentityType: uint8
-  - None
-  - Guest
-  - OIDC
 
 struct AccountData
   - projectId: uint64
@@ -141,6 +137,19 @@ struct SessionData
   - expiresAt: timestamp
     + json = expiresAt
 
+struct VerificationContext
+  - projectId: uint64
+    + go.field.name = ProjectID
+  - sessionId: string
+    + go.field.name = SessionID
+  - identityType: IdentityType
+  - verifier: string
+  - challenge?: string
+  - answer?: string
+  - attempts: int
+  - lastAttemptAt?: timestamp
+  - expiresAt: timestamp
+
 
 ##
 ## Errors
@@ -167,5 +176,5 @@ service WaasAuthenticatorAdmin
     - Clock() => (serverTime: timestamp)
 
     - GetTenant(projectId: uint64) => (tenant: Tenant)
-    - CreateTenant(projectId: uint64, waasAccessToken: string, oidcProviders: []OpenIdProvider, allowedOrigins: []string, password?: string) => (tenant: Tenant, upgradeCode: string)
-    - UpdateTenant(projectId: uint64, upgradeCode: string, oidcProviders: []OpenIdProvider, allowedOrigins: []string) => (tenant: Tenant)
+    - CreateTenant(projectId: uint64, waasAccessToken: string, emailEnabled: bool, oidcProviders: []OpenIdProvider, allowedOrigins: []string, password?: string) => (tenant: Tenant, upgradeCode: string)
+    - UpdateTenant(projectId: uint64, upgradeCode: string, emailEnabled: bool, oidcProviders: []OpenIdProvider, allowedOrigins: []string) => (tenant: Tenant)
