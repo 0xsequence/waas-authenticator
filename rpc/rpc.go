@@ -289,8 +289,8 @@ func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config)
 	emailVerifier := email.NewAuthProvider(sender, waasClient, builderClient)
 
 	verifiers := map[intents.IdentityType]auth.Provider{
-		intents.IdentityType_None:  legacyVerifier,
-		intents.IdentityType_Email: emailVerifier,
+		intents.IdentityType_None:  auth.NewTracedProvider("oidc.LegacyAuthProvider", legacyVerifier),
+		intents.IdentityType_Email: auth.NewTracedProvider("email.AuthProvider", emailVerifier),
 	}
 	return verifiers, nil
 }

@@ -70,14 +70,6 @@ func (v *LegacyAuthProvider) InitiateAuth(
 func (v *LegacyAuthProvider) Verify(
 	ctx context.Context, verifCtx *proto.VerificationContext, sessionID string, answer string,
 ) (ident proto.Identity, err error) {
-	ctx, span := tracing.Span(ctx, "LegacyAuthProvider.Verify")
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-		}
-		span.End()
-	}()
-
 	if verifCtx != nil {
 		return proto.Identity{}, fmt.Errorf("unexpected auth session for identity type that does not support it")
 	}
@@ -153,14 +145,6 @@ func (v *LegacyAuthProvider) ValidateTenant(ctx context.Context, tenant *proto.T
 }
 
 func (v *LegacyAuthProvider) GetKeySet(ctx context.Context, issuer string) (set jwk.Set, err error) {
-	ctx, span := tracing.Span(ctx, "LegacyAuthProvider.GetKeySet")
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-		}
-		span.End()
-	}()
-
 	jwksURL, err := fetchJWKSURL(ctx, v.client, issuer)
 	if err != nil {
 		return nil, fmt.Errorf("fetch issuer keys: %w", err)
