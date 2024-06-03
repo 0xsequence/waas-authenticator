@@ -1,6 +1,7 @@
 package sequence
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -168,7 +169,7 @@ func IsValidMessageSignature(address common.Address, message []byte, signature [
 		return true, nil
 	}
 
-	return IsValidSignature(log, address, MessageDigest(accounts.TextHash(message)), signature, SequenceContexts(), chainID, provider)
+	return IsValidSignature(log, address, common.BytesToHash(accounts.TextHash(message)), signature, SequenceContexts(), chainID, provider)
 }
 
 func IsValidSignature(log logger.Logger, walletAddress common.Address, digest common.Hash, seqSig []byte, walletContexts WalletContexts, chainID *big.Int, provider *ethrpc.Provider) (bool, error) {
@@ -180,6 +181,13 @@ func IsValidSignature(log logger.Logger, walletAddress common.Address, digest co
 	// NOTICE: This is legacy code, we only need it while we deploy EIP-6492
 	// on prod, otherwise we need to coordinate both.
 	// as soon as we have EIP-6492 running on prod we can remove this.
+
+	var err error
+	seqSig, err = UnwrapEIP6492Signature(seqSig)
+	if err != nil {
+		return false, err
+	}
+
 	generalIsValid, err := GeneralIsValidSignature(walletAddress, digest, seqSig, walletContexts, chainID, provider)
 	if err != nil {
 		return false, err
@@ -261,4 +269,24 @@ func EIP6492Signature(signature []byte, config core.WalletConfig) ([]byte, error
 	}
 	signature = append(signature, eip6492.EIP6492MagicBytes...)
 	return signature, nil
+}
+
+func UnwrapEIP6492Signature(signature []byte) ([]byte, error) {
+	if !bytes.HasSuffix(signature, eip6492.EIP6492MagicBytes) {
+		return signature, nil
+	}
+	signature = bytes.TrimSuffix(signature, eip6492.EIP6492MagicBytes)
+
+	var (
+		to         common.Address
+		data       []byte
+		signature_ []byte
+	)
+
+	err := ethcoder.AbiDecoder([]string{"address", "bytes", "bytes"}, signature, []any{&to, &data, &signature_})
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode eip-6492 signature: %w", err)
+	}
+
+	return signature_, nil
 }
