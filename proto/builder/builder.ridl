@@ -1,0 +1,89 @@
+webrpc = v1 # TODO, use v2
+
+name = sequence-builder
+version = v0.1.0
+
+
+# db table: "email_templates"
+struct EmailTemplate
+  - id: uint64
+    + go.field.name = ID
+    + go.tag.db = id,omitempty
+
+  - templateType?: EmailTemplateType
+    + go.field.name = TemplateType
+    + go.tag.db = template_type
+
+  - projectId: uint64
+    + go.field.name = ProjectID
+    + go.tag.db = project_id
+
+  - subject: string
+    + go.tag.db = subject
+
+  - introText: string
+    + go.tag.db = intro_text
+
+  - logoUrl: string
+    + go.field.name = LogoURL
+    + go.tag.db = logo_url
+
+  - template?: string
+    + go.field.name = Template
+    + go.tag.db = template
+
+  - placeholders: []string
+    + go.tag.db = placeholders
+
+  - createdAt: timestamp
+    + json = createdAt
+    + go.tag.db = created_at
+
+  - updatedAt: timestamp
+    + json = updatedAt
+    + go.tag.db = updated_at
+
+  - deletedAt?: timestamp
+    + go.tag.db = deleted_at,omitempty
+    + go.tag.json = deletedAt,omitempty
+    + go.field.type = *time.Time
+
+enum EmailTemplateType: uint8
+  - UNKNOWN
+  - LOGIN
+  - GUARD
+
+
+##
+## Errors
+##
+error 1000 Unauthorized     "Unauthorized access"           HTTP 401
+error 1001 PermissionDenied "Permission denied"             HTTP 403
+error 1002 SessionExpired   "Session expired"               HTTP 403
+error 1003 MethodNotFound   "Method not found"              HTTP 404
+error 1004 RequestConflict  "Conflict with target resource" HTTP 409
+
+error 2000 Timeout         "Request timed out" HTTP 408
+error 2001 InvalidArgument "Invalid argument"  HTTP 400
+
+error 3000 NotFound            "Resource not found"         HTTP 400
+error 3001 UserNotFound        "User not found"             HTTP 400
+error 3002 ProjectNotFound     "Project not found"          HTTP 400
+error 3003 InvalidTier         "Invalid subscription tier"  HTTP 400
+error 3004 EmailTemplateExists "Email Template exists"      HTTP 409
+error 3005 SubscriptionLimit   "Subscription limit reached" HTTP 402
+error 3006 FeatureNotIncluded  "Feature not included"       HTTP 402
+error 3007 InvalidNetwork      "Invalid network"            HTTP 400
+
+error 4000 InvitationExpired   "Invitation code is expired" HTTP 400
+error 4001 AlreadyCollaborator "Already a collaborator"     HTTP 409
+
+##
+## Builder rpc service
+##
+service Builder
+  # Project > Email Templates
+  #
+  - GetEmailTemplate(projectId: uint64, templateType?: EmailTemplateType) => (emailTemplate: EmailTemplate)
+
+

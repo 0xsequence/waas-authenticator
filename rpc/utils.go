@@ -7,10 +7,11 @@ import (
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/waas-authenticator/proto"
 	api "github.com/0xsequence/waas-authenticator/proto/waas"
+	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
 )
 
 func (s *RPC) ChainList(ctx context.Context) ([]*proto.Chain, error) {
-	chains, err := s.Wallets.ChainList(waasContext(ctx))
+	chains, err := s.Wallets.ChainList(waasapi.Context(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -56,24 +57,6 @@ func convertProtoSignaturesToSignatures(signatures []*proto.Signature) []*intent
 		}
 	}
 	return result
-}
-
-func convertToAPIIntent(intent *intents.Intent) *api.Intent {
-	signatures := make([]*api.Signature, len(intent.Signatures))
-	for i, s := range intent.Signatures {
-		signatures[i] = &api.Signature{
-			SessionID: s.SessionID,
-			Signature: s.Signature,
-		}
-	}
-	return &api.Intent{
-		Version:    intent.Version,
-		Name:       intent.Name.String(),
-		ExpiresAt:  intent.ExpiresAt,
-		IssuedAt:   intent.IssuedAt,
-		Data:       intent.Data,
-		Signatures: signatures,
-	}
 }
 
 func convertIntentResponse(res *api.IntentResponse) *proto.IntentResponse {

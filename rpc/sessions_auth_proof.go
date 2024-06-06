@@ -12,6 +12,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
+	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
 )
 
 func (s *RPC) sessionAuthProof(
@@ -34,8 +35,8 @@ func (s *RPC) sessionAuthProof(
 		return nil, fmt.Errorf("signing session register proof message: %w", err)
 	}
 
-	apiIntent := convertToAPIIntent(&intent.Intent)
-	res, err := s.Wallets.SessionAuthProof(waasContext(ctx), apiIntent, proof)
+	apiIntent := waasapi.ConvertToAPIIntent(&intent.Intent)
+	res, err := s.Wallets.SessionAuthProof(waasapi.Context(ctx), apiIntent, proof)
 	if err != nil {
 		return nil, fmt.Errorf("signing message: %w", err)
 	}

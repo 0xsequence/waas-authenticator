@@ -25,8 +25,9 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc"
+	"github.com/0xsequence/waas-authenticator/rpc/auth"
+	"github.com/0xsequence/waas-authenticator/rpc/auth/oidc"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
-	"github.com/0xsequence/waas-authenticator/rpc/identity"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -69,19 +70,20 @@ func getTestingCtxValue(ctx context.Context, k string) string {
 func initRPC(cfg *config.Config, enc *enclave.Enclave, dbClient *dbMock) *rpc.RPC {
 	client := httpClient{}
 	cacheBackend := memlru.Backend(1024)
-	verifier, err := identity.NewVerifier(cacheBackend, client)
+	legacyProvider, err := oidc.NewLegacyAuthProvider(cacheBackend, client)
 	if err != nil {
 		panic(err)
 	}
 	svc := &rpc.RPC{
-		Config:     cfg,
-		HTTPClient: client,
-		Enclave:    enc,
-		Wallets:    newWalletServiceMock(nil),
-		Tenants:    data.NewTenantTable(dbClient, "Tenants"),
-		Sessions:   data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
-		Accounts:   data.NewAccountTable(dbClient, "Accounts", data.AccountIndices{}),
-		Verifier:   verifier,
+		Config:               cfg,
+		HTTPClient:           client,
+		Enclave:              enc,
+		Wallets:              newWalletServiceMock(nil),
+		Tenants:              data.NewTenantTable(dbClient, "Tenants"),
+		Sessions:             data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
+		Accounts:             data.NewAccountTable(dbClient, "Accounts", data.AccountIndices{}),
+		VerificationContexts: data.NewVerificationContextTable(dbClient, "VerificationContexts"),
+		AuthProviders:        map[intents.IdentityType]auth.Provider{intents.IdentityType_None: legacyProvider},
 	}
 	return svc
 }
@@ -265,9 +267,10 @@ func (m *kmsMock) GenerateDataKey(ctx context.Context, params *kms.GenerateDataK
 }
 
 type dbMock struct {
-	tenants  map[uint64][]*data.Tenant
-	sessions map[string]*data.Session
-	accounts map[uint64]map[string]*data.Account
+	tenants       map[uint64][]*data.Tenant
+	sessions      map[string]*data.Session
+	accounts      map[uint64]map[string]*data.Account
+	verifContexts map[string]*data.VerificationContext
 }
 
 func (d *dbMock) DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
@@ -339,6 +342,18 @@ func (d *dbMock) GetItem(ctx context.Context, params *dynamodb.GetItemInput, opt
 			return out, nil
 		}
 		out.Item, err = attributevalue.MarshalMap(acc)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	case "VerificationContexts":
+		id, err := getDynamoAttribute[*dynamodbtypes.AttributeValueMemberS](params.Key, "ID")
+		if err != nil {
+			return nil, err
+		}
+		out := &dynamodb.GetItemOutput{}
+		verifCtx := d.verifContexts[id.Value]
+		out.Item, err = attributevalue.MarshalMap(verifCtx)
 		if err != nil {
 			return nil, err
 		}
@@ -599,6 +614,11 @@ func newSession(t *testing.T, enc *enclave.Enclave, issuer string, signingSessio
 type walletServiceMock struct {
 	registeredUsers    map[string]struct{}
 	registeredSessions map[string]struct{}
+}
+
+func (w walletServiceMock) InitiateEmailAuth(ctx context.Context, intent *proto_wallet.Intent, answerHash string, salt string) (*proto_wallet.IntentResponse, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (w walletServiceMock) UpdateProjectUserMapRules(ctx context.Context, projectID uint64, userMapRules *proto_wallet.ProjectSessionUserMapRules) error {

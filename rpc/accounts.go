@@ -3,16 +3,15 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/0xsequence/ethkit/ethcoder"
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
+	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
 )
 
 func (s *RPC) listAccounts(
@@ -39,8 +38,8 @@ func (s *RPC) listAccounts(
 
 		out[i] = &intents.Account{
 			ID:     identity.String(),
-			Type:   intents.IdentityType(identity.Type.String()),
-			Issuer: identity.Issuer,
+			Type:   intents.IdentityType(identity.Type),
+			Issuer: &identity.Issuer,
 		}
 		if dbAcc.Email != "" {
 			out[i].Email = &dbAcc.Email
@@ -59,13 +58,42 @@ func (s *RPC) federateAccount(
 		return nil, fmt.Errorf("sessionId mismatch")
 	}
 
-	sessionHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(sess.ID))).String()
-	ident, err := s.Verifier.Verify(ctx, intent.Data.IdToken, sessionHash)
+	authProvider, err := s.getAuthProvider(intent.Data.IdentityType)
+	if err != nil {
+		return nil, fmt.Errorf("get auth provider: %w", err)
+	}
+
+	var verifCtx *proto.VerificationContext
+	authID := data.AuthID{
+		ProjectID:    tntData.ProjectID,
+		IdentityType: intent.Data.IdentityType,
+		Verifier:     intent.Data.Verifier,
+	}
+	dbVerifCtx, found, err := s.VerificationContexts.Get(ctx, authID)
+	if err != nil {
+		return nil, fmt.Errorf("getting verification context: %w", err)
+	}
+	if found && dbVerifCtx != nil {
+		verifCtx, _, err = crypto.DecryptData[*proto.VerificationContext](ctx, dbVerifCtx.EncryptedKey, dbVerifCtx.Ciphertext, tntData.KMSKeys)
+		if err != nil {
+			return nil, fmt.Errorf("decrypting verification context data: %w", err)
+		}
+
+		if time.Now().After(verifCtx.ExpiresAt) {
+			return nil, fmt.Errorf("auth session expired")
+		}
+
+		if !dbVerifCtx.CorrespondsTo(verifCtx) {
+			return nil, fmt.Errorf("malformed verification context data")
+		}
+	}
+
+	ident, err := authProvider.Verify(ctx, verifCtx, sess.ID, intent.Data.Answer)
 	if err != nil {
 		return nil, fmt.Errorf("verifying identity: %w", err)
 	}
 
-	_, found, err := s.Accounts.Get(ctx, tntData.ProjectID, ident)
+	_, found, err = s.Accounts.Get(ctx, tntData.ProjectID, ident)
 	if err != nil {
 		return nil, fmt.Errorf("retrieving account: %w", err)
 	}
@@ -97,7 +125,7 @@ func (s *RPC) federateAccount(
 		CreatedAt:          accData.CreatedAt,
 	}
 
-	if _, err := s.Wallets.FederateAccount(waasContext(ctx), account.UserID, convertToAPIIntent(intent.ToIntent())); err != nil {
+	if _, err := s.Wallets.FederateAccount(waasapi.Context(ctx), account.UserID, waasapi.ConvertToAPIIntent(intent.ToIntent())); err != nil {
 		return nil, fmt.Errorf("creating account with WaaS API: %w", err)
 	}
 
@@ -108,7 +136,7 @@ func (s *RPC) federateAccount(
 	outAcc := &intents.Account{
 		ID:     ident.String(),
 		Type:   intents.IdentityType(ident.Type),
-		Issuer: ident.Issuer,
+		Issuer: &ident.Issuer,
 	}
 	if ident.Email != "" {
 		outAcc.Email = &ident.Email
@@ -160,7 +188,7 @@ func (s *RPC) removeAccount(
 		return fmt.Errorf("invalid account")
 	}
 
-	_, err = s.Wallets.RemoveAccount(waasContext(ctx), convertToAPIIntent(intent.ToIntent()))
+	_, err = s.Wallets.RemoveAccount(waasapi.Context(ctx), waasapi.ConvertToAPIIntent(intent.ToIntent()))
 	if err != nil {
 		return err
 	}

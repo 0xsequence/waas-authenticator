@@ -15,6 +15,8 @@ type Config struct {
 	Admin     AdminConfig      `toml:"admin"`
 	Endpoints EndpointsConfig  `toml:"endpoints"`
 	KMS       KMSConfig        `toml:"kms"`
+	SES       SESConfig        `toml:"ses"`
+	Builder   BuilderConfig    `toml:"builder"`
 	Database  DatabaseConfig   `toml:"database"`
 	Telemetry telemetry.Config `toml:"telemetry"`
 	Tracing   TracingConfig    `toml:"tracing"`
@@ -44,10 +46,23 @@ type KMSConfig struct {
 	DefaultSessionKeys []string `toml:"default_session_keys"`
 }
 
+type SESConfig struct {
+	Region        string `toml:"region"`
+	Source        string `toml:"source"`
+	SourceARN     string `toml:"source_arn"`
+	AccessRoleARN string `toml:"access_role_arn"`
+}
+
 type DatabaseConfig struct {
-	TenantsTable  string `toml:"tenants_table"`
-	AccountsTable string `toml:"accounts_table"`
-	SessionsTable string `toml:"sessions_table"`
+	TenantsTable              string `toml:"tenants_table"`
+	AccountsTable             string `toml:"accounts_table"`
+	SessionsTable             string `toml:"sessions_table"`
+	VerificationContextsTable string `toml:"verification_contexts_table"`
+}
+
+type BuilderConfig struct {
+	BaseURL  string `toml:"base_url"`
+	SecretID string `toml:"secret_id"`
 }
 
 type TracingConfig struct {

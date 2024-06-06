@@ -12,6 +12,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
+	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
 )
 
 func (s *RPC) signMessage(
@@ -64,8 +65,8 @@ func (s *RPC) signMessage(
 	}
 
 	// use original intent otherwise we may experience lose of data because of outdated struct
-	apiIntent := convertToAPIIntent(&intent.Intent)
-	res, err := s.Wallets.SignMessage(waasContext(ctx), apiIntent, signMessage, signatures)
+	apiIntent := waasapi.ConvertToAPIIntent(&intent.Intent)
+	res, err := s.Wallets.SignMessage(waasapi.Context(ctx), apiIntent, signMessage, signatures)
 	if err != nil {
 		return nil, fmt.Errorf("signing message: %w", err)
 	}

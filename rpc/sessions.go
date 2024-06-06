@@ -11,9 +11,11 @@ import (
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
+	"github.com/0xsequence/waas-authenticator/rpc/auth"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/0xsequence/waas-authenticator/rpc/tracing"
+	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
 )
 
 func (s *RPC) RegisterSession(
@@ -43,15 +45,59 @@ func (s *RPC) RegisterSession(
 		return nil, nil, fmt.Errorf("signing session and session to register must match")
 	}
 
-	idToken := intentTyped.Data.IdToken
-	if idToken == nil || *idToken == "" {
-		return nil, nil, fmt.Errorf("idToken is required")
+	authProvider, err := s.getAuthProvider(intentTyped.Data.IdentityType)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get auth provider: %w", err)
 	}
 
 	sessionHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(sessionID))).String()
-	ident, err := s.Verifier.Verify(ctx, *idToken, sessionHash)
+	answer := intentTyped.Data.Answer
+	if idToken := intentTyped.Data.IdToken; idToken != nil {
+		answer = *idToken
+	}
+
+	var verifCtx *proto.VerificationContext
+	authID := data.AuthID{
+		ProjectID:    tntData.ProjectID,
+		IdentityType: intentTyped.Data.IdentityType,
+		Verifier:     intentTyped.Data.Verifier,
+	}
+	dbVerifCtx, found, err := s.VerificationContexts.Get(ctx, authID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("verifying identity: %w", err)
+		return nil, nil, fmt.Errorf("getting auth session: %w", err)
+	}
+	if found && dbVerifCtx != nil {
+		verifCtx, _, err = crypto.DecryptData[*proto.VerificationContext](ctx, dbVerifCtx.EncryptedKey, dbVerifCtx.Ciphertext, tntData.KMSKeys)
+		if err != nil {
+			return nil, nil, fmt.Errorf("decrypting auth session data: %w", err)
+		}
+
+		if time.Now().After(verifCtx.ExpiresAt) {
+			return nil, nil, fmt.Errorf("auth session expired")
+		}
+
+		if !dbVerifCtx.CorrespondsTo(verifCtx) {
+			return nil, nil, fmt.Errorf("malformed auth session data")
+		}
+	}
+
+	ident, err := authProvider.Verify(ctx, verifCtx, sessionID, answer)
+	if err != nil {
+		if verifCtx != nil {
+			now := time.Now()
+			verifCtx.Attempts += 1
+			verifCtx.LastAttemptAt = &now
+
+			encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.KMSKeys[0], verifCtx)
+			if err != nil {
+				return nil, nil, fmt.Errorf("encrypt data: %w", err)
+			}
+			if err := s.VerificationContexts.UpdateData(ctx, dbVerifCtx, encryptedKey, algorithm, ciphertext); err != nil {
+				return nil, nil, fmt.Errorf("update verification context: %w", err)
+			}
+		}
+
+		return nil, nil, fmt.Errorf("verifying answer: %w", err)
 	}
 
 	account, accountFound, err := s.Accounts.Get(ctx, tntData.ProjectID, ident)
@@ -94,7 +140,7 @@ func (s *RPC) RegisterSession(
 		}
 	}
 
-	res, err := s.Wallets.RegisterSession(waasContext(ctx), account.UserID, convertToAPIIntent(intent))
+	res, err := s.Wallets.RegisterSession(waasapi.Context(ctx), account.UserID, waasapi.ConvertToAPIIntent(intent))
 	if err != nil {
 		return nil, nil, fmt.Errorf("registering session with WaaS API: %w", err)
 	}
@@ -150,6 +196,58 @@ func (s *RPC) RegisterSession(
 	return retSess, convertIntentResponse(res), nil
 }
 
+func (s *RPC) initiateAuth(ctx context.Context, intent *intents.IntentTyped[intents.IntentDataInitiateAuth]) (*intents.IntentResponseAuthInitiated, error) {
+	tnt := tenant.FromContext(ctx)
+
+	authProvider, err := s.getAuthProvider(intent.Data.IdentityType)
+	if err != nil {
+		return nil, fmt.Errorf("get auth provider: %w", err)
+	}
+
+	var verifCtx *proto.VerificationContext
+	authID := data.AuthID{
+		ProjectID:    tnt.ProjectID,
+		IdentityType: intent.Data.IdentityType,
+		Verifier:     intent.Data.Verifier,
+	}
+	authSess, found, err := s.VerificationContexts.Get(ctx, authID)
+	if err != nil {
+		return nil, fmt.Errorf("getting auth session: %w", err)
+	}
+	if found && authSess != nil {
+		verifCtx, _, err = crypto.DecryptData[*proto.VerificationContext](ctx, authSess.EncryptedKey, authSess.Ciphertext, tnt.KMSKeys)
+		if err != nil {
+			return nil, fmt.Errorf("decrypting auth session data: %w", err)
+		}
+	}
+
+	storeSessFn := func(ctx context.Context, verifCtx *proto.VerificationContext) error {
+		att := attestation.FromContext(ctx)
+
+		encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tnt.KMSKeys[0], verifCtx)
+		if err != nil {
+			return fmt.Errorf("encrypting account data: %w", err)
+		}
+
+		dbVerifCtx := &data.VerificationContext{
+			ID: data.AuthID{
+				ProjectID:    tnt.ProjectID,
+				IdentityType: intents.IdentityType_Email,
+				Verifier:     verifCtx.Verifier,
+			},
+			EncryptedKey: encryptedKey,
+			Algorithm:    algorithm,
+			Ciphertext:   ciphertext,
+		}
+		if err := s.VerificationContexts.Put(ctx, dbVerifCtx); err != nil {
+			return fmt.Errorf("putting auth session: %w", err)
+		}
+		return nil
+	}
+
+	return authProvider.InitiateAuth(ctx, verifCtx, intent.Data.Verifier, intent.ToIntent(), storeSessFn)
+}
+
 func (s *RPC) dropSession(
 	ctx context.Context, sess *data.Session, intent *intents.IntentTyped[intents.IntentDataCloseSession],
 ) (bool, error) {
@@ -160,7 +258,7 @@ func (s *RPC) dropSession(
 		return true, nil
 	}
 
-	if _, err := s.Wallets.InvalidateSession(waasContext(ctx), dropSess.ID); err != nil {
+	if _, err := s.Wallets.InvalidateSession(waasapi.Context(ctx), dropSess.ID); err != nil {
 		return false, fmt.Errorf("invalidating session with WaaS API: %w", err)
 	}
 
@@ -205,4 +303,16 @@ func (s *RPC) listSessions(
 		}
 	}
 	return out, nil
+}
+
+func (s *RPC) getAuthProvider(identityType intents.IdentityType) (auth.Provider, error) {
+	if identityType == "" {
+		identityType = intents.IdentityType_None
+	}
+
+	authProvider, ok := s.AuthProviders[identityType]
+	if !ok {
+		return nil, fmt.Errorf("unknown identity type: %v", identityType)
+	}
+	return authProvider, nil
 }
