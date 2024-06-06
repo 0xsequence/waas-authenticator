@@ -31,25 +31,17 @@ func NewAuthenticatedClient(httpClient HTTPClient, sm *secretsmanager.Client, se
 }
 
 func (c *AuthenticatedClient) Do(req *http.Request) (*http.Response, error) {
-	ctx := req.Context()
-
 	token, exp := c.getToken()
 	if token == "" || time.Now().After(exp) {
 		var err error
-		token, err = c.fetchToken(ctx)
+		token, err = c.fetchToken(req.Context())
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	h := http.Header{}
-	h.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	ctx, err := WithHTTPRequestHeaders(ctx, h)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.Do(req.WithContext(ctx))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	return c.HTTPClient.Do(req)
 }
 
 func (c *AuthenticatedClient) getToken() (string, time.Time) {
