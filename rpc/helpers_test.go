@@ -25,16 +25,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc"
-	"github.com/0xsequence/waas-authenticator/rpc/auth"
-	"github.com/0xsequence/waas-authenticator/rpc/auth/oidc"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go-v2/service/kms"
-	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/goware/cachestore/memlru"
 	"github.com/goware/validation"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -56,7 +47,7 @@ func TestMain(m *testing.M) {
 
 func initRPC(t *testing.T) *rpc.RPC {
 	cfg := initConfig(t, awsEndpoint)
-	svc, err := rpc.New(cfg, http.DefaultClient)
+	svc, err := rpc.New(cfg, &http.Client{Transport: &testTransport{RoundTripper: http.DefaultTransport}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,9 +97,10 @@ QwIDAQAB
 -----END RSA PUBLIC KEY-----`,
 		},
 		Database: config.DatabaseConfig{
-			TenantsTable:  "TenantsTable",
-			AccountsTable: "AccountsTable",
-			SessionsTable: "SessionsTable",
+			TenantsTable:              "TenantsTable",
+			AccountsTable:             "AccountsTable",
+			SessionsTable:             "SessionsTable",
+			VerificationContextsTable: "VerificationContextsTable",
 		},
 		KMS: config.KMSConfig{
 			TenantKeys:         []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
@@ -563,18 +555,13 @@ func (w walletServiceMock) FinishValidateSession(ctx context.Context, sessionId 
 
 var _ proto_wallet.WaaS = (*walletServiceMock)(nil)
 
-type httpClient struct{}
+type testTransport struct {
+	http.RoundTripper
+}
 
-func (httpClient) Do(req *http.Request) (*http.Response, error) {
+func (tt testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.URL.Scheme = "http"
-	return http.DefaultClient.Do(req)
+	return tt.RoundTripper.RoundTrip(req)
 }
 
-func (httpClient) Get(s string) (*http.Response, error) {
-	if strings.HasPrefix(s, "https://") {
-		s = "http://" + strings.TrimPrefix(s, "https://")
-	}
-	return http.DefaultClient.Get(s)
-}
-
-var _ rpc.HTTPClient = (*httpClient)(nil)
+var _ http.RoundTripper = (*testTransport)(nil)

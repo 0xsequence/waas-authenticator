@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,9 +28,9 @@ func TestRPC_RegisterSession(t *testing.T) {
 	sessHash := ethcoder.Keccak256Hash([]byte(signingSession.SessionID())).String()
 
 	type assertionParams struct {
-		tenant *data.Tenant
-		issuer string
-		//dbClient      *dbMock
+		svc           *rpc.RPC
+		tenant        *data.Tenant
+		issuer        string
 		walletService *walletServiceMock
 	}
 	testCases := map[string]struct {
@@ -49,10 +50,16 @@ func TestRPC_RegisterSession(t *testing.T) {
 				assert.Equal(t, fmt.Sprintf("%d|%s", p.tenant.ProjectID, sessHash), sess.UserID)
 				assert.Equal(t, "FriendlyName", sess.FriendlyName)
 
-				//assert.Contains(t, p.dbClient.sessions, sess.ID)
-				//assert.Contains(t, p.dbClient.accounts[p.tenant.ProjectID], sess.Identity.String())
 				assert.Contains(t, p.walletService.registeredSessions, sess.ID)
 				assert.Contains(t, p.walletService.registeredUsers, sess.UserID)
+
+				_, found, err := p.svc.Sessions.Get(context.Background(), p.tenant.ProjectID, sess.ID)
+				require.NoError(t, err)
+				require.True(t, found)
+
+				_, found, err = p.svc.Accounts.Get(context.Background(), p.tenant.ProjectID, sess.Identity)
+				require.NoError(t, err)
+				require.True(t, found)
 			},
 		},
 		"WithInvalidIssuer": {
@@ -124,21 +131,19 @@ func TestRPC_RegisterSession(t *testing.T) {
 				assert.ErrorContains(t, err, "intent is invalid: no signatures")
 			},
 		},
-		/*
-			"IssuerMissingScheme": {
-				tokBuilderFn: func(b *jwt.Builder, url string) {
-					b.Issuer(strings.TrimPrefix(url, "http://")).
-						Claim("sequence:session_hash", sessHash)
-				},
-				assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
-					require.NoError(t, err)
-					require.NotNil(t, sess)
-
-					httpsIssuer := "https://" + strings.TrimPrefix(p.issuer, "http://")
-					assert.Equal(t, httpsIssuer, sess.Identity.Issuer)
-				},
+		"IssuerMissingScheme": {
+			tokBuilderFn: func(b *jwt.Builder, url string) {
+				b.Issuer(strings.TrimPrefix(url, "http://")).
+					Claim("sequence:session_hash", sessHash)
 			},
-		*/
+			assertFn: func(t *testing.T, sess *proto.Session, err error, p assertionParams) {
+				require.NoError(t, err)
+				require.NotNil(t, sess)
+
+				httpsIssuer := "https://" + strings.TrimPrefix(p.issuer, "http://")
+				assert.Equal(t, httpsIssuer, sess.Identity.Issuer)
+			},
+		},
 		"EmailAlreadyInUse": {
 			tokBuilderFn: func(b *jwt.Builder, url string) {
 				b.Claim("email", "user@example.com").
@@ -162,11 +167,16 @@ func TestRPC_RegisterSession(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, sess)
 
-				//assert.Len(t, p.dbClient.accounts[p.tenant.ProjectID], 2)
-				//assert.Contains(t, p.dbClient.sessions, sess.ID)
-				//assert.Contains(t, p.dbClient.accounts[p.tenant.ProjectID], sess.Identity.String())
 				assert.Contains(t, p.walletService.registeredSessions, sess.ID)
 				assert.Contains(t, p.walletService.registeredUsers, sess.UserID)
+
+				_, found, err := p.svc.Sessions.Get(context.Background(), p.tenant.ProjectID, sess.ID)
+				require.NoError(t, err)
+				require.True(t, found)
+
+				_, found, err = p.svc.Accounts.Get(context.Background(), p.tenant.ProjectID, sess.Identity)
+				require.NoError(t, err)
+				require.True(t, found)
 			},
 		},
 	}
@@ -211,9 +221,9 @@ func TestRPC_RegisterSession(t *testing.T) {
 
 			sess, _, err := c.RegisterSession(ctx, intent, "FriendlyName")
 			testCase.assertFn(t, sess, err, assertionParams{
-				tenant: tenant,
-				issuer: issuer,
-				//dbClient:      dbClient,
+				svc:           svc,
+				tenant:        tenant,
+				issuer:        issuer,
 				walletService: walletService,
 			})
 		})
@@ -226,9 +236,9 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 	signingSession := intents.NewSessionP256K1(sessWallet)
 
 	type assertionParams struct {
-		tenant *data.Tenant
-		issuer string
-		//dbClient      *dbMock
+		svc           *rpc.RPC
+		tenant        *data.Tenant
+		issuer        string
 		walletService *walletServiceMock
 	}
 	testCases := map[string]struct {
@@ -243,8 +253,10 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 				require.Equal(t, proto.IntentResponseCode_sessionClosed, res.Code)
 
 				dropSession := signingSession.SessionID()
-				//assert.NotContains(t, p.dbClient.sessions, dropSession)
 				assert.NotContains(t, p.walletService.registeredSessions, dropSession)
+				_, found, err := p.svc.Sessions.Get(context.Background(), p.tenant.ProjectID, dropSession)
+				require.NoError(t, err)
+				require.False(t, found)
 			},
 			dropSessionID: signingSession.SessionID(),
 		},
@@ -255,8 +267,10 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 				require.Equal(t, proto.IntentResponseCode_sessionClosed, res.Code)
 
 				dropSession := "0x1111111111111111111111111111111111111111"
-				//assert.NotContains(t, p.dbClient.sessions, dropSession)
 				assert.NotContains(t, p.walletService.registeredSessions, dropSession)
+				_, found, err := p.svc.Sessions.Get(context.Background(), p.tenant.ProjectID, dropSession)
+				require.NoError(t, err)
+				require.False(t, found)
 			},
 			dropSessionID: "0x1111111111111111111111111111111111111111",
 		},
@@ -269,8 +283,10 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 
 				// ...but the session is not dropped
 				dropSession := "0x2222222222222222222222222222222222222222"
-				//assert.Contains(t, p.dbClient.sessions, dropSession)
 				assert.Contains(t, p.walletService.registeredSessions, dropSession)
+				_, found, err := p.svc.Sessions.Get(context.Background(), p.tenant.ProjectID, dropSession)
+				require.NoError(t, err)
+				require.True(t, found)
 			},
 			dropSessionID: "0x2222222222222222222222222222222222222222",
 		},
@@ -337,9 +353,9 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 
 			res, err := c.SendIntent(ctx, intent)
 			testCase.assertFn(t, res, err, assertionParams{
-				tenant: tenant,
-				issuer: issuer,
-				//dbClient:      dbClient,
+				svc:           svc,
+				tenant:        tenant,
+				issuer:        issuer,
 				walletService: walletService,
 			})
 		})
