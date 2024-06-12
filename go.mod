@@ -16,6 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.29.1
 	github.com/aws/aws-sdk-go-v2/service/ses v1.22.9
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.1
+	github.com/dunglas/httpsfv v1.0.2
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/go-chi/httplog v0.3.2
 	github.com/go-chi/jwtauth/v5 v5.3.0

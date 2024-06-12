@@ -261,6 +261,9 @@ github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa
 # github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
 ## explicit
 github.com/dgryski/go-rendezvous
+# github.com/dunglas/httpsfv v1.0.2
+## explicit; go 1.14
+github.com/dunglas/httpsfv
 # github.com/emirpasic/gods v1.18.1
 ## explicit; go 1.2
 github.com/emirpasic/gods/containers
