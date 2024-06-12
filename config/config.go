@@ -12,6 +12,7 @@ type Config struct {
 	Mode      Mode             `toml:"-"`
 	Region    string           `toml:"region"`
 	Service   ServiceConfig    `toml:"service"`
+	BaseURL   string           `toml:"base_url"`
 	Admin     AdminConfig      `toml:"admin"`
 	Endpoints EndpointsConfig  `toml:"endpoints"`
 	KMS       KMSConfig        `toml:"kms"`
@@ -42,6 +43,7 @@ type EndpointsConfig struct {
 }
 
 type KMSConfig struct {
+	SigningKey         string   `toml:"signing_key"`
 	TenantKeys         []string `toml:"tenant_keys"`
 	DefaultSessionKeys []string `toml:"default_session_keys"`
 }
