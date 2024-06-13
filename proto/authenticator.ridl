@@ -53,6 +53,13 @@ struct AuthEmailConfig
 struct AuthGuestConfig
   - enabled: bool
 
+struct AuthPlayfabConfig
+  - enabled: bool
+  - titleId?: string
+    + go.field.name = TitleID
+    + go.field.type = string
+    + go.tag.json = titleId,omitempty
+
 struct AuthConfig
   - email?: AuthEmailConfig
     + go.field.type = AuthEmailConfig
@@ -60,6 +67,9 @@ struct AuthConfig
   - guest?: AuthGuestConfig
     + go.field.type = AuthGuestConfig
     + go.tag.json = guest,omitempty
+  - playfab?: AuthPlayfabConfig
+    + go.field.type = AuthPlayfabConfig
+    + go.tag.json = playfab,omitempty
 
 struct Tenant
   - projectId: uint64
