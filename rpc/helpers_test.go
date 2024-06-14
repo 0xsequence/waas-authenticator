@@ -342,6 +342,11 @@ type walletServiceMock struct {
 	registeredSessions map[string]struct{}
 }
 
+func (w walletServiceMock) InitiateAuth(ctx context.Context, intent *proto_wallet.Intent, answer string, challenge string) (*proto_wallet.IntentResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (w walletServiceMock) InitiateEmailAuth(ctx context.Context, intent *proto_wallet.Intent, answerHash string, salt string) (*proto_wallet.IntentResponse, error) {
 	//TODO implement me
 	panic("implement me")

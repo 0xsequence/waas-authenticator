@@ -45,7 +45,7 @@ func (s *RPC) CreateTenant(
 	ctx context.Context,
 	projectID uint64,
 	waasAccessToken string,
-	emailEnabled bool,
+	authConfig *proto.AuthConfig,
 	oidcProviders []*proto.OpenIdProvider,
 	allowedOrigins []string,
 	password *string,
@@ -60,7 +60,14 @@ func (s *RPC) CreateTenant(
 		return nil, "", fmt.Errorf("tenant already exists")
 	}
 
-	tenantData := proto.TenantData{OIDCProviders: oidcProviders}
+	if authConfig == nil {
+		authConfig = &proto.AuthConfig{}
+	}
+
+	tenantData := proto.TenantData{
+		AuthConfig:    *authConfig,
+		OIDCProviders: oidcProviders,
+	}
 	for _, authProvider := range s.AuthProviders {
 		if err := authProvider.ValidateTenant(ctx, &tenantData); err != nil {
 			return nil, "", fmt.Errorf("invalid auth provider configuration: %w", err)
@@ -129,7 +136,7 @@ func (s *RPC) CreateTenant(
 		},
 		UpgradeCode:     upgradeCode,
 		WaasAccessToken: waasAccessToken,
-		EmailEnabled:    emailEnabled,
+		AuthConfig:      *authConfig,
 		OIDCProviders:   oidcProviders,
 		KMSKeys:         s.Config.KMS.DefaultSessionKeys,
 		AllowedOrigins:  origins,
@@ -163,9 +170,12 @@ func (s *RPC) CreateTenant(
 }
 
 func (s *RPC) UpdateTenant(
-	ctx context.Context, projectID uint64, upgradeCode string,
-	emailEnabled bool,
-	oidcProviders []*proto.OpenIdProvider, allowedOrigins []string,
+	ctx context.Context,
+	projectID uint64,
+	upgradeCode string,
+	authConfig *proto.AuthConfig,
+	oidcProviders []*proto.OpenIdProvider,
+	allowedOrigins []string,
 ) (*proto.Tenant, error) {
 	att := attestation.FromContext(ctx)
 
@@ -192,13 +202,14 @@ func (s *RPC) UpdateTenant(
 		return nil, fmt.Errorf("invalid allowedOrigins: %w", err)
 	}
 
-	tntData.EmailEnabled = emailEnabled
+	if authConfig != nil {
+		tntData.AuthConfig = *authConfig
+	}
 	tntData.OIDCProviders = oidcProviders
 	tntData.AllowedOrigins = origins
 
-	tenantData := proto.TenantData{OIDCProviders: oidcProviders}
 	for _, authProvider := range s.AuthProviders {
-		if err := authProvider.ValidateTenant(ctx, &tenantData); err != nil {
+		if err := authProvider.ValidateTenant(ctx, tntData); err != nil {
 			return nil, fmt.Errorf("invalid auth provider configuration: %w", err)
 		}
 	}

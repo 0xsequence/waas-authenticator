@@ -21,13 +21,13 @@ func (p tracedProvider) InitiateAuth(
 	ctx context.Context,
 	verifCtx *proto.VerificationContext,
 	verifier string,
-	intent *intents.Intent,
+	sessionID string,
 	storeFn StoreVerificationContextFn,
 ) (*intents.IntentResponseAuthInitiated, error) {
 	ctx, span := tracing.Span(ctx, p.name+".InitiateAuth")
 	defer span.End()
 
-	res, err := p.Provider.InitiateAuth(ctx, verifCtx, verifier, intent, storeFn)
+	res, err := p.Provider.InitiateAuth(ctx, verifCtx, verifier, sessionID, storeFn)
 	if err != nil {
 		span.RecordError(err)
 	}
