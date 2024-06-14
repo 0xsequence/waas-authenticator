@@ -64,20 +64,20 @@ func (s *RPC) RegisterSession(
 	}
 	dbVerifCtx, found, err := s.VerificationContexts.Get(ctx, authID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting auth session: %w", err)
+		return nil, nil, fmt.Errorf("getting verification context: %w", err)
 	}
 	if found && dbVerifCtx != nil {
 		verifCtx, _, err = crypto.DecryptData[*proto.VerificationContext](ctx, dbVerifCtx.EncryptedKey, dbVerifCtx.Ciphertext, tntData.KMSKeys)
 		if err != nil {
-			return nil, nil, fmt.Errorf("decrypting auth session data: %w", err)
+			return nil, nil, fmt.Errorf("decrypting verification context data: %w", err)
 		}
 
 		if time.Now().After(verifCtx.ExpiresAt) {
-			return nil, nil, fmt.Errorf("auth session expired")
+			return nil, nil, fmt.Errorf("verification context expired")
 		}
 
 		if !dbVerifCtx.CorrespondsTo(verifCtx) {
-			return nil, nil, fmt.Errorf("malformed auth session data")
+			return nil, nil, fmt.Errorf("malformed verification context data")
 		}
 	}
 
@@ -196,12 +196,18 @@ func (s *RPC) RegisterSession(
 	return retSess, convertIntentResponse(res), nil
 }
 
-func (s *RPC) initiateAuth(ctx context.Context, intent *intents.IntentTyped[intents.IntentDataInitiateAuth]) (*intents.IntentResponseAuthInitiated, error) {
+func (s *RPC) initiateAuth(
+	ctx context.Context, intent *intents.IntentTyped[intents.IntentDataInitiateAuth],
+) (*intents.IntentResponseAuthInitiated, error) {
 	tnt := tenant.FromContext(ctx)
 
 	authProvider, err := s.getAuthProvider(intent.Data.IdentityType)
 	if err != nil {
 		return nil, fmt.Errorf("get auth provider: %w", err)
+	}
+
+	if !authProvider.IsEnabled(tnt) {
+		return nil, fmt.Errorf("identity type %s is unavailable", intent.Data.IdentityType)
 	}
 
 	var verifCtx *proto.VerificationContext
@@ -210,19 +216,34 @@ func (s *RPC) initiateAuth(ctx context.Context, intent *intents.IntentTyped[inte
 		IdentityType: intent.Data.IdentityType,
 		Verifier:     intent.Data.Verifier,
 	}
-	authSess, found, err := s.VerificationContexts.Get(ctx, authID)
+	dbVerifCtx, found, err := s.VerificationContexts.Get(ctx, authID)
 	if err != nil {
-		return nil, fmt.Errorf("getting auth session: %w", err)
+		return nil, fmt.Errorf("getting verification context: %w", err)
 	}
-	if found && authSess != nil {
-		verifCtx, _, err = crypto.DecryptData[*proto.VerificationContext](ctx, authSess.EncryptedKey, authSess.Ciphertext, tnt.KMSKeys)
+	if found && dbVerifCtx != nil {
+		verifCtx, _, err = crypto.DecryptData[*proto.VerificationContext](
+			ctx, dbVerifCtx.EncryptedKey, dbVerifCtx.Ciphertext, tnt.KMSKeys,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("decrypting auth session data: %w", err)
+			return nil, fmt.Errorf("decrypting verification context data: %w", err)
 		}
 	}
 
 	storeSessFn := func(ctx context.Context, verifCtx *proto.VerificationContext) error {
 		att := attestation.FromContext(ctx)
+
+		answer, challenge := "", ""
+		if verifCtx.Answer != nil {
+			answer = *verifCtx.Answer
+		}
+		if verifCtx.Challenge != nil {
+			challenge = *verifCtx.Challenge
+		}
+
+		_, err = s.Wallets.InitiateAuth(waasapi.Context(ctx), waasapi.ConvertToAPIIntent(intent.ToIntent()), answer, challenge)
+		if err != nil {
+			return fmt.Errorf("initiating auth with WaaS API: %m", err)
+		}
 
 		encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tnt.KMSKeys[0], verifCtx)
 		if err != nil {
@@ -232,7 +253,7 @@ func (s *RPC) initiateAuth(ctx context.Context, intent *intents.IntentTyped[inte
 		dbVerifCtx := &data.VerificationContext{
 			ID: data.AuthID{
 				ProjectID:    tnt.ProjectID,
-				IdentityType: intents.IdentityType_Email,
+				IdentityType: intent.Data.IdentityType,
 				Verifier:     verifCtx.Verifier,
 			},
 			EncryptedKey: encryptedKey,
@@ -240,12 +261,12 @@ func (s *RPC) initiateAuth(ctx context.Context, intent *intents.IntentTyped[inte
 			Ciphertext:   ciphertext,
 		}
 		if err := s.VerificationContexts.Put(ctx, dbVerifCtx); err != nil {
-			return fmt.Errorf("putting auth session: %w", err)
+			return fmt.Errorf("putting verification context: %w", err)
 		}
 		return nil
 	}
 
-	return authProvider.InitiateAuth(ctx, verifCtx, intent.Data.Verifier, intent.ToIntent(), storeSessFn)
+	return authProvider.InitiateAuth(ctx, verifCtx, intent.Data.Verifier, intent.Signers()[0], storeSessFn)
 }
 
 func (s *RPC) dropSession(

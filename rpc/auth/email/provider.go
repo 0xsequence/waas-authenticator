@@ -14,32 +14,32 @@ import (
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/proto/builder"
-	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/auth"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
-	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
 )
 
 // AuthProvider is a Verifier that uses a secret code, delivered to user's email address, as the auth challenge.
 type AuthProvider struct {
 	Sender  Sender
-	Wallets proto_wallet.WaaS
 	Builder builder.Builder
 }
 
-func NewAuthProvider(sender Sender, wallets proto_wallet.WaaS, builder builder.Builder) auth.Provider {
+func NewAuthProvider(sender Sender, builder builder.Builder) auth.Provider {
 	return &AuthProvider{
 		Sender:  sender,
-		Wallets: wallets,
 		Builder: builder,
 	}
+}
+
+func (*AuthProvider) IsEnabled(tenant *proto.TenantData) bool {
+	return tenant.AuthConfig.Email.Enabled == true
 }
 
 // InitiateAuth for Email ignores any preexisting auth session data. Instead, if called multiple times, the auth session
 // is replaced. This allows the user to resend the verification code in case of issues. Note that this invalidates the
 // previous auth session - only the most recent one is stored and used in Verify.
-func (m *AuthProvider) InitiateAuth(
+func (p *AuthProvider) InitiateAuth(
 	ctx context.Context,
 	verifCtx *proto.VerificationContext,
 	verifier string,
@@ -90,11 +90,6 @@ func (m *AuthProvider) InitiateAuth(
 	serverAnswer := hexutil.Encode(ethcrypto.Keccak256([]byte(serverSalt + clientAnswer)))
 
 	// WaaS API is expected to store the answer and salt for later verification
-	_, err = m.Wallets.InitiateEmailAuth(waasapi.Context(ctx), waasapi.ConvertToAPIIntent(intent), serverAnswer, serverSalt)
-	if err != nil {
-		return nil, fmt.Errorf("initiating email auth with WaaS API: %m", err)
-	}
-
 	verifCtx = &proto.VerificationContext{
 		ProjectID:    tnt.ProjectID,
 		SessionID:    sessionID,
