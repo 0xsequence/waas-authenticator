@@ -284,13 +284,12 @@ func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config)
 		cfg.Builder.BaseURL,
 		builder.NewAuthenticatedClient(client, sm, cfg.Builder.SecretID),
 	)
-	waasClient := proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, client)
 	sender := email.NewSESSender(awsCfg, cfg.SES)
-	emailVerifier := email.NewAuthProvider(sender, waasClient, builderClient)
+	emailProvider := email.NewAuthProvider(sender, builderClient)
 
 	verifiers := map[intents.IdentityType]auth.Provider{
 		intents.IdentityType_None:  auth.NewTracedProvider("oidc.LegacyAuthProvider", legacyVerifier),
-		intents.IdentityType_Email: auth.NewTracedProvider("email.AuthProvider", emailVerifier),
+		intents.IdentityType_Email: auth.NewTracedProvider("email.AuthProvider", emailProvider),
 	}
 	return verifiers, nil
 }

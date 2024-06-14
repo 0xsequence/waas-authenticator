@@ -70,7 +70,7 @@ func TestRPC_CreateTenant(t *testing.T) {
 	allowedOrigins := []string{"http://localhost"}
 
 	t.Run("TenantAlreadyExists", func(t *testing.T) {
-		tnt, code, err := c.CreateTenant(ctx, tenant.ProjectID, "WAAS_ACCESS_TOKEN", false, validOidcProviders, allowedOrigins, nil)
+		tnt, code, err := c.CreateTenant(ctx, tenant.ProjectID, "WAAS_ACCESS_TOKEN", nil, validOidcProviders, allowedOrigins, nil)
 		assert.Nil(t, tnt)
 		assert.Empty(t, code)
 		assert.ErrorContains(t, err, "tenant already exists")
@@ -81,7 +81,7 @@ func TestRPC_CreateTenant(t *testing.T) {
 			{Issuer: issuer, Audience: audience},
 			{Issuer: "INVALID", Audience: audience},
 		}
-		tnt, code, err := c.CreateTenant(ctx, currentProjectID.Add(1), "WAAS_ACCESS_TOKEN", false, invalidOidcProviders, allowedOrigins, nil)
+		tnt, code, err := c.CreateTenant(ctx, currentProjectID.Add(1), "WAAS_ACCESS_TOKEN", nil, invalidOidcProviders, allowedOrigins, nil)
 		assert.Nil(t, tnt)
 		assert.Empty(t, code)
 		assert.ErrorContains(t, err, "invalid auth provider configuration")
@@ -89,7 +89,7 @@ func TestRPC_CreateTenant(t *testing.T) {
 
 	t.Run("InvalidOrigin", func(t *testing.T) {
 		invalidOrigins := []string{"localhost"}
-		tnt, code, err := c.CreateTenant(ctx, currentProjectID.Add(1), "WAAS_ACCESS_TOKEN", false, validOidcProviders, invalidOrigins, nil)
+		tnt, code, err := c.CreateTenant(ctx, currentProjectID.Add(1), "WAAS_ACCESS_TOKEN", nil, validOidcProviders, invalidOrigins, nil)
 		assert.Nil(t, tnt)
 		assert.Empty(t, code)
 		assert.ErrorContains(t, err, "invalid allowedOrigins")
@@ -97,7 +97,7 @@ func TestRPC_CreateTenant(t *testing.T) {
 
 	t.Run("InvalidPassword", func(t *testing.T) {
 		password := "Password123"
-		tnt, code, err := c.CreateTenant(ctx, currentProjectID.Add(1), "WAAS_ACCESS_TOKEN", false, validOidcProviders, allowedOrigins, &password)
+		tnt, code, err := c.CreateTenant(ctx, currentProjectID.Add(1), "WAAS_ACCESS_TOKEN", nil, validOidcProviders, allowedOrigins, &password)
 		assert.Nil(t, tnt)
 		assert.Empty(t, code)
 		assert.ErrorContains(t, err, "password must be at least 12 characters long")
@@ -105,7 +105,7 @@ func TestRPC_CreateTenant(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		projectID := currentProjectID.Add(1)
-		tnt, code, err := c.CreateTenant(ctx, projectID, "WAAS_ACCESS_TOKEN", false, validOidcProviders, allowedOrigins, nil)
+		tnt, code, err := c.CreateTenant(ctx, projectID, "WAAS_ACCESS_TOKEN", nil, validOidcProviders, allowedOrigins, nil)
 		require.NoError(t, err)
 		assert.NotEmpty(t, code)
 		assert.NotNil(t, tnt)
@@ -118,7 +118,7 @@ func TestRPC_CreateTenant(t *testing.T) {
 	t.Run("SuccessWithPassword", func(t *testing.T) {
 		projectID := currentProjectID.Add(1)
 		password := "Password1234"
-		tnt, code, err := c.CreateTenant(ctx, projectID, "WAAS_ACCESS_TOKEN", false, validOidcProviders, allowedOrigins, &password)
+		tnt, code, err := c.CreateTenant(ctx, projectID, "WAAS_ACCESS_TOKEN", nil, validOidcProviders, allowedOrigins, &password)
 		require.NoError(t, err)
 		assert.Equal(t, password, code)
 		assert.NotNil(t, tnt)

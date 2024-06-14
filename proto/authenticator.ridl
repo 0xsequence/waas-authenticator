@@ -47,6 +47,20 @@ struct OpenIdProvider
   - audience: []string
     + json = aud
 
+struct AuthEmailConfig
+  - enabled: bool
+
+struct AuthGuestConfig
+  - enabled: bool
+
+struct AuthConfig
+  - email?: AuthEmailConfig
+    + go.field.type = AuthEmailConfig
+    + go.tag.json = email,omitempty
+  - guest?: AuthGuestConfig
+    + go.field.type = AuthGuestConfig
+    + go.tag.json = guest,omitempty
+
 struct Tenant
   - projectId: uint64
     + go.field.name = ProjectID
@@ -78,8 +92,9 @@ struct TenantData
     + json = upgradeCode
   - waasAccessToken: string
     + json = waasAccessToken
-  - emailEnabled: bool
-    + json = emailEnabled
+  - authConfig: AuthConfig
+    + json = authConfig
+    + go.field.type = AuthConfig
   - oidcProviders: []OpenIdProvider
     + go.field.name = OIDCProviders
     + json = oidcProviders
@@ -176,5 +191,5 @@ service WaasAuthenticatorAdmin
     - Clock() => (serverTime: timestamp)
 
     - GetTenant(projectId: uint64) => (tenant: Tenant)
-    - CreateTenant(projectId: uint64, waasAccessToken: string, emailEnabled: bool, oidcProviders: []OpenIdProvider, allowedOrigins: []string, password?: string) => (tenant: Tenant, upgradeCode: string)
-    - UpdateTenant(projectId: uint64, upgradeCode: string, emailEnabled: bool, oidcProviders: []OpenIdProvider, allowedOrigins: []string) => (tenant: Tenant)
+    - CreateTenant(projectId: uint64, waasAccessToken: string, authConfig: AuthConfig, oidcProviders: []OpenIdProvider, allowedOrigins: []string, password?: string) => (tenant: Tenant, upgradeCode: string)
+    - UpdateTenant(projectId: uint64, upgradeCode: string, authConfig: AuthConfig, oidcProviders: []OpenIdProvider, allowedOrigins: []string) => (tenant: Tenant)
