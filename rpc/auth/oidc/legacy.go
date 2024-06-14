@@ -54,11 +54,11 @@ func NewLegacyAuthProvider(cacheBackend cachestore.Backend, client HTTPClient) (
 }
 
 // InitiateAuth returns an error in the legacy flow.
-func (v *LegacyAuthProvider) InitiateAuth(
+func (p *LegacyAuthProvider) InitiateAuth(
 	ctx context.Context,
 	verifCtx *proto.VerificationContext,
 	verifier string,
-	intent *intents.Intent,
+	sessionID string,
 	storeFn auth.StoreVerificationContextFn,
 ) (*intents.IntentResponseAuthInitiated, error) {
 	if verifCtx != nil {
@@ -67,7 +67,7 @@ func (v *LegacyAuthProvider) InitiateAuth(
 	return nil, fmt.Errorf("this identity type does not support initiateAuth")
 }
 
-func (v *LegacyAuthProvider) Verify(
+func (p *LegacyAuthProvider) Verify(
 	ctx context.Context, verifCtx *proto.VerificationContext, sessionID string, answer string,
 ) (ident proto.Identity, err error) {
 	if verifCtx != nil {
@@ -88,8 +88,8 @@ func (v *LegacyAuthProvider) Verify(
 	ks := &operationKeySet{
 		ctx:       ctx,
 		iss:       issuer,
-		store:     v.store,
-		getKeySet: v.GetKeySet,
+		store:     p.store,
+		getKeySet: p.GetKeySet,
 	}
 
 	if _, err := jws.Verify([]byte(answer), jws.WithKeySet(ks, jws.WithMultipleKeysPerKeyID(false))); err != nil {
@@ -117,7 +117,7 @@ func (v *LegacyAuthProvider) Verify(
 	return identity, nil
 }
 
-func (v *LegacyAuthProvider) ValidateTenant(ctx context.Context, tenant *proto.TenantData) error {
+func (p *LegacyAuthProvider) ValidateTenant(ctx context.Context, tenant *proto.TenantData) error {
 	var wg errgroup.Group
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -134,7 +134,7 @@ func (v *LegacyAuthProvider) ValidateTenant(ctx context.Context, tenant *proto.T
 		}
 
 		wg.Go(func() error {
-			if _, err := v.GetKeySet(ctx, provider.Issuer); err != nil {
+			if _, err := p.GetKeySet(ctx, provider.Issuer); err != nil {
 				return err
 			}
 			return nil
@@ -144,13 +144,13 @@ func (v *LegacyAuthProvider) ValidateTenant(ctx context.Context, tenant *proto.T
 	return wg.Wait()
 }
 
-func (v *LegacyAuthProvider) GetKeySet(ctx context.Context, issuer string) (set jwk.Set, err error) {
-	jwksURL, err := fetchJWKSURL(ctx, v.client, issuer)
+func (p *LegacyAuthProvider) GetKeySet(ctx context.Context, issuer string) (set jwk.Set, err error) {
+	jwksURL, err := fetchJWKSURL(ctx, p.client, issuer)
 	if err != nil {
 		return nil, fmt.Errorf("fetch issuer keys: %w", err)
 	}
 
-	keySet, err := jwk.Fetch(ctx, jwksURL, jwk.WithHTTPClient(tracing.WrapClientWithContext(ctx, v.client)))
+	keySet, err := jwk.Fetch(ctx, jwksURL, jwk.WithHTTPClient(tracing.WrapClientWithContext(ctx, p.client)))
 	if err != nil {
 		return nil, fmt.Errorf("fetch issuer keys: %w", err)
 	}

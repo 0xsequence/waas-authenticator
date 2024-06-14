@@ -43,18 +43,18 @@ func (m *AuthProvider) InitiateAuth(
 	ctx context.Context,
 	verifCtx *proto.VerificationContext,
 	verifier string,
-	intent *intents.Intent,
+	sessionID string,
 	storeFn auth.StoreVerificationContextFn,
 ) (*intents.IntentResponseAuthInitiated, error) {
 	att := attestation.FromContext(ctx)
 	tnt := tenant.FromContext(ctx)
 
 	// the verifier consists of the email address and sessionID separated by ';'
-	emailAddress, sessionID, err := m.extractVerifier(verifier)
+	emailAddress, expectedSessionID, err := p.extractVerifier(verifier)
 	if err != nil {
 		return nil, err
 	}
-	if sessionID != intent.Signers()[0] {
+	if sessionID != expectedSessionID {
 		return nil, fmt.Errorf("invalid session ID")
 	}
 
@@ -62,7 +62,7 @@ func (m *AuthProvider) InitiateAuth(
 
 	// Retrieve the email template from the Builder.
 	tplType := builder.EmailTemplateType_LOGIN
-	tpl, err := m.Builder.GetEmailTemplate(ctx, tnt.ProjectID, &tplType)
+	tpl, err := p.Builder.GetEmailTemplate(ctx, tnt.ProjectID, &tplType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build email template: %w", err)
 	}
@@ -97,7 +97,7 @@ func (m *AuthProvider) InitiateAuth(
 
 	verifCtx = &proto.VerificationContext{
 		ProjectID:    tnt.ProjectID,
-		SessionID:    intent.Signers()[0],
+		SessionID:    sessionID,
 		IdentityType: proto.IdentityType_Email,
 		Verifier:     verifier,
 		Challenge:    &serverSalt,   // the SERVER salt is a challenge in server's context
@@ -116,7 +116,7 @@ func (m *AuthProvider) InitiateAuth(
 		HTML:      strings.Replace(*tpl.Template, "{auth_code}", secretCode, 1),
 		Text:      tpl.IntroText + "\n\n" + secretCode,
 	}
-	if err := m.Sender.Send(ctx, msg); err != nil {
+	if err := p.Sender.Send(ctx, msg); err != nil {
 		return nil, fmt.Errorf("failed to send email: %w", err)
 	}
 
@@ -134,7 +134,7 @@ func (m *AuthProvider) InitiateAuth(
 // Verify requires the auth session to exist as it contains the challenge and final answer. The challenge (server salt)
 // from the auth session is combined with the client's answer and the resulting value compared with the final answer.
 // Verify returns the identity if this is successful.
-func (m *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationContext, sessionID string, answer string) (proto.Identity, error) {
+func (p *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationContext, sessionID string, answer string) (proto.Identity, error) {
 	if verifCtx == nil {
 		return proto.Identity{}, fmt.Errorf("auth session not found")
 	}
@@ -144,7 +144,7 @@ func (m *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationC
 	}
 
 	// the verifier consists of the email address and sessionID separated by ';'
-	emailAddress, verifierSessionID, err := m.extractVerifier(verifCtx.Verifier)
+	emailAddress, verifierSessionID, err := p.extractVerifier(verifCtx.Verifier)
 	if err != nil {
 		return proto.Identity{}, err
 	}
@@ -166,11 +166,11 @@ func (m *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationC
 }
 
 // ValidateTenant always succeeds as there are no email-specific settings to validate.
-func (m *AuthProvider) ValidateTenant(ctx context.Context, tenant *proto.TenantData) error {
+func (p *AuthProvider) ValidateTenant(ctx context.Context, tenant *proto.TenantData) error {
 	return nil
 }
 
-func (m *AuthProvider) extractVerifier(verifier string) (emailAddress string, sessionID string, err error) {
+func (p *AuthProvider) extractVerifier(verifier string) (emailAddress string, sessionID string, err error) {
 	parts := strings.SplitN(verifier, ";", 2)
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid verifier")
