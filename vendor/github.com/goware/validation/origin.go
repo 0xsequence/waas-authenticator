@@ -75,6 +75,14 @@ func (o Origin) Matches(origin string) bool {
 	return true
 }
 
+func (o Origin) Scheme() string {
+	parts := strings.Split(o.String(), "://")
+	if len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
+}
+
 func NewOrigins(s ...string) (Origins, error) {
 	origins := make(Origins, 0, len(s))
 	for _, origin := range s {
