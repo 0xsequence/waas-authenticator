@@ -4,14 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
+	"os"
+	"os/exec"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -25,84 +25,40 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc"
-	"github.com/0xsequence/waas-authenticator/rpc/auth"
-	"github.com/0xsequence/waas-authenticator/rpc/auth/oidc"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go-v2/service/kms"
-	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/goware/cachestore/memlru"
 	"github.com/goware/validation"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/localstack"
 )
 
-type testContextKeyType string
+var awsEndpoint string
 
-const testContextKey testContextKeyType = "TESTCTX"
-
-func testingMiddleware(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		values := make(map[string]string)
-		for k, vs := range r.Header {
-			if len(vs) > 0 {
-				values[strings.TrimPrefix(strings.ToLower(k), "-x-testctx-")] = vs[0]
-			}
-		}
-		ctx := context.WithValue(r.Context(), testContextKey, values)
-		handler.ServeHTTP(w, r.WithContext(ctx))
-	})
+func TestMain(m *testing.M) {
+	ep, terminate := initLocalstack()
+	defer terminate()
+	awsEndpoint = ep
+	code := m.Run()
+	os.Exit(code)
 }
 
-func getTestingCtxValue(ctx context.Context, k string) string {
-	values, ok := ctx.Value(testContextKey).(map[string]string)
-	if !ok || values == nil {
-		return ""
-	}
-	return values[strings.ToLower(k)]
-}
-
-func initRPC(cfg *config.Config, enc *enclave.Enclave, dbClient *dbMock) *rpc.RPC {
-	client := httpClient{}
-	cacheBackend := memlru.Backend(1024)
-	legacyProvider, err := oidc.NewLegacyAuthProvider(cacheBackend, client)
+func initRPC(t *testing.T) *rpc.RPC {
+	cfg := initConfig(t, awsEndpoint)
+	svc, err := rpc.New(cfg, &http.Client{Transport: &testTransport{RoundTripper: http.DefaultTransport}})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
-	svc := &rpc.RPC{
-		Config:               cfg,
-		HTTPClient:           client,
-		Enclave:              enc,
-		Wallets:              newWalletServiceMock(nil),
-		Tenants:              data.NewTenantTable(dbClient, "Tenants"),
-		Sessions:             data.NewSessionTable(dbClient, "Sessions", "UserID-Index"),
-		Accounts:             data.NewAccountTable(dbClient, "Accounts", data.AccountIndices{}),
-		VerificationContexts: data.NewVerificationContextTable(dbClient, "VerificationContexts"),
-		AuthProviders:        map[intents.IdentityType]auth.Provider{intents.IdentityType_None: legacyProvider},
-	}
+	svc.Wallets = newWalletServiceMock(nil)
 	return svc
-}
-
-func generateIntent(t *testing.T, name intents.IntentName, data any) *proto.Intent {
-	return &proto.Intent{
-		Version:    "1.0.0",
-		Name:       proto.IntentName(name),
-		ExpiresAt:  uint64(time.Now().Add(1 * time.Minute).Unix()),
-		IssuedAt:   uint64(time.Now().Unix()),
-		Data:       data,
-		Signatures: nil,
-	}
 }
 
 func generateSignedIntent(t *testing.T, name intents.IntentName, data any, session intents.Session) *proto.Intent {
 	intent := &intents.Intent{
 		Version:    "1.0.0",
-		Name:       intents.IntentName(name),
+		Name:       name,
 		ExpiresAt:  uint64(time.Now().Add(1 * time.Minute).Unix()),
 		IssuedAt:   uint64(time.Now().Unix()),
 		Data:       data,
@@ -126,39 +82,9 @@ func generateSignedIntent(t *testing.T, name intents.IntentName, data any, sessi
 	}
 }
 
-var (
-	testPrivateKey = `
------BEGIN RSA PRIVATE KEY-----
-MIIEpAIBAAKCAQEAwg8xlWTIwm44aLEqiA5lweHUSm2eeKwrTg3qEUhOVyGAo3eN
-XRoD9wOHzjcvS8r/qfQdSdLA9p6IbSxV9LU2fXgYnT3IDhNuQ1rVkiIYqWqPWUn2
-izUMJmbdVFRsgWi7/keXkslZD0DeKQM1R2QsCRZnPGHU3Jo/+2b6dTg8IRoBH2cq
-rAPuynqBXYCC9+wNdYMQLA5vdaVzhFBASIVkMDDWlMaFgdOsISMHy9Klm0cXj3RE
-02VsHcOQ1NRLY4Ddgpb5r0LUB0nfB4HMeK9plYqkkVF5BJihoGtGmebGuMqSFNgU
-XflrxH152bHAZqqV+aIPIy2y4IdaQgP1VJrVKwIDAQABAoIBAQCQhtJNyh6+t2np
-hrD/XYGpkPATcmqIwukJm9FMh8ZYnAn7NKmiwiJb0FRPX8gosYoRYE6D0aOGyPEg
-Jdnqgx+O+GeUjBO3b/85yKewyxYE7ujN/gjRCnP/EbMbADlDc+Y27cjUOILMmmoa
-r1n5zoABUJ8YWGA43+Rw7vPvYy9dEn1fbmsp850u/Grqdi0MUwIpQe9VKkVsYZ0n
-HKAz+uY9Mhb/CsveD75cHrpaa5Ilfjkzo47Gah/+E6LB3/5wRjlzNzLMAQT449PW
-yt2E/DYtVAR8uAtbfHB3cFcgNrWVg9IwU1G74SwqqwgQfpfEqKqsqG9BBXz0vwLT
-o3vczVWZAoGBANJbz5+1XRlblmDV8MnVGoaHoylIA6+xE5iTiAUtopxfh3lMgTAh
-sIepf7na0nkNPXFrR48Tkm29Y4f8EU2LY0a1t9WyAyufz9UTA4ABlHCuKztSqpG7
-SgGEQvr/bAE61uN7JwVXGUICAR27OVfy7+iIOCzFDaOwhyfrE2XuP82VAoGBAOwq
-DYedgoxuV63BWYDtvUt4olQbBCczJKyDirTGGdiPyQbsfE5eegcfZYxRkiCJ0Z5z
-9OQlafIrok93kwkWgta2dj3onbXKLUviyGMSW1kGXoaTZu47rTZ7nxhqS5QeySGl
-sHs/8j3+2UPHnwvLMlrMAOhIFQYrlFeQkxvIw+e/AoGAZh2Xjon2JccmGuAAQZon
-hEL326RP1cv6HUkQ8KKUm6BsHWAcHodcMJ8Bl/E31vesahCP7k6r+IXFeU/N/ny5
-tqukECKYE2dC9saCHnOl4YVLC0M39gKbDF1uPnYbsgUkJ82yxY7gfgCHFi26yozu
-FU17J5CI7HtXQPOGuSaM5nkCgYEAqI4PIAbMYVxz2cDRF9MWsuIDwdGSckPvXe14
-tzNYyRc+nGF3CxwlLiY7fR3PFMgow1XxqFAHwN9htiQa3nahpYuO8vqubUxCbhIL
-gaJdbjm8h4J3CXuwUd2DnJJpJOugFBLE1gK664KUIOs92dYKN4G4+BBSaRf7hU/b
-nw34vNMCgYBfG/VbQXT1WCcJgVycnU1hX7zmyzB/hk0xkmLR0nUzTgXMKOKUUXgX
-2mD7U5VGZPYj7t8P+bz6/HEZqKmOoxFkXpsMPug34ZUWfjv3uCm7CFHtxA+BDT+5
-cJEGAbCDYhyjvtjBLNy7YDQ1hdmCnqMxg/5AIwUMkvTTRg+qepfboA==
------END RSA PRIVATE KEY-----`
-)
-
-func initConfig(t *testing.T) *config.Config {
+func initConfig(t *testing.T, awsEndpoint string) *config.Config {
 	return &config.Config{
+		Region: "us-east-1",
 		Admin: config.AdminConfig{
 			PublicKey: `-----BEGIN RSA PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAz+WUoYyHdSNN802C9q3Z
@@ -170,8 +96,18 @@ O/1N3VmFauveH6CaYZ1uiBvwsNUiKczJWlPloDRNO/HKsH1gF/EqfF9ObU1WGP3A
 QwIDAQAB
 -----END RSA PUBLIC KEY-----`,
 		},
+		Database: config.DatabaseConfig{
+			TenantsTable:              "TenantsTable",
+			AccountsTable:             "AccountsTable",
+			SessionsTable:             "SessionsTable",
+			VerificationContextsTable: "VerificationContextsTable",
+		},
 		KMS: config.KMSConfig{
-			TenantKeys: []string{"TenantKey"},
+			TenantKeys:         []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
+			DefaultSessionKeys: []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
+		},
+		Endpoints: config.EndpointsConfig{
+			AWSEndpoint: awsEndpoint,
 		},
 	}
 }
@@ -225,264 +161,52 @@ func issueAccessTokenAndRunJwksServer(t *testing.T, optTokenBuilderFn ...func(*j
 	return jwksServer.URL, string(tokBytes), jwksServer.Close
 }
 
-type kmsMock struct {
-	random io.Reader
+func initLocalstack() (string, func()) {
+	ctx := context.Background()
+	lc, err := localstack.RunContainer(context.Background(),
+		testcontainers.WithImage("localstack/localstack:3.4"),
+	)
+	if err != nil {
+		panic(err)
+	}
+	terminate := func() {
+		lc.Terminate(context.Background())
+	}
+
+	mappedPort, err := lc.MappedPort(ctx, "4566/tcp")
+	if err != nil {
+		terminate()
+		panic(err)
+	}
+
+	provider, err := testcontainers.NewDockerProvider()
+	if err != nil {
+		terminate()
+		panic(err)
+	}
+	defer provider.Close()
+
+	host, err := provider.DaemonHost(ctx)
+	if err != nil {
+		terminate()
+		panic(err)
+	}
+
+	endpoint := fmt.Sprintf("http://%s:%d", host, mappedPort.Int())
+
+	// TODO: mount this as volume and let localstack take care of execution
+	cmd := exec.Command("/bin/bash", "../docker/awslocal_ready_hook.sh")
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LOCALSTACK_ENDPOINT=%s", endpoint))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		terminate()
+		panic(fmt.Sprintf("%s: %s", err, out))
+	}
+
+	return endpoint, terminate
 }
 
-func (m *kmsMock) Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error) {
-	out := &kms.DecryptOutput{
-		EncryptionAlgorithm: kmstypes.EncryptionAlgorithmSpecSymmetricDefault,
-		KeyId:               aws.String("TenantKey"),
-	}
-
-	switch string(params.CiphertextBlob) {
-	case "CiphertextForTenantKey":
-		out.KeyId = aws.String("TenantKey")
-	case "CiphertextForSessionKey":
-		out.KeyId = aws.String("SessionKey")
-	default:
-		return nil, fmt.Errorf("invalid CiphertextBlob: %s", string(params.CiphertextBlob))
-	}
-
-	out.Plaintext, _ = base64.StdEncoding.DecodeString("RabEAhmjV3thObgGLjhJoza2jVDU0x4E8qHSL5MpsL4=")
-	return out, nil
-}
-
-func (m *kmsMock) GenerateDataKey(ctx context.Context, params *kms.GenerateDataKeyInput, optFns ...func(*kms.Options)) (*kms.GenerateDataKeyOutput, error) {
-	if params.KeyId == nil {
-		return nil, fmt.Errorf("KeyId cannot be nil")
-	}
-	out := &kms.GenerateDataKeyOutput{KeyId: params.KeyId}
-
-	switch *params.KeyId {
-	case "TenantKey":
-		out.CiphertextBlob = []byte("CiphertextForTenantKey")
-	case "SessionKey":
-		out.CiphertextBlob = []byte("CiphertextForSessionKey")
-	default:
-		return out, fmt.Errorf("invalid KeyId: %s", *params.KeyId)
-	}
-	out.Plaintext, _ = base64.StdEncoding.DecodeString("RabEAhmjV3thObgGLjhJoza2jVDU0x4E8qHSL5MpsL4=")
-	return out, nil
-}
-
-type dbMock struct {
-	tenants       map[uint64][]*data.Tenant
-	sessions      map[string]*data.Session
-	accounts      map[uint64]map[string]*data.Account
-	verifContexts map[string]*data.VerificationContext
-}
-
-func (d *dbMock) DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
-	if params.TableName == nil {
-		return nil, fmt.Errorf("empty TableName")
-	}
-
-	switch *params.TableName {
-	case "Sessions":
-		idParam, ok := params.Key["ID"]
-		if !ok {
-			return nil, fmt.Errorf("must include an ID key")
-		}
-		idAttr, ok := idParam.(*dynamodbtypes.AttributeValueMemberS)
-		if !ok {
-			return nil, fmt.Errorf("ID key must be of type S")
-		}
-		if _, ok := d.sessions[idAttr.Value]; !ok {
-			return nil, fmt.Errorf("session does not exist")
-		}
-
-		delete(d.sessions, idAttr.Value)
-
-		out := &dynamodb.DeleteItemOutput{}
-		return out, nil
-	}
-
-	return nil, fmt.Errorf("invalid TableName: %q", *params.TableName)
-}
-
-func (d *dbMock) GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
-	if params.TableName == nil {
-		return nil, fmt.Errorf("empty TableName")
-	}
-
-	switch *params.TableName {
-	case "Sessions":
-		id, err := getDynamoAttribute[*dynamodbtypes.AttributeValueMemberS](params.Key, "ID")
-		if err != nil {
-			return nil, err
-		}
-		out := &dynamodb.GetItemOutput{}
-		sess := d.sessions[id.Value]
-		out.Item, err = attributevalue.MarshalMap(sess)
-		if err != nil {
-			return nil, err
-		}
-		return out, nil
-	case "Accounts":
-		projectAttr, err := getDynamoAttribute[*dynamodbtypes.AttributeValueMemberN](params.Key, "ProjectID")
-		if err != nil {
-			return nil, err
-		}
-		projectID, err := strconv.Atoi(projectAttr.Value)
-		if err != nil {
-			return nil, err
-		}
-		identity, err := getDynamoAttribute[*dynamodbtypes.AttributeValueMemberS](params.Key, "Identity")
-		if err != nil {
-			return nil, err
-		}
-		out := &dynamodb.GetItemOutput{}
-		projectAccounts, ok := d.accounts[uint64(projectID)]
-		if !ok {
-			return out, nil
-		}
-		acc, ok := projectAccounts[identity.Value]
-		if !ok {
-			return out, nil
-		}
-		out.Item, err = attributevalue.MarshalMap(acc)
-		if err != nil {
-			return nil, err
-		}
-		return out, nil
-	case "VerificationContexts":
-		id, err := getDynamoAttribute[*dynamodbtypes.AttributeValueMemberS](params.Key, "ID")
-		if err != nil {
-			return nil, err
-		}
-		out := &dynamodb.GetItemOutput{}
-		verifCtx := d.verifContexts[id.Value]
-		out.Item, err = attributevalue.MarshalMap(verifCtx)
-		if err != nil {
-			return nil, err
-		}
-		return out, nil
-	}
-
-	return nil, fmt.Errorf("invalid TableName: %q", *params.TableName)
-}
-
-func (d *dbMock) PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
-	if params.TableName == nil {
-		return nil, fmt.Errorf("empty TableName")
-	}
-
-	switch *params.TableName {
-	case "Sessions":
-		var sess data.Session
-		if err := attributevalue.UnmarshalMap(params.Item, &sess); err != nil {
-			return nil, err
-		}
-		d.sessions[sess.ID] = &sess
-		return nil, nil
-	case "Tenants":
-		var tnt data.Tenant
-		if err := attributevalue.UnmarshalMap(params.Item, &tnt); err != nil {
-			return nil, err
-		}
-		d.tenants[tnt.ProjectID] = []*data.Tenant{&tnt}
-		return nil, nil
-	case "Accounts":
-		var acc data.Account
-		if err := attributevalue.UnmarshalMap(params.Item, &acc); err != nil {
-			return nil, err
-		}
-		if _, ok := d.accounts[acc.ProjectID]; !ok {
-			d.accounts[acc.ProjectID] = make(map[string]*data.Account)
-		}
-		d.accounts[acc.ProjectID][acc.Identity.String()] = &acc
-		return nil, nil
-	}
-
-	return nil, fmt.Errorf("invalid TableName: %q", *params.TableName)
-}
-
-func (d *dbMock) Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
-	if params.TableName == nil {
-		return nil, fmt.Errorf("empty TableName")
-	}
-
-	switch *params.TableName {
-	case "Sessions":
-		userID, err := getDynamoAttribute[*dynamodbtypes.AttributeValueMemberS](params.ExpressionAttributeValues, ":userID")
-		if err != nil {
-			return nil, err
-		}
-
-		out := &dynamodb.QueryOutput{Items: make([]map[string]dynamodbtypes.AttributeValue, 0)}
-		for _, sess := range d.sessions {
-			if sess.UserID != userID.Value {
-				continue
-			}
-			item, err := attributevalue.MarshalMap(sess)
-			if err != nil {
-				return nil, err
-			}
-			out.Items = append(out.Items, item)
-		}
-		return out, nil
-	case "Tenants":
-		idParam, ok := params.ExpressionAttributeValues[":id"]
-		if !ok {
-			return nil, fmt.Errorf("must include an :id expression attribute")
-		}
-		idAttr, ok := idParam.(*dynamodbtypes.AttributeValueMemberN)
-		if !ok {
-			return nil, fmt.Errorf("ProjectID key must be of type N")
-		}
-
-		idInt, _ := strconv.Atoi(idAttr.Value)
-		versions, ok := d.tenants[uint64(idInt)]
-		if !ok || len(versions) == 0 {
-			return &dynamodb.QueryOutput{Items: nil}, nil
-		}
-
-		tnt := versions[len(versions)-1]
-		item, err := attributevalue.MarshalMap(tnt)
-		if err != nil {
-			return nil, err
-		}
-		out := &dynamodb.QueryOutput{Items: []map[string]dynamodbtypes.AttributeValue{item}}
-		return out, nil
-	case "Accounts":
-		pseParam, ok := params.ExpressionAttributeValues[":pse"]
-		if !ok {
-			return nil, fmt.Errorf("must include a :pse expression attribute")
-		}
-		pseParts := strings.Split(pseParam.(*dynamodbtypes.AttributeValueMemberS).Value, "|")
-		projectID, _ := strconv.Atoi(pseParts[0])
-		email := pseParts[1]
-
-		projectAccounts := d.accounts[uint64(projectID)]
-		out := &dynamodb.QueryOutput{Items: []map[string]dynamodbtypes.AttributeValue{}}
-		for _, acc := range projectAccounts {
-			if acc.Email == email {
-				item, err := attributevalue.MarshalMap(acc)
-				if err != nil {
-					return nil, err
-				}
-				out.Items = append(out.Items, item)
-			}
-		}
-		return out, nil
-	}
-
-	return nil, fmt.Errorf("invalid TableName: %q", *params.TableName)
-}
-
-func getDynamoAttribute[T dynamodbtypes.AttributeValue](attrVals map[string]dynamodbtypes.AttributeValue, name string) (T, error) {
-	var zero T
-	attr, ok := attrVals[name]
-	if !ok {
-		return zero, fmt.Errorf("must include key: %s", name)
-	}
-	value, ok := attr.(T)
-	if !ok {
-		return zero, fmt.Errorf("ID key must be of type %T", *new(T))
-	}
-	return value, nil
-}
+var currentProjectID atomic.Uint64
 
 func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant, *proto.TenantData) {
 	att, err := enc.GetAttestation(context.Background(), nil)
@@ -491,9 +215,11 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 	wallet, err := ethwallet.NewWalletFromRandomEntropy()
 	require.NoError(t, err)
 
+	projectID := currentProjectID.Add(1)
+
 	userSalt, _ := hexutil.Decode("0xa176de7902ef0781d2c6120cc5fd5add3048e1543f597ef4feae38391d234839")
 	payload := &proto.TenantData{
-		ProjectID:     1,
+		ProjectID:     projectID,
 		PrivateKey:    wallet.PrivateKeyHex()[2:],
 		ParentAddress: common.HexToAddress("0xcF104bc904E4dC1cCe0027aB9F9C905Ad3aE6c21"),
 		UserSalt:      userSalt,
@@ -508,14 +234,14 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 			{Issuer: "https://" + strings.TrimPrefix(issuer, "http://"), Audience: []string{"audience"}},
 		},
 		AllowedOrigins: validation.Origins{"http://localhost"},
-		KMSKeys:        []string{"SessionKey"},
+		KMSKeys:        []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
 	}
 
-	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "TenantKey", payload)
+	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79", payload)
 	require.NoError(t, err)
 
 	return &data.Tenant{
-		ProjectID:    1,
+		ProjectID:    projectID,
 		Version:      1,
 		EncryptedKey: encryptedKey,
 		Algorithm:    algorithm,
@@ -524,7 +250,7 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 	}, payload
 }
 
-func newAccount(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwallet.Wallet) *data.Account {
+func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, issuer string, wallet *ethwallet.Wallet) *data.Account {
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
 
@@ -539,21 +265,21 @@ func newAccount(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwa
 		Subject: "SUBJECT",
 	}
 	payload := &proto.AccountData{
-		ProjectID: 1,
+		ProjectID: tnt.ProjectID,
 		UserID:    fmt.Sprintf("%d|%s", 1, wallet.Address()),
 		Identity:  identity.String(),
 		CreatedAt: time.Now(),
 	}
 
-	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "SessionKey", payload)
+	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79", payload)
 	require.NoError(t, err)
 
 	return &data.Account{
-		ProjectID:          1,
+		ProjectID:          tnt.ProjectID,
 		Identity:           data.Identity(identity),
 		UserID:             payload.UserID,
 		Email:              "user@example.com",
-		ProjectScopedEmail: "1|user@example.com",
+		ProjectScopedEmail: fmt.Sprintf("%d|user@example.com", tnt.ProjectID),
 		EncryptedKey:       encryptedKey,
 		Algorithm:          algorithm,
 		Ciphertext:         ciphertext,
@@ -562,19 +288,19 @@ func newAccount(t *testing.T, enc *enclave.Enclave, issuer string, wallet *ethwa
 
 }
 
-func newSessionFromData(t *testing.T, enc *enclave.Enclave, payload *proto.SessionData) *data.Session {
+func newSessionFromData(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, payload *proto.SessionData) *data.Session {
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
 
 	var identity proto.Identity
 	require.NoError(t, identity.FromString(payload.Identity))
 
-	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "SessionKey", payload)
+	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79", payload)
 	require.NoError(t, err)
 
 	return &data.Session{
 		ID:           payload.ID,
-		ProjectID:    1,
+		ProjectID:    tnt.ProjectID,
 		UserID:       payload.UserID,
 		Identity:     payload.Identity,
 		FriendlyName: "FriendlyName",
@@ -586,7 +312,7 @@ func newSessionFromData(t *testing.T, enc *enclave.Enclave, payload *proto.Sessi
 	}
 }
 
-func newSession(t *testing.T, enc *enclave.Enclave, issuer string, signingSession intents.Session) *data.Session {
+func newSession(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, issuer string, signingSession intents.Session) *data.Session {
 	if signingSession == nil {
 		var err error
 		wallet, err := ethwallet.NewWalletFromRandomEntropy()
@@ -601,14 +327,14 @@ func newSession(t *testing.T, enc *enclave.Enclave, issuer string, signingSessio
 	}
 	payload := &proto.SessionData{
 		ID:        signingSession.SessionID(),
-		ProjectID: 1,
-		UserID:    "1|USER",
+		ProjectID: tnt.ProjectID,
+		UserID:    fmt.Sprintf("%d|%s", tnt.ProjectID, signingSession.SessionID()),
 		Identity:  identity.String(),
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
 
-	return newSessionFromData(t, enc, payload)
+	return newSessionFromData(t, tnt, enc, payload)
 }
 
 type walletServiceMock struct {
@@ -829,18 +555,13 @@ func (w walletServiceMock) FinishValidateSession(ctx context.Context, sessionId 
 
 var _ proto_wallet.WaaS = (*walletServiceMock)(nil)
 
-type httpClient struct{}
+type testTransport struct {
+	http.RoundTripper
+}
 
-func (httpClient) Do(req *http.Request) (*http.Response, error) {
+func (tt testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.URL.Scheme = "http"
-	return http.DefaultClient.Do(req)
+	return tt.RoundTripper.RoundTrip(req)
 }
 
-func (httpClient) Get(s string) (*http.Response, error) {
-	if strings.HasPrefix(s, "https://") {
-		s = "http://" + strings.TrimPrefix(s, "https://")
-	}
-	return http.DefaultClient.Get(s)
-}
-
-var _ rpc.HTTPClient = (*httpClient)(nil)
+var _ http.RoundTripper = (*testTransport)(nil)
