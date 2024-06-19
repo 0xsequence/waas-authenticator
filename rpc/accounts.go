@@ -63,6 +63,10 @@ func (s *RPC) federateAccount(
 		return nil, fmt.Errorf("get auth provider: %w", err)
 	}
 
+	if intent.Data.IdentityType == intents.IdentityType_Guest {
+		return nil, fmt.Errorf("cannot federate a guest account")
+	}
+
 	var verifCtx *proto.VerificationContext
 	authID := data.AuthID{
 		ProjectID:    tntData.ProjectID,
