@@ -250,6 +250,49 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 	}, payload
 }
 
+func newGuestTenant(t *testing.T, enc *enclave.Enclave) (*data.Tenant, *proto.TenantData) {
+	att, err := enc.GetAttestation(context.Background(), nil)
+	require.NoError(t, err)
+
+	wallet, err := ethwallet.NewWalletFromRandomEntropy()
+	require.NoError(t, err)
+
+	projectID := currentProjectID.Add(1)
+
+	userSalt, _ := hexutil.Decode("0xa176de7902ef0781d2c6120cc5fd5add3048e1543f597ef4feae38391d234839")
+	payload := &proto.TenantData{
+		ProjectID:     projectID,
+		PrivateKey:    wallet.PrivateKeyHex()[2:],
+		ParentAddress: common.HexToAddress("0xcF104bc904E4dC1cCe0027aB9F9C905Ad3aE6c21"),
+		UserSalt:      userSalt,
+		SequenceContext: &proto.MiniSequenceContext{
+			Factory:    "0xFaA5c0b14d1bED5C888Ca655B9a8A5911F78eF4A",
+			MainModule: "0xfBf8f1A5E00034762D928f46d438B947f5d4065d",
+		},
+		UpgradeCode:     "CHANGEME",
+		WaasAccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVyX2lkIjozfQ.g2fWwLrKPhTUpLFc7ZM9pMm4kEHGu8haCMzMOOGiqSM",
+		AllowedOrigins:  validation.Origins{"http://localhost"},
+		AuthConfig: proto.AuthConfig{
+			Guest: proto.AuthGuestConfig{
+				Enabled: true,
+			},
+		},
+		KMSKeys: []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
+	}
+
+	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79", payload)
+	require.NoError(t, err)
+
+	return &data.Tenant{
+		ProjectID:    projectID,
+		Version:      1,
+		EncryptedKey: encryptedKey,
+		Algorithm:    algorithm,
+		Ciphertext:   ciphertext,
+		CreatedAt:    time.Now(),
+	}, payload
+}
+
 func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, issuer string, wallet *ethwallet.Wallet) *data.Account {
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
@@ -343,8 +386,7 @@ type walletServiceMock struct {
 }
 
 func (w walletServiceMock) InitiateAuth(ctx context.Context, intent *proto_wallet.Intent, answer string, challenge string) (*proto_wallet.IntentResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, nil
 }
 
 func (w walletServiceMock) InitiateEmailAuth(ctx context.Context, intent *proto_wallet.Intent, answerHash string, salt string) (*proto_wallet.IntentResponse, error) {
@@ -522,7 +564,7 @@ func (w *walletServiceMock) RegisterSession(ctx context.Context, userID string, 
 	w.registeredUsers[userID] = struct{}{}
 
 	return &proto_wallet.IntentResponse{
-		Code: "openedSession",
+		Code: string(proto.IntentResponseCode_sessionOpened),
 	}, nil
 }
 

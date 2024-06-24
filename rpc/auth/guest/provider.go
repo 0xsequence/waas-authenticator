@@ -74,7 +74,7 @@ func (p AuthProvider) InitiateAuth(
 	res := &intents.IntentResponseAuthInitiated{
 		SessionID:    verifCtx.SessionID,
 		IdentityType: intents.IdentityType_Guest,
-		ExpiresIn:    int(time.Now().Sub(verifCtx.ExpiresAt).Seconds()),
+		ExpiresIn:    int(verifCtx.ExpiresAt.Sub(time.Now()).Seconds()),
 		Challenge:    &clientSalt, // the CLIENT salt is a challenge in client's context
 	}
 	return res, nil
