@@ -45,9 +45,13 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func initRPC(t *testing.T) *rpc.RPC {
+func initRPC(t *testing.T, optClient ...*http.Client) *rpc.RPC {
 	cfg := initConfig(t, awsEndpoint)
-	svc, err := rpc.New(cfg, &http.Client{Transport: &testTransport{RoundTripper: http.DefaultTransport}})
+	client := &http.Client{Transport: &testTransport{RoundTripper: http.DefaultTransport}}
+	if len(optClient) > 0 {
+		client = optClient[0]
+	}
+	svc, err := rpc.New(cfg, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +254,7 @@ func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant,
 	}, payload
 }
 
-func newGuestTenant(t *testing.T, enc *enclave.Enclave) (*data.Tenant, *proto.TenantData) {
+func newTenantWithAuthConfig(t *testing.T, enc *enclave.Enclave, authCfg proto.AuthConfig) (*data.Tenant, *proto.TenantData) {
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
 
@@ -272,12 +276,8 @@ func newGuestTenant(t *testing.T, enc *enclave.Enclave) (*data.Tenant, *proto.Te
 		UpgradeCode:     "CHANGEME",
 		WaasAccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVyX2lkIjozfQ.g2fWwLrKPhTUpLFc7ZM9pMm4kEHGu8haCMzMOOGiqSM",
 		AllowedOrigins:  validation.Origins{"http://localhost"},
-		AuthConfig: proto.AuthConfig{
-			Guest: proto.AuthGuestConfig{
-				Enabled: true,
-			},
-		},
-		KMSKeys: []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
+		AuthConfig:      authCfg,
+		KMSKeys:         []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
 	}
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79", payload)
@@ -604,10 +604,16 @@ var _ proto_wallet.WaaS = (*walletServiceMock)(nil)
 
 type testTransport struct {
 	http.RoundTripper
+	modifyRequest func(req *http.Request)
 }
 
 func (tt testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.URL.Scheme = "http"
+
+	if tt.modifyRequest != nil {
+		tt.modifyRequest(req)
+	}
+
 	return tt.RoundTripper.RoundTrip(req)
 }
 
