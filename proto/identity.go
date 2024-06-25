@@ -7,6 +7,8 @@ import (
 
 func (id Identity) String() string {
 	switch id.Type {
+	case IdentityType_Guest:
+		return string(id.Type) + ":" + id.Subject
 	case IdentityType_OIDC:
 		return string(id.Type) + ":" + id.Issuer + "#" + id.Subject
 	case IdentityType_Email:
@@ -23,6 +25,10 @@ func (id *Identity) FromString(s string) error {
 	}
 
 	switch IdentityType(parts[0]) {
+	case IdentityType_Guest:
+		id.Type = IdentityType_Guest
+		id.Subject = parts[1]
+
 	case IdentityType_OIDC:
 		oidcParts := strings.SplitN(parts[1], "#", 2)
 		if len(oidcParts) != 2 {

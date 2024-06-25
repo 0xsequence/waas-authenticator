@@ -20,6 +20,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/auth"
 	"github.com/0xsequence/waas-authenticator/rpc/auth/email"
+	"github.com/0xsequence/waas-authenticator/rpc/auth/guest"
 	"github.com/0xsequence/waas-authenticator/rpc/auth/oidc"
 	"github.com/0xsequence/waas-authenticator/rpc/awscreds"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
@@ -278,6 +279,10 @@ func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config)
 	if err != nil {
 		return nil, err
 	}
+	oidcProvider, err := oidc.NewAuthProvider(cacheBackend, client)
+	if err != nil {
+		return nil, err
+	}
 
 	sm := secretsmanager.NewFromConfig(awsCfg)
 	builderClient := builder.NewBuilderClient(
@@ -286,10 +291,13 @@ func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config)
 	)
 	sender := email.NewSESSender(awsCfg, cfg.SES)
 	emailProvider := email.NewAuthProvider(sender, builderClient)
+	guestProvider := guest.NewAuthProvider()
 
 	verifiers := map[intents.IdentityType]auth.Provider{
 		intents.IdentityType_None:  auth.NewTracedProvider("oidc.LegacyAuthProvider", legacyVerifier),
 		intents.IdentityType_Email: auth.NewTracedProvider("email.AuthProvider", emailProvider),
+		intents.IdentityType_OIDC:  auth.NewTracedProvider("oidc.AuthProvider", oidcProvider),
+		intents.IdentityType_Guest: auth.NewTracedProvider("guest.AuthProvider", guestProvider),
 	}
 	return verifiers, nil
 }
