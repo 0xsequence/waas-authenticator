@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -23,6 +22,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/config"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
+	"github.com/0xsequence/waas-authenticator/proto/builder"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 var awsEndpoint string
@@ -45,12 +46,26 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func initRPC(t *testing.T, optClient ...*http.Client) *rpc.RPC {
+func initRPC(t *testing.T, options ...func(*config.Config)) *rpc.RPC {
 	cfg := initConfig(t, awsEndpoint)
-	client := &http.Client{Transport: &testTransport{RoundTripper: http.DefaultTransport}}
-	if len(optClient) > 0 {
-		client = optClient[0]
+	for _, opt := range options {
+		opt(cfg)
 	}
+
+	svc, err := rpc.New(cfg, &http.Client{Transport: &testTransport{RoundTripper: http.DefaultTransport}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.Wallets = newWalletServiceMock(nil)
+	return svc
+}
+
+func initRPCWithClient(t *testing.T, client *http.Client, options ...func(*config.Config)) *rpc.RPC {
+	cfg := initConfig(t, awsEndpoint)
+	for _, opt := range options {
+		opt(cfg)
+	}
+
 	svc, err := rpc.New(cfg, client)
 	if err != nil {
 		t.Fatal(err)
@@ -113,6 +128,12 @@ QwIDAQAB
 		Endpoints: config.EndpointsConfig{
 			AWSEndpoint: awsEndpoint,
 		},
+		Builder: config.BuilderConfig{
+			SecretID: "BuilderJWT",
+		},
+		SES: config.SESConfig{
+			Source: "noreply@local.auth.sequence.app",
+		},
 	}
 }
 
@@ -169,6 +190,21 @@ func initLocalstack() (string, func()) {
 	ctx := context.Background()
 	lc, err := localstack.RunContainer(context.Background(),
 		testcontainers.WithImage("localstack/localstack:3.4"),
+		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				WaitingFor: wait.ForAll(
+					wait.ForHTTP("/_localstack/health").WithPort("4566/tcp"),
+					wait.ForLog("Finished bootstrapping localstack resources!"),
+				).WithDeadline(60 * time.Second),
+				Files: []testcontainers.ContainerFile{
+					{
+						HostFilePath:      "../docker/awslocal_ready_hook.sh",
+						ContainerFilePath: "/etc/localstack/init/ready.d/awslocal_ready_hook.sh",
+						FileMode:          0777,
+					},
+				},
+			},
+		}),
 	)
 	if err != nil {
 		panic(err)
@@ -197,16 +233,6 @@ func initLocalstack() (string, func()) {
 	}
 
 	endpoint := fmt.Sprintf("http://%s:%d", host, mappedPort.Int())
-
-	// TODO: mount this as volume and let localstack take care of execution
-	cmd := exec.Command("/bin/bash", "../docker/awslocal_ready_hook.sh")
-	cmd.Env = append(os.Environ(), fmt.Sprintf("LOCALSTACK_ENDPOINT=%s", endpoint))
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		terminate()
-		panic(fmt.Sprintf("%s: %s", err, out))
-	}
-
 	return endpoint, terminate
 }
 
@@ -293,7 +319,7 @@ func newTenantWithAuthConfig(t *testing.T, enc *enclave.Enclave, authCfg proto.A
 	}, payload
 }
 
-func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, issuer string, wallet *ethwallet.Wallet) *data.Account {
+func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, identity proto.Identity, wallet *ethwallet.Wallet) *data.Account {
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
 
@@ -302,11 +328,6 @@ func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, issuer str
 		require.NoError(t, err)
 	}
 
-	identity := proto.Identity{
-		Type:    proto.IdentityType_OIDC,
-		Issuer:  issuer,
-		Subject: "SUBJECT",
-	}
 	payload := &proto.AccountData{
 		ProjectID: tnt.ProjectID,
 		UserID:    fmt.Sprintf("%d|%s", 1, wallet.Address()),
@@ -328,7 +349,21 @@ func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, issuer str
 		Ciphertext:         ciphertext,
 		CreatedAt:          payload.CreatedAt,
 	}
+}
 
+func newOIDCIdentity(issuer string) proto.Identity {
+	return proto.Identity{
+		Type:    proto.IdentityType_OIDC,
+		Issuer:  issuer,
+		Subject: "SUBJECT",
+	}
+}
+
+func newEmailIdentity(email string) proto.Identity {
+	return proto.Identity{
+		Type:  proto.IdentityType_Email,
+		Email: email,
+	}
 }
 
 func newSessionFromData(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, payload *proto.SessionData) *data.Session {
@@ -390,8 +425,7 @@ func (w walletServiceMock) InitiateAuth(ctx context.Context, intent *proto_walle
 }
 
 func (w walletServiceMock) InitiateEmailAuth(ctx context.Context, intent *proto_wallet.Intent, answerHash string, salt string) (*proto_wallet.IntentResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, nil
 }
 
 func (w walletServiceMock) UpdateProjectUserMapRules(ctx context.Context, projectID uint64, userMapRules *proto_wallet.ProjectSessionUserMapRules) error {
@@ -602,6 +636,20 @@ func (w walletServiceMock) FinishValidateSession(ctx context.Context, sessionId 
 
 var _ proto_wallet.WaaS = (*walletServiceMock)(nil)
 
+type builderMock struct{}
+
+func (m builderMock) GetEmailTemplate(ctx context.Context, projectID uint64, templateType *builder.EmailTemplateType) (*builder.EmailTemplate, error) {
+	template := "Your login code: {auth_code}"
+	return &builder.EmailTemplate{
+		TemplateType: templateType,
+		IntroText:    "Your login code",
+		Subject:      fmt.Sprintf("Login code for %d", projectID),
+		Template:     &template,
+	}, nil
+}
+
+var _ builder.Builder = (*builderMock)(nil)
+
 type testTransport struct {
 	http.RoundTripper
 	modifyRequest func(req *http.Request)
@@ -618,3 +666,33 @@ func (tt testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 var _ http.RoundTripper = (*testTransport)(nil)
+
+func getSentEmailMessage(t *testing.T, recipient string) (string, string, bool) {
+	res, err := http.Get(fmt.Sprintf("%s/_aws/ses?email=%s", awsEndpoint, "noreply@local.auth.sequence.app"))
+	require.NoError(t, err)
+	defer res.Body.Close()
+
+	var result struct {
+		Messages []struct {
+			Destination struct {
+				ToAddresses []string
+			}
+			Subject string
+			Body    struct {
+				HTML string `json:"html_part"`
+			}
+		}
+	}
+
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&result))
+
+	for _, msg := range result.Messages {
+		for _, toAddress := range msg.Destination.ToAddresses {
+			if toAddress == recipient {
+				return msg.Subject, msg.Body.HTML, true
+			}
+		}
+	}
+
+	return "", "", false
+}
