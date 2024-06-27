@@ -164,6 +164,7 @@ func (s *RPC) CreateTenant(
 		Version:        dbTenant.Version,
 		OIDCProviders:  tenantData.OIDCProviders,
 		AllowedOrigins: tenantData.AllowedOrigins,
+		AuthConfig:     &tenantData.AuthConfig,
 		UpdatedAt:      dbTenant.CreatedAt,
 	}
 	return retTenant, tenantData.UpgradeCode, nil
@@ -233,6 +234,7 @@ func (s *RPC) UpdateTenant(
 		Version:        tnt.Version,
 		OIDCProviders:  tntData.OIDCProviders,
 		AllowedOrigins: tntData.AllowedOrigins,
+		AuthConfig:     &tntData.AuthConfig,
 		UpdatedAt:      tnt.CreatedAt,
 	}
 	return retTenant, nil

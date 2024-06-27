@@ -9,7 +9,7 @@ fi
 awslocal kms create-key --region us-east-1 --tags '[{"TagKey":"_custom_id_","TagValue":"aeb99e0f-9e89-44de-a084-e1817af47778"}]'
 awslocal kms create-key --region us-east-1 --tags '[{"TagKey":"_custom_id_","TagValue":"27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"}]'
 
-awslocal ses verify-email-identity --email noreply@local.auth.sequence.app
+awslocal ses verify-email-identity --email-address noreply@local.auth.sequence.app
 
 awslocal secretsmanager create-secret \
   --region us-east-1 \
@@ -47,3 +47,5 @@ awslocal dynamodb create-table \
   --attribute-definitions AttributeName=ID,AttributeType=S \
   --key-schema AttributeName=ID,KeyType=HASH \
   --provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=10
+
+echo "Finished bootstrapping localstack resources!"

@@ -170,7 +170,8 @@ func (p *AuthProvider) extractVerifier(verifier string) (emailAddress string, se
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid verifier")
 	}
-	return parts[0], parts[1], nil
+	emailAddress = strings.TrimSpace(strings.ToLower(parts[0]))
+	return emailAddress, parts[1], nil
 }
 
 func randomDigits(source io.Reader, n int) (string, error) {
