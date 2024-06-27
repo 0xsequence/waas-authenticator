@@ -22,7 +22,6 @@ import (
 	"github.com/0xsequence/waas-authenticator/config"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
-	"github.com/0xsequence/waas-authenticator/proto/builder"
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
@@ -636,20 +635,6 @@ func (w walletServiceMock) FinishValidateSession(ctx context.Context, sessionId 
 
 var _ proto_wallet.WaaS = (*walletServiceMock)(nil)
 
-type builderMock struct{}
-
-func (m builderMock) GetEmailTemplate(ctx context.Context, projectID uint64, templateType *builder.EmailTemplateType) (*builder.EmailTemplate, error) {
-	template := "Your login code: {auth_code}"
-	return &builder.EmailTemplate{
-		TemplateType: templateType,
-		IntroText:    "Your login code",
-		Subject:      fmt.Sprintf("Login code for %d", projectID),
-		Template:     &template,
-	}, nil
-}
-
-var _ builder.Builder = (*builderMock)(nil)
-
 type testTransport struct {
 	http.RoundTripper
 	modifyRequest func(req *http.Request)
@@ -668,7 +653,7 @@ func (tt testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 var _ http.RoundTripper = (*testTransport)(nil)
 
 func getSentEmailMessage(t *testing.T, recipient string) (string, string, bool) {
-	res, err := http.Get(fmt.Sprintf("%s/_aws/ses?email=%s", awsEndpoint, "noreply@local.auth.sequence.app"))
+	res, err := http.Get(fmt.Sprintf("%s/_aws/ses?email=noreply@local.auth.sequence.app", awsEndpoint))
 	require.NoError(t, err)
 	defer res.Body.Close()
 

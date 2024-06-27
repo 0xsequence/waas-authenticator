@@ -95,7 +95,7 @@ func TestEmailAuth(t *testing.T) {
 			require.NoError(t, err)
 			signingSession := intents.NewSessionP256K1(sessWallet)
 
-			builderServer := httptest.NewServer(builder.NewBuilderServer(builderMock{}))
+			builderServer := httptest.NewServer(builder.NewBuilderServer(builder.NewMock()))
 			defer builderServer.Close()
 			walletService := newWalletServiceMock(nil)
 			waasServer := httptest.NewServer(proto_wallet.NewWaaSServer(walletService))
