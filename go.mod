@@ -2,6 +2,8 @@ module github.com/0xsequence/waas-authenticator
 
 go 1.22.1
 
+replace github.com/go-chi/chi/v5 v5.0.12 => github.com/patrislav/chi/v5 v5.0.0-20240628131924-91f4808e563f
+
 require (
 	github.com/0xsequence/ethkit v1.25.0
 	github.com/0xsequence/go-sequence v0.33.0
