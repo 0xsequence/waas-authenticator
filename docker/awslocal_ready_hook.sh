@@ -8,6 +8,7 @@ fi
 
 awslocal kms create-key --region us-east-1 --tags '[{"TagKey":"_custom_id_","TagValue":"aeb99e0f-9e89-44de-a084-e1817af47778"}]'
 awslocal kms create-key --region us-east-1 --tags '[{"TagKey":"_custom_id_","TagValue":"27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"}]'
+awslocal kms create-key --region us-east-1 --key-usage SIGN_VERIFY --key-spec RSA_2048 --tags '[{"TagKey":"_custom_id_","TagValue":"5edb0219-8da9-4842-98fb-e83c6316f3bd"}]'
 
 awslocal ses verify-email-identity --email noreply@local.auth.sequence.app
 

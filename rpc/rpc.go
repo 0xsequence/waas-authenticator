@@ -24,6 +24,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/auth/oidc"
 	"github.com/0xsequence/waas-authenticator/rpc/auth/playfab"
 	"github.com/0xsequence/waas-authenticator/rpc/awscreds"
+	"github.com/0xsequence/waas-authenticator/rpc/signing"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/0xsequence/waas-authenticator/rpc/tracing"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -64,6 +65,7 @@ type RPC struct {
 	Accounts             *data.AccountTable
 	Wallets              proto_wallet.WaaS
 	AuthProviders        map[intents.IdentityType]auth.Provider
+	Signer               signing.Signer
 
 	measurements *enclave.Measurements
 	startTime    time.Time
@@ -117,11 +119,12 @@ func New(cfg *config.Config, client *http.Client) (*RPC, error) {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	kmsClient := kms.NewFromConfig(awsCfg)
 	enclaveProvider := enclave.DummyProvider
 	if cfg.Service.UseNSM {
 		enclaveProvider = enclave.NitroProvider
 	}
-	enc, err := enclave.New(context.Background(), enclaveProvider, kms.NewFromConfig(awsCfg))
+	enc, err := enclave.New(context.Background(), enclaveProvider, kmsClient)
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +157,7 @@ func New(cfg *config.Config, client *http.Client) (*RPC, error) {
 		}),
 		Wallets:       proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, wrappedClient),
 		AuthProviders: authProviders,
+		Signer:        signing.NewKMS(kmsClient, cfg.KMS.SigningKey),
 		startTime:     time.Now(),
 		measurements:  m,
 	}
@@ -219,6 +223,9 @@ func (s *RPC) Handler() http.Handler {
 	r.Use(middleware.NoCache)
 	r.Use(middleware.Heartbeat("/ping"))
 
+	// Sign responses
+	r.Use(signing.Middleware(s.Signer))
+
 	// Propagate TraceId
 	r.Use(traceid.Middleware)
 
@@ -241,6 +248,9 @@ func (s *RPC) Handler() http.Handler {
 
 	// Healthcheck
 	r.Use(middleware.PageRoute("/health", http.HandlerFunc(s.healthHandler)))
+
+	r.Get("/.well-known/openid-configuration", s.handleOpenidConfiguration)
+	r.Get("/.well-known/jwks.json", s.handleJWKS)
 
 	userRouter := r.Group(func(r chi.Router) {
 		// Find and decrypt tenant data
