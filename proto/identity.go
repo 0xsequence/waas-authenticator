@@ -7,12 +7,10 @@ import (
 
 func (id Identity) String() string {
 	switch id.Type {
-	case IdentityType_Guest:
+	case IdentityType_Guest, IdentityType_Email:
 		return string(id.Type) + ":" + id.Subject
 	case IdentityType_OIDC, IdentityType_PlayFab:
 		return string(id.Type) + ":" + id.Issuer + "#" + id.Subject
-	case IdentityType_Email:
-		return string(id.Type) + ":" + id.Email
 	default:
 		return ""
 	}
@@ -41,7 +39,7 @@ func (id *Identity) FromString(s string) error {
 
 	case IdentityType_Email:
 		id.Type = IdentityType_Email
-		id.Email = parts[1]
+		id.Subject = parts[1]
 
 	default:
 		return fmt.Errorf("invalid identity type: %s", parts[0])
