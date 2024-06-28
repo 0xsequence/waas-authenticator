@@ -2,10 +2,10 @@ package signing
 
 import (
 	"bytes"
-	"io"
 	"net/http"
 
 	"github.com/0xsequence/waas-authenticator/proto"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 func Middleware(signer Signer) func(http.Handler) http.Handler {
@@ -17,11 +17,13 @@ func Middleware(signer Signer) func(http.Handler) http.Handler {
 			}
 
 			var body bytes.Buffer
-			ww := newWrappedRW(w, &body)
+			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			ww.Tee(&body)
+			ww.Discard()
 
 			next.ServeHTTP(ww, r)
 
-			b, err := newHTTPSignatureBuilder(signer, &body, r, ww.Header(), ww.status)
+			b, err := newHTTPSignatureBuilder(signer, body.Bytes(), r, ww.Header(), ww.Status())
 			if err != nil {
 				proto.RespondWithError(w, err)
 				return
@@ -32,51 +34,10 @@ func Middleware(signer Signer) func(http.Handler) http.Handler {
 				return
 			}
 
-			if err := ww.finalize(); err != nil {
+			w.WriteHeader(ww.Status())
+			if _, err := body.WriteTo(w); err != nil {
 				proto.RespondWithError(w, err)
 			}
 		})
 	}
-}
-
-type wrappedRW struct {
-	http.ResponseWriter
-	body        *bytes.Buffer
-	wroteHeader bool
-	status      int
-	tee         io.Writer
-}
-
-func newWrappedRW(w http.ResponseWriter, tee io.Writer) *wrappedRW {
-	return &wrappedRW{
-		ResponseWriter: w,
-		body:           &bytes.Buffer{},
-		tee:            tee,
-	}
-}
-
-func (w *wrappedRW) Write(p []byte) (n int, err error) {
-	if !w.wroteHeader {
-		w.status = http.StatusOK
-		w.wroteHeader = true
-	}
-	if w.tee != nil {
-		if n, err := w.tee.Write(p); err != nil {
-			return n, err
-		}
-	}
-	return w.body.Write(p)
-}
-
-func (w *wrappedRW) WriteHeader(code int) {
-	if !w.wroteHeader {
-		w.status = code
-		w.wroteHeader = true
-	}
-}
-
-func (w *wrappedRW) finalize() error {
-	w.ResponseWriter.WriteHeader(w.status)
-	_, err := io.Copy(w.ResponseWriter, w.body)
-	return err
 }

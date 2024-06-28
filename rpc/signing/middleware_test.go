@@ -141,9 +141,6 @@ func (m mockSigner) Sign(ctx context.Context, alg Algorithm, message []byte) ([]
 	sum := sha256.Sum256(message)
 	res := append([]byte(alg+":"), sum[:]...)
 
-	fmt.Println()
-	fmt.Println(string(message))
-
 	return res, nil
 }
 

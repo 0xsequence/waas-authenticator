@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"slices"
@@ -23,7 +22,7 @@ var knownHeaders = map[string]bool{
 
 type httpSignatureBuilder struct {
 	signer Signer
-	body   io.Reader
+	body   []byte
 	header http.Header
 	status int
 	req    *http.Request
@@ -34,7 +33,7 @@ type httpSignatureBuilder struct {
 	alg    Algorithm
 }
 
-func newHTTPSignatureBuilder(signer Signer, body io.Reader, req *http.Request, resHeader http.Header, status int) (*httpSignatureBuilder, error) {
+func newHTTPSignatureBuilder(signer Signer, body []byte, req *http.Request, resHeader http.Header, status int) (*httpSignatureBuilder, error) {
 	b := &httpSignatureBuilder{
 		signer: signer,
 		body:   body,
@@ -181,7 +180,7 @@ func (b *httpSignatureBuilder) signatureParams() (string, error) {
 func (b *httpSignatureBuilder) generateDigest() (string, int, error) {
 	dict := httpsfv.NewDictionary()
 	s := sha256.New()
-	contentLen, err := io.Copy(s, b.body)
+	contentLen, err := s.Write(b.body)
 	if err != nil {
 		return "", 0, err
 	}
