@@ -14,47 +14,47 @@ import (
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/proto/builder"
-	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/auth"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
-	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
 )
 
 // AuthProvider is a Verifier that uses a secret code, delivered to user's email address, as the auth challenge.
 type AuthProvider struct {
 	Sender  Sender
-	Wallets proto_wallet.WaaS
 	Builder builder.Builder
 }
 
-func NewAuthProvider(sender Sender, wallets proto_wallet.WaaS, builder builder.Builder) auth.Provider {
+func NewAuthProvider(sender Sender, builder builder.Builder) auth.Provider {
 	return &AuthProvider{
 		Sender:  sender,
-		Wallets: wallets,
 		Builder: builder,
 	}
+}
+
+func (*AuthProvider) IsEnabled(tenant *proto.TenantData) bool {
+	return tenant.AuthConfig.Email.Enabled == true
 }
 
 // InitiateAuth for Email ignores any preexisting auth session data. Instead, if called multiple times, the auth session
 // is replaced. This allows the user to resend the verification code in case of issues. Note that this invalidates the
 // previous auth session - only the most recent one is stored and used in Verify.
-func (m *AuthProvider) InitiateAuth(
+func (p *AuthProvider) InitiateAuth(
 	ctx context.Context,
 	verifCtx *proto.VerificationContext,
 	verifier string,
-	intent *intents.Intent,
+	sessionID string,
 	storeFn auth.StoreVerificationContextFn,
 ) (*intents.IntentResponseAuthInitiated, error) {
 	att := attestation.FromContext(ctx)
 	tnt := tenant.FromContext(ctx)
 
 	// the verifier consists of the email address and sessionID separated by ';'
-	emailAddress, sessionID, err := m.extractVerifier(verifier)
+	emailAddress, expectedSessionID, err := p.extractVerifier(verifier)
 	if err != nil {
 		return nil, err
 	}
-	if sessionID != intent.Signers()[0] {
+	if sessionID != expectedSessionID {
 		return nil, fmt.Errorf("invalid session ID")
 	}
 
@@ -62,7 +62,7 @@ func (m *AuthProvider) InitiateAuth(
 
 	// Retrieve the email template from the Builder.
 	tplType := builder.EmailTemplateType_LOGIN
-	tpl, err := m.Builder.GetEmailTemplate(ctx, tnt.ProjectID, &tplType)
+	tpl, err := p.Builder.GetEmailTemplate(ctx, tnt.ProjectID, &tplType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build email template: %w", err)
 	}
@@ -90,14 +90,9 @@ func (m *AuthProvider) InitiateAuth(
 	serverAnswer := hexutil.Encode(ethcrypto.Keccak256([]byte(serverSalt + clientAnswer)))
 
 	// WaaS API is expected to store the answer and salt for later verification
-	_, err = m.Wallets.InitiateEmailAuth(waasapi.Context(ctx), waasapi.ConvertToAPIIntent(intent), serverAnswer, serverSalt)
-	if err != nil {
-		return nil, fmt.Errorf("initiating email auth with WaaS API: %m", err)
-	}
-
 	verifCtx = &proto.VerificationContext{
 		ProjectID:    tnt.ProjectID,
-		SessionID:    intent.Signers()[0],
+		SessionID:    sessionID,
 		IdentityType: proto.IdentityType_Email,
 		Verifier:     verifier,
 		Challenge:    &serverSalt,   // the SERVER salt is a challenge in server's context
@@ -116,7 +111,7 @@ func (m *AuthProvider) InitiateAuth(
 		HTML:      strings.Replace(*tpl.Template, "{auth_code}", secretCode, 1),
 		Text:      tpl.IntroText + "\n\n" + secretCode,
 	}
-	if err := m.Sender.Send(ctx, msg); err != nil {
+	if err := p.Sender.Send(ctx, msg); err != nil {
 		return nil, fmt.Errorf("failed to send email: %w", err)
 	}
 
@@ -134,7 +129,7 @@ func (m *AuthProvider) InitiateAuth(
 // Verify requires the auth session to exist as it contains the challenge and final answer. The challenge (server salt)
 // from the auth session is combined with the client's answer and the resulting value compared with the final answer.
 // Verify returns the identity if this is successful.
-func (m *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationContext, sessionID string, answer string) (proto.Identity, error) {
+func (p *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationContext, sessionID string, answer string) (proto.Identity, error) {
 	if verifCtx == nil {
 		return proto.Identity{}, fmt.Errorf("auth session not found")
 	}
@@ -144,7 +139,7 @@ func (m *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationC
 	}
 
 	// the verifier consists of the email address and sessionID separated by ';'
-	emailAddress, verifierSessionID, err := m.extractVerifier(verifCtx.Verifier)
+	emailAddress, verifierSessionID, err := p.extractVerifier(verifCtx.Verifier)
 	if err != nil {
 		return proto.Identity{}, err
 	}
@@ -166,11 +161,11 @@ func (m *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationC
 }
 
 // ValidateTenant always succeeds as there are no email-specific settings to validate.
-func (m *AuthProvider) ValidateTenant(ctx context.Context, tenant *proto.TenantData) error {
+func (p *AuthProvider) ValidateTenant(ctx context.Context, tenant *proto.TenantData) error {
 	return nil
 }
 
-func (m *AuthProvider) extractVerifier(verifier string) (emailAddress string, sessionID string, err error) {
+func (p *AuthProvider) extractVerifier(verifier string) (emailAddress string, sessionID string, err error) {
 	parts := strings.SplitN(verifier, ";", 2)
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid verifier")

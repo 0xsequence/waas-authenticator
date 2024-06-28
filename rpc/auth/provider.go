@@ -21,7 +21,7 @@ type Provider interface {
 		ctx context.Context,
 		verifCtx *proto.VerificationContext,
 		verifier string,
-		intent *intents.Intent,
+		sessionID string,
 		storeFn StoreVerificationContextFn,
 	) (*intents.IntentResponseAuthInitiated, error)
 
@@ -33,6 +33,9 @@ type Provider interface {
 	Verify(
 		ctx context.Context, verifCtx *proto.VerificationContext, sessionID string, answer string,
 	) (proto.Identity, error)
+
+	// IsEnabled answers whether the identity type handled by this Provider is enabled for the given Tenant.
+	IsEnabled(tenant *proto.TenantData) bool
 
 	// ValidateTenant is called by the admin service whenever the Tenant is created or updated. Provider should verify
 	// that the configuration is correct and valid for the specific identity type.
