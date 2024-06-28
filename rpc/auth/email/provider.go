@@ -154,8 +154,9 @@ func (p *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationC
 	}
 
 	ident := proto.Identity{
-		Type:  proto.IdentityType_Email,
-		Email: emailAddress,
+		Type:    proto.IdentityType_Email,
+		Subject: emailAddress,
+		Email:   emailAddress,
 	}
 	return ident, nil
 }
