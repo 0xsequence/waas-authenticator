@@ -35,8 +35,10 @@ struct Identity
   - type: IdentityType
     + go.field.type = IdentityType
   - issuer: string
+    + json = iss
     + go.tag.json = iss,omitempty
   - subject: string
+    + json = sub
     + go.tag.json = sub,omitempty
   - email: string
     + go.tag.json = email,omitempty
