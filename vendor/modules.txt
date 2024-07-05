@@ -329,6 +329,9 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
+# github.com/dunglas/httpsfv v1.0.2
+## explicit; go 1.14
+github.com/dunglas/httpsfv
 # github.com/emirpasic/gods v1.18.1
 ## explicit; go 1.2
 github.com/emirpasic/gods/containers
@@ -351,7 +354,7 @@ github.com/fxamacker/cbor/v2
 github.com/gibson042/canonicaljson-go
 # github.com/gliderlabs/ssh v0.3.5
 ## explicit; go 1.12
-# github.com/go-chi/chi/v5 v5.0.12
+# github.com/go-chi/chi/v5 v5.1.0
 ## explicit; go 1.14
 github.com/go-chi/chi/v5
 github.com/go-chi/chi/v5/middleware

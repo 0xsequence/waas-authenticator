@@ -16,12 +16,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.29.1
 	github.com/aws/aws-sdk-go-v2/service/ses v1.22.9
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.2
-	github.com/go-chi/chi/v5 v5.0.12
+	github.com/dunglas/httpsfv v1.0.2
+	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/httplog v0.3.2
 	github.com/go-chi/jwtauth/v5 v5.3.0
 	github.com/go-chi/telemetry v0.3.3
 	github.com/go-chi/traceid v0.2.0
 	github.com/go-chi/transport v0.1.0
+	github.com/goccy/go-json v0.10.2
 	github.com/goware/cachestore v0.8.1
 	github.com/goware/rerun v0.0.9
 	github.com/goware/validation v0.1.2
@@ -92,7 +94,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
-	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-cz/textcase v1.2.1 // indirect
 	github.com/golang/mock v1.6.0 // indirect
