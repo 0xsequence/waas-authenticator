@@ -23,13 +23,8 @@ func Middleware(signer Signer) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(ww, r)
 
-			b, err := newHTTPSignatureBuilder(signer, body.Bytes(), r, ww.Header(), ww.Status())
+			err := generateHTTPSignature(r.Context(), signer, body.Bytes(), r, ww.Header(), ww.Status())
 			if err != nil {
-				proto.RespondWithError(w, err)
-				return
-			}
-
-			if err := b.Generate(r.Context()); err != nil {
 				proto.RespondWithError(w, err)
 				return
 			}

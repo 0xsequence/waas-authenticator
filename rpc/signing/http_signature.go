@@ -33,7 +33,7 @@ type httpSignatureBuilder struct {
 	alg    Algorithm
 }
 
-func newHTTPSignatureBuilder(signer Signer, body []byte, req *http.Request, resHeader http.Header, status int) (*httpSignatureBuilder, error) {
+func generateHTTPSignature(ctx context.Context, signer Signer, body []byte, req *http.Request, resHeader http.Header, status int) error {
 	b := &httpSignatureBuilder{
 		signer: signer,
 		body:   body,
@@ -43,7 +43,7 @@ func newHTTPSignatureBuilder(signer Signer, body []byte, req *http.Request, resH
 	}
 
 	if err := b.parseAcceptSignature(req.Header.Get("accept-signature")); err != nil {
-		return nil, err
+		return err
 	}
 
 	fieldsToInclude := []string{"content-digest"}
@@ -53,7 +53,7 @@ func newHTTPSignatureBuilder(signer Signer, body []byte, req *http.Request, resH
 		}
 	}
 
-	return b, nil
+	return b.generate(ctx)
 }
 
 func (b *httpSignatureBuilder) parseAcceptSignature(headerValue string) error {
@@ -116,7 +116,7 @@ func (b *httpSignatureBuilder) parseAcceptSignature(headerValue string) error {
 	return nil
 }
 
-func (b *httpSignatureBuilder) Generate(ctx context.Context) error {
+func (b *httpSignatureBuilder) generate(ctx context.Context) error {
 	digest, contentLen, err := b.generateDigest()
 	if err != nil {
 		return err

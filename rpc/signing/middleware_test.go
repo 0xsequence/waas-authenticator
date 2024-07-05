@@ -1,4 +1,4 @@
-package signing
+package signing_test
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/0xsequence/waas-authenticator/rpc/signing"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +25,7 @@ func TestMiddleware(t *testing.T) {
 	})
 
 	signer := &mockSigner{}
-	server := httptest.NewServer(Middleware(signer)(handler))
+	server := httptest.NewServer(signing.Middleware(signer)(handler))
 	defer server.Close()
 
 	testCases := map[string]struct {
@@ -59,7 +60,7 @@ func TestMiddleware(t *testing.T) {
 					fmt.Sprintf(`"@signature-params": %s`, strings.TrimPrefix(sigInput, "sig=")),
 				}, "\n")
 
-				signature, _ := signer.Sign(context.Background(), AlgorithmRsaPkcs1V15Sha256, []byte(message))
+				signature, _ := signer.Sign(context.Background(), signing.AlgorithmRsaPkcs1V15Sha256, []byte(message))
 				expect := fmt.Sprintf("sig=:%s:", base64.StdEncoding.EncodeToString(signature))
 
 				assert.Equal(t, expect, res.Header.Get("signature"))
@@ -84,7 +85,7 @@ func TestMiddleware(t *testing.T) {
 					fmt.Sprintf(`"@signature-params": %s`, strings.TrimPrefix(sigInput, "sig=")),
 				}, "\n")
 
-				signature, _ := signer.Sign(context.Background(), AlgorithmRsaPkcs1V15Sha256, []byte(message))
+				signature, _ := signer.Sign(context.Background(), signing.AlgorithmRsaPkcs1V15Sha256, []byte(message))
 				expect := fmt.Sprintf("sig=:%s:", base64.StdEncoding.EncodeToString(signature))
 
 				assert.Equal(t, expect, res.Header.Get("signature"))
@@ -112,7 +113,7 @@ func TestMiddleware(t *testing.T) {
 					fmt.Sprintf(`"@signature-params": %s`, strings.TrimPrefix(sigInput, "sig=")),
 				}, "\n")
 
-				signature, _ := signer.Sign(context.Background(), AlgorithmRsaPssSha512, []byte(message))
+				signature, _ := signer.Sign(context.Background(), signing.AlgorithmRsaPssSha512, []byte(message))
 				expect := fmt.Sprintf("sig=:%s:", base64.StdEncoding.EncodeToString(signature))
 
 				assert.Equal(t, expect, res.Header.Get("signature"))
@@ -137,7 +138,7 @@ func TestMiddleware(t *testing.T) {
 
 type mockSigner struct{}
 
-func (m mockSigner) Sign(ctx context.Context, alg Algorithm, message []byte) ([]byte, error) {
+func (m mockSigner) Sign(ctx context.Context, alg signing.Algorithm, message []byte) ([]byte, error) {
 	sum := sha256.Sum256(message)
 	res := append([]byte(alg+":"), sum[:]...)
 
