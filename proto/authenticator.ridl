@@ -82,6 +82,7 @@ struct Tenant
   - allowedOrigins: []string
     + go.field.type = validation.Origins
     + go.type.import = github.com/goware/validation
+  - authConfig: AuthConfig
   - updatedAt: timestamp
 
 struct TenantData

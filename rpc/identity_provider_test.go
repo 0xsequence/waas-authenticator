@@ -32,7 +32,7 @@ func TestRPC_SendIntent_GetIdToken(t *testing.T) {
 	svc := initRPC(t)
 
 	tenant, tntData := newTenant(t, svc.Enclave, issuer)
-	acc := newAccount(t, tenant, svc.Enclave, issuer, sessWallet)
+	acc := newAccount(t, tenant, svc.Enclave, newOIDCIdentity(issuer), sessWallet)
 	sess := newSession(t, tenant, svc.Enclave, issuer, signingSession)
 
 	walletAddr, err := rpc.AddressForUser(context.Background(), tntData, acc.UserID)

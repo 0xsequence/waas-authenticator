@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRPC_RegisterSession(t *testing.T) {
+func TestLegacyAuth(t *testing.T) {
 	sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
 	require.NoError(t, err)
 	signingSession := intents.NewSessionP256K1(sessWallet)
@@ -199,7 +199,7 @@ func TestRPC_RegisterSession(t *testing.T) {
 			svc.Wallets = walletService
 
 			tenant, _ := newTenant(t, svc.Enclave, issuer)
-			account := newAccount(t, tenant, svc.Enclave, "http://another-issuer", nil)
+			account := newAccount(t, tenant, svc.Enclave, newOIDCIdentity("http://another-issuer"), nil)
 
 			require.NoError(t, svc.Tenants.Add(ctx, tenant))
 			require.NoError(t, svc.Accounts.Put(ctx, account))
@@ -308,7 +308,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 			svc := initRPC(t)
 
 			tenant, _ := newTenant(t, svc.Enclave, issuer)
-			acc := newAccount(t, tenant, svc.Enclave, issuer, sessWallet)
+			acc := newAccount(t, tenant, svc.Enclave, newOIDCIdentity(issuer), sessWallet)
 			session := newSession(t, tenant, svc.Enclave, issuer, signingSession)
 
 			session2 := newSessionFromData(t, tenant, svc.Enclave, &proto.SessionData{
@@ -375,7 +375,7 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 	svc := initRPC(t)
 
 	tenant, tntData := newTenant(t, svc.Enclave, issuer)
-	acc := newAccount(t, tenant, svc.Enclave, issuer, sessWallet)
+	acc := newAccount(t, tenant, svc.Enclave, newOIDCIdentity(issuer), sessWallet)
 	sess1 := newSession(t, tenant, svc.Enclave, issuer, signingSession)
 	sess2 := newSessionFromData(t, tenant, svc.Enclave, &proto.SessionData{
 		ID:        "0x1111111111111111111111111111111111111111",
