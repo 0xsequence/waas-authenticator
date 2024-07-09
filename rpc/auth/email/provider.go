@@ -50,7 +50,7 @@ func (p *AuthProvider) InitiateAuth(
 	tnt := tenant.FromContext(ctx)
 
 	// the verifier consists of the email address and sessionID separated by ';'
-	emailAddress, expectedSessionID, err := p.extractVerifier(verifier)
+	emailAddress, expectedSessionID, err := extractVerifier(verifier)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (p *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationC
 	}
 
 	// the verifier consists of the email address and sessionID separated by ';'
-	emailAddress, verifierSessionID, err := p.extractVerifier(verifCtx.Verifier)
+	emailAddress, verifierSessionID, err := extractVerifier(verifCtx.Verifier)
 	if err != nil {
 		return proto.Identity{}, err
 	}
@@ -165,13 +165,16 @@ func (p *AuthProvider) ValidateTenant(ctx context.Context, tenant *proto.TenantD
 	return nil
 }
 
-func (p *AuthProvider) extractVerifier(verifier string) (emailAddress string, sessionID string, err error) {
-	parts := strings.SplitN(verifier, ";", 2)
-	if len(parts) != 2 {
+func extractVerifier(verifier string) (emailAddress string, sessionID string, err error) {
+	emailAddress, sessionID, found := strings.Cut(verifier, ";")
+	if !found {
 		return "", "", fmt.Errorf("invalid verifier")
 	}
-	emailAddress = strings.TrimSpace(strings.ToLower(parts[0]))
-	return emailAddress, parts[1], nil
+	return normalizeEmail(emailAddress), sessionID, nil
+}
+
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }
 
 func randomDigits(source io.Reader, n int) (string, error) {
