@@ -87,7 +87,7 @@ func (s *RPC) getIDToken(
 		return nil, fmt.Errorf("parsing session identity: %w", err)
 	}
 
-	acc, found, err := s.Accounts.Get(ctx, tnt.ProjectID, identity)
+	account, found, err := s.Accounts.Get(ctx, tnt.ProjectID, identity)
 	if err != nil {
 		return nil, fmt.Errorf("getting account: %w", err)
 	}
@@ -95,7 +95,7 @@ func (s *RPC) getIDToken(
 		return nil, fmt.Errorf("account not found")
 	}
 
-	walletAddr, err := AddressForUser(ctx, tnt, acc.UserID)
+	walletAddr, err := AddressForUser(ctx, tnt, account.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("getting wallet address: %w", err)
 	}
@@ -104,7 +104,7 @@ func (s *RPC) getIDToken(
 	iat := time.Now()
 	exp := iat.Add(10 * time.Minute)
 
-	b := jwt.NewBuilder().
+	tokenBuilder := jwt.NewBuilder().
 		Subject(walletAddr).
 		Audience([]string{aud}).
 		Issuer(s.Config.BaseURL).
@@ -113,36 +113,36 @@ func (s *RPC) getIDToken(
 		Claim("auth_time", sessData.CreatedAt.Unix()).
 		Claim(s.Config.BaseURL+"/identity", identity)
 
-	if acc.Email != "" {
-		b.Claim("email", acc.Email)
+	if account.Email != "" {
+		tokenBuilder.Claim("email", account.Email)
 	}
 
 	if intent.Data.Nonce != "" {
-		b.Claim("nonce", intent.Data.Nonce)
+		tokenBuilder.Claim("nonce", intent.Data.Nonce)
 	}
 
-	tok, err := b.Build()
+	token, err := tokenBuilder.Build()
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := jwt.NewSerializer().Serialize(tok)
+	serialized, err := jwt.NewSerializer().Serialize(token)
 	if err != nil {
 		return nil, err
 	}
 
 	// these can't fail, thus we ignore the errors
-	h := jws.NewHeaders()
-	_ = h.Set(jws.AlgorithmKey, jwa.RS256)
-	_ = h.Set(jws.KeyIDKey, s.Signer.KeyID())
-	_ = h.Set(jws.TypeKey, "JWT")
+	headers := jws.NewHeaders()
+	_ = headers.Set(jws.AlgorithmKey, jwa.RS256)
+	_ = headers.Set(jws.KeyIDKey, s.Signer.KeyID())
+	_ = headers.Set(jws.TypeKey, "JWT")
 
-	mh, err := json.Marshal(h)
+	jsonHeaders, err := json.Marshal(headers)
 	if err != nil {
 		return nil, err
 	}
 
-	payload := base64.RawURLEncoding.EncodeToString(mh) + "." + base64.RawURLEncoding.EncodeToString(serialized)
+	payload := base64.RawURLEncoding.EncodeToString(jsonHeaders) + "." + base64.RawURLEncoding.EncodeToString(serialized)
 	signature, err := s.Signer.Sign(ctx, signing.AlgorithmRsaPkcs1V15Sha256, []byte(payload))
 	if err != nil {
 		return nil, err
