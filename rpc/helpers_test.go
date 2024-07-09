@@ -121,6 +121,7 @@ QwIDAQAB
 			VerificationContextsTable: "VerificationContextsTable",
 		},
 		KMS: config.KMSConfig{
+			SigningKey:         "arn:aws:kms:us-east-1:000000000000:key/5edb0219-8da9-4842-98fb-e83c6316f3bd",
 			TenantKeys:         []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
 			DefaultSessionKeys: []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
 		},
@@ -326,10 +327,11 @@ func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, identity p
 		wallet, err = ethwallet.NewWalletFromRandomEntropy()
 		require.NoError(t, err)
 	}
+	signingSession := intents.NewSessionP256K1(wallet)
 
 	payload := &proto.AccountData{
 		ProjectID: tnt.ProjectID,
-		UserID:    fmt.Sprintf("%d|%s", 1, wallet.Address()),
+		UserID:    fmt.Sprintf("%d|%s", tnt.ProjectID, signingSession.SessionID()),
 		Identity:  identity.String(),
 		CreatedAt: time.Now(),
 	}
@@ -360,8 +362,9 @@ func newOIDCIdentity(issuer string) proto.Identity {
 
 func newEmailIdentity(email string) proto.Identity {
 	return proto.Identity{
-		Type:  proto.IdentityType_Email,
-		Email: email,
+		Type:    proto.IdentityType_Email,
+		Subject: email,
+		Email:   email,
 	}
 }
 
@@ -412,6 +415,15 @@ func newSession(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, issuer str
 	}
 
 	return newSessionFromData(t, tnt, enc, payload)
+}
+
+func unmarshalResponse[T any](t *testing.T, data any) *T {
+	b, err := json.Marshal(data)
+	require.NoError(t, err)
+
+	var res T
+	require.NoError(t, json.Unmarshal(b, &res))
+	return &res
 }
 
 type walletServiceMock struct {

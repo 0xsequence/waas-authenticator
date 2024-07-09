@@ -164,6 +164,17 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 			return nil, err
 		}
 		return makeIntentResponse(proto.IntentResponseCode_accountRemoved, true), nil
+
+	case intents.IntentName_getIdToken:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataGetIdToken](intent)
+		if err != nil {
+			return nil, err
+		}
+		res, err := s.getIDToken(ctx, sess, intentTyped)
+		if err != nil {
+			return nil, err
+		}
+		return makeIntentResponse(proto.IntentResponseCode_idToken, res), nil
 	}
 
 	// Generic forwarding of intent, no special handling
