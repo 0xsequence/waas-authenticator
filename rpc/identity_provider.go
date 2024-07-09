@@ -89,7 +89,7 @@ func (s *RPC) getIDToken(
 
 	acc, found, err := s.Accounts.Get(ctx, tnt.ProjectID, identity)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting account: %w", err)
 	}
 	if !found {
 		return nil, fmt.Errorf("account not found")
