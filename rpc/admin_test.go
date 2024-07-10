@@ -21,7 +21,9 @@ func TestRPC_GetTenant(t *testing.T) {
 	svc := initRPC(t)
 
 	tenant, _ := newTenant(t, svc.Enclave, issuer)
+	tenant2, _ := newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{Email: proto.AuthEmailConfig{Enabled: true}})
 	require.NoError(t, svc.Tenants.Add(context.Background(), tenant))
+	require.NoError(t, svc.Tenants.Add(context.Background(), tenant2))
 
 	srv := httptest.NewServer(svc.Handler())
 	defer srv.Close()
@@ -33,15 +35,23 @@ func TestRPC_GetTenant(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("ExistingTenant", func(t *testing.T) {
-		tnt, err := c.GetTenant(ctx, 1)
+		tnt, err := c.GetTenant(ctx, tenant.ProjectID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, tnt)
-		assert.Equal(t, uint64(1), tnt.ProjectID)
+		assert.Equal(t, tenant.ProjectID, tnt.ProjectID)
 		assert.Equal(t, validation.Origins{"http://localhost"}, tnt.AllowedOrigins)
 	})
 
+	t.Run("ExistingTenantWithAuthConfig", func(t *testing.T) {
+		tnt, err := c.GetTenant(ctx, tenant2.ProjectID)
+		require.NoError(t, err)
+		assert.NotEmpty(t, tnt)
+		assert.Equal(t, tenant2.ProjectID, tnt.ProjectID)
+		assert.True(t, tnt.AuthConfig.Email.Enabled)
+	})
+
 	t.Run("MissingTenant", func(t *testing.T) {
-		tnt, err := c.GetTenant(ctx, 2)
+		tnt, err := c.GetTenant(ctx, 12345)
 		assert.ErrorIs(t, err, proto.ErrTenantNotFound)
 		assert.Nil(t, tnt)
 	})
