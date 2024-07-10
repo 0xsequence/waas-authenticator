@@ -36,6 +36,7 @@ func (s *RPC) GetTenant(ctx context.Context, projectID uint64) (*proto.Tenant, e
 		Version:        tnt.Version,
 		OIDCProviders:  tenantData.OIDCProviders,
 		AllowedOrigins: tenantData.AllowedOrigins,
+		AuthConfig:     &tenantData.AuthConfig,
 		UpdatedAt:      tnt.CreatedAt,
 	}
 	return retTenant, nil
