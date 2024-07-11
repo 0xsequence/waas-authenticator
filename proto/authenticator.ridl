@@ -187,6 +187,10 @@ error 1000 Unauthorized "Unauthorized access" HTTP 401
 error 1001 TenantNotFound "Tenant not found" HTTP 404
 
 error 2000 EmailAlreadyInUse "Could not create account as the email is already in use" HTTP 409
+error 2001 AccountAlreadyLinked "Could not link account as it is linked to another wallet" HTTP 409
+error 2002 ProofVerificationFailed "The authentication proof could not be verified" HTTP 400
+error 2003 AnswerIncorrect "The provided answer is incorrect" HTTP 400
+error 2004 ChallengeExpired "The challenge has expired" HTTP 400
 
 
 ##
