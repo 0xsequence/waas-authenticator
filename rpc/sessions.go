@@ -112,7 +112,11 @@ func (s *RPC) RegisterSession(
 				return nil, nil, fmt.Errorf("failed to perform email check: %w", err)
 			}
 			if len(accs) > 0 {
-				return nil, nil, proto.ErrEmailAlreadyInUse.WithCause(fmt.Errorf("%s", accs[0].Identity.Issuer))
+				cause := string(accs[0].Identity.Type) + "|" + accs[0].Email
+				if iss := accs[0].Identity.Issuer; iss != "" {
+					cause += "|" + iss
+				}
+				return nil, nil, proto.ErrEmailAlreadyInUse.WithCause(errors.New(cause))
 			}
 		}
 
