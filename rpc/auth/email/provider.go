@@ -171,10 +171,10 @@ func extractVerifier(verifier string) (emailAddress string, sessionID string, er
 	if !found {
 		return "", "", fmt.Errorf("invalid verifier")
 	}
-	return normalizeEmail(emailAddress), sessionID, nil
+	return Normalize(emailAddress), sessionID, nil
 }
 
-func normalizeEmail(email string) string {
+func Normalize(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 

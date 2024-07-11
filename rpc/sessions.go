@@ -12,6 +12,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/auth"
+	"github.com/0xsequence/waas-authenticator/rpc/auth/email"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/0xsequence/waas-authenticator/rpc/tracing"
@@ -100,13 +101,16 @@ func (s *RPC) RegisterSession(
 		return nil, nil, fmt.Errorf("verifying answer: %w", err)
 	}
 
+	// always use normalized email address
+	ident.Email = email.Normalize(ident.Email)
+
 	account, accountFound, err := s.Accounts.Get(ctx, tntData.ProjectID, ident)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retrieve account: %w", err)
 	}
 
 	if !accountFound {
-		if !intentTyped.Data.ForceCreateAccount {
+		if !intentTyped.Data.ForceCreateAccount && ident.Email != "" {
 			accs, err := s.Accounts.ListByEmail(ctx, tntData.ProjectID, ident.Email)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to perform email check: %w", err)
