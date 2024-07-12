@@ -72,3 +72,11 @@ func makeIntentResponse(code proto.IntentResponseCode, data any) *proto.IntentRe
 		Data: data,
 	}
 }
+
+func makeTypedIntentResponse[T any](data *T) (*proto.IntentResponse, error) {
+	code := intents.IntentResponseTypeToCode[T](data)
+	if code == "" {
+		return nil, fmt.Errorf("invalid intent response type")
+	}
+	return &proto.IntentResponse{Code: proto.IntentResponseCode(code), Data: data}, nil
+}

@@ -78,7 +78,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		if err != nil {
 			return nil, err
 		}
-		return makeIntentResponse(proto.IntentResponseCode_authInitiated, res), nil
+		return makeTypedIntentResponse(res)
 	}
 
 	sess, found, err := s.Sessions.Get(ctx, tntData.ProjectID, sessionID)
@@ -99,7 +99,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		if err != nil {
 			return nil, err
 		}
-		return makeIntentResponse(proto.IntentResponseCode_sessionClosed, intents.IntentResponseSessionClosed{}), nil
+		return makeTypedIntentResponse(&intents.IntentResponseSessionClosed{})
 
 	case intents.IntentName_listSessions:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataListSessions](intent)
@@ -110,6 +110,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		if err != nil {
 			return nil, err
 		}
+		// TODO switch to correct response (compare the intent.Version semver to not break older clients)
 		return makeIntentResponse(proto.IntentResponseCode_sessionList, sessions), nil
 
 	case intents.IntentName_sessionAuthProof:
@@ -138,11 +139,11 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		if err != nil {
 			return nil, err
 		}
-		accounts, err := s.listAccounts(ctx, sess, intentTyped)
+		res, err := s.listAccounts(ctx, sess, intentTyped)
 		if err != nil {
 			return nil, err
 		}
-		return makeIntentResponse(proto.IntentResponseCode_accountList, accounts), nil
+		return makeTypedIntentResponse(res)
 
 	case intents.IntentName_federateAccount:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataFederateAccount](intent)
@@ -153,7 +154,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		if err != nil {
 			return nil, err
 		}
-		return makeIntentResponse(proto.IntentResponseCode_accountFederated, account), nil
+		return makeTypedIntentResponse(&intents.IntentResponseAccountFederated{Account: account})
 
 	case intents.IntentName_removeAccount:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataRemoveAccount](intent)
@@ -163,7 +164,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		if err := s.removeAccount(ctx, sess, intentTyped); err != nil {
 			return nil, err
 		}
-		return makeIntentResponse(proto.IntentResponseCode_accountRemoved, true), nil
+		return makeTypedIntentResponse(&intents.IntentResponseAccountRemoved{})
 
 	case intents.IntentName_getIdToken:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataGetIdToken](intent)
@@ -174,7 +175,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		if err != nil {
 			return nil, err
 		}
-		return makeIntentResponse(proto.IntentResponseCode_idToken, res), nil
+		return makeTypedIntentResponse(res)
 	}
 
 	// Generic forwarding of intent, no special handling

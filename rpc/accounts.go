@@ -17,7 +17,7 @@ import (
 
 func (s *RPC) listAccounts(
 	ctx context.Context, sess *data.Session, intent *intents.IntentTyped[intents.IntentDataListAccounts],
-) ([]*intents.Account, error) {
+) (*intents.IntentResponseAccountList, error) {
 	tntData := tenant.FromContext(ctx)
 
 	dbAccounts, err := s.Accounts.ListByUserID(ctx, sess.UserID)
@@ -46,7 +46,12 @@ func (s *RPC) listAccounts(
 			out[i].Email = &dbAcc.Email
 		}
 	}
-	return out, nil
+
+	res := &intents.IntentResponseAccountList{
+		Accounts:         out,
+		CurrentAccountID: sess.Identity,
+	}
+	return res, nil
 }
 
 func (s *RPC) federateAccount(
