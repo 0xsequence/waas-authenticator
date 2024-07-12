@@ -185,35 +185,37 @@ func TestGuestAuth(t *testing.T) {
 		ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
 		require.NoError(t, err)
 
-		sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
-		require.NoError(t, err)
-		signingSession := intents.NewSessionP256K1(sessWallet)
+		for i := 0; i < 10; i++ {
+			sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
+			require.NoError(t, err)
+			signingSession := intents.NewSessionP256K1(sessWallet)
 
-		initiateAuth := generateSignedIntent(t, intents.IntentName_initiateAuth, intents.IntentDataInitiateAuth{
-			SessionID:    signingSession.SessionID(),
-			IdentityType: intents.IdentityType_Guest,
-			Verifier:     signingSession.SessionID(),
-		}, signingSession)
-		initRes, err := c.SendIntent(ctx, initiateAuth)
-		require.NoError(t, err)
-		assert.Equal(t, proto.IntentResponseCode_authInitiated, initRes.Code)
+			initiateAuth := generateSignedIntent(t, intents.IntentName_initiateAuth, intents.IntentDataInitiateAuth{
+				SessionID:    signingSession.SessionID(),
+				IdentityType: intents.IdentityType_Guest,
+				Verifier:     signingSession.SessionID(),
+			}, signingSession)
+			initRes, err := c.SendIntent(ctx, initiateAuth)
+			require.NoError(t, err)
+			assert.Equal(t, proto.IntentResponseCode_authInitiated, initRes.Code)
 
-		b, err := json.Marshal(initRes.Data)
-		require.NoError(t, err)
-		var initResData intents.IntentResponseAuthInitiated
-		require.NoError(t, json.Unmarshal(b, &initResData))
+			b, err := json.Marshal(initRes.Data)
+			require.NoError(t, err)
+			var initResData intents.IntentResponseAuthInitiated
+			require.NoError(t, json.Unmarshal(b, &initResData))
 
-		answer := crypto.Keccak256([]byte(*initResData.Challenge + signingSession.SessionID()))
-		registerSession := generateSignedIntent(t, intents.IntentName_openSession, intents.IntentDataOpenSession{
-			SessionID:    signingSession.SessionID(),
-			IdentityType: intents.IdentityType_Guest,
-			Verifier:     signingSession.SessionID(),
-			Answer:       hexutil.Encode(answer),
-		}, signingSession)
-		sess, registerRes, err := c.RegisterSession(ctx, registerSession, "Friendly name")
-		require.NoError(t, err)
-		assert.Equal(t, "Guest:"+signingSession.SessionID(), sess.Identity.String())
-		assert.Equal(t, proto.IntentResponseCode_sessionOpened, registerRes.Code)
+			answer := crypto.Keccak256([]byte(*initResData.Challenge + signingSession.SessionID()))
+			registerSession := generateSignedIntent(t, intents.IntentName_openSession, intents.IntentDataOpenSession{
+				SessionID:    signingSession.SessionID(),
+				IdentityType: intents.IdentityType_Guest,
+				Verifier:     signingSession.SessionID(),
+				Answer:       hexutil.Encode(answer),
+			}, signingSession)
+			sess, registerRes, err := c.RegisterSession(ctx, registerSession, "Friendly name")
+			require.NoError(t, err)
+			assert.Equal(t, "Guest:"+signingSession.SessionID(), sess.Identity.String())
+			assert.Equal(t, proto.IntentResponseCode_sessionOpened, registerRes.Code)
+		}
 	})
 }
 

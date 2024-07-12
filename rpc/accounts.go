@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -55,16 +56,16 @@ func (s *RPC) federateAccount(
 	tntData := tenant.FromContext(ctx)
 
 	if intent.Data.SessionID != sess.ID {
-		return nil, fmt.Errorf("sessionId mismatch")
+		return nil, proto.ErrWebrpcBadRequest.WithCausef("sessionId mismatch")
 	}
 
 	authProvider, err := s.getAuthProvider(intent.Data.IdentityType)
 	if err != nil {
-		return nil, fmt.Errorf("get auth provider: %w", err)
+		return nil, proto.ErrWebrpcBadRequest.WithCausef("get auth provider: %w", err)
 	}
 
 	if intent.Data.IdentityType == intents.IdentityType_Guest {
-		return nil, fmt.Errorf("cannot federate a guest account")
+		return nil, proto.ErrWebrpcBadRequest.WithCausef("cannot federate a guest account")
 	}
 
 	var verifCtx *proto.VerificationContext
@@ -75,34 +76,52 @@ func (s *RPC) federateAccount(
 	}
 	dbVerifCtx, found, err := s.VerificationContexts.Get(ctx, authID)
 	if err != nil {
-		return nil, fmt.Errorf("getting verification context: %w", err)
+		return nil, proto.ErrWebrpcInternalError.WithCausef("getting verification context: %w", err)
 	}
 	if found && dbVerifCtx != nil {
 		verifCtx, _, err = crypto.DecryptData[*proto.VerificationContext](ctx, dbVerifCtx.EncryptedKey, dbVerifCtx.Ciphertext, tntData.KMSKeys)
 		if err != nil {
-			return nil, fmt.Errorf("decrypting verification context data: %w", err)
+			return nil, proto.ErrWebrpcInternalError.WithCausef("decrypting verification context data: %w", err)
 		}
 
 		if time.Now().After(verifCtx.ExpiresAt) {
-			return nil, fmt.Errorf("auth session expired")
+			return nil, proto.ErrChallengeExpired
 		}
 
 		if !dbVerifCtx.CorrespondsTo(verifCtx) {
-			return nil, fmt.Errorf("malformed verification context data")
+			return nil, proto.ErrWebrpcInternalError.WithCausef("malformed verification context data")
 		}
 	}
 
 	ident, err := authProvider.Verify(ctx, verifCtx, sess.ID, intent.Data.Answer)
 	if err != nil {
-		return nil, fmt.Errorf("verifying identity: %w", err)
+		if verifCtx != nil {
+			now := time.Now()
+			verifCtx.Attempts += 1
+			verifCtx.LastAttemptAt = &now
+
+			encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.KMSKeys[0], verifCtx)
+			if err != nil {
+				return nil, proto.ErrWebrpcInternalError.WithCausef("encrypt data: %w", err)
+			}
+			if err := s.VerificationContexts.UpdateData(ctx, dbVerifCtx, encryptedKey, algorithm, ciphertext); err != nil {
+				return nil, proto.ErrWebrpcInternalError.WithCausef("update verification context: %w", err)
+			}
+		}
+
+		var wErr proto.WebRPCError
+		if errors.As(err, &wErr) {
+			return nil, wErr
+		}
+		return nil, proto.ErrAnswerIncorrect.WithCausef("verifying answer: %w", err)
 	}
 
 	_, found, err = s.Accounts.Get(ctx, tntData.ProjectID, ident)
 	if err != nil {
-		return nil, fmt.Errorf("retrieving account: %w", err)
+		return nil, proto.ErrWebrpcInternalError.WithCausef("retrieving account: %w", err)
 	}
 	if found {
-		return nil, fmt.Errorf("account already exists")
+		return nil, proto.ErrAccountAlreadyLinked
 	}
 
 	accData := &proto.AccountData{
@@ -114,7 +133,7 @@ func (s *RPC) federateAccount(
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.KMSKeys[0], accData)
 	if err != nil {
-		return nil, fmt.Errorf("encrypting account data: %w", err)
+		return nil, proto.ErrWebrpcInternalError.WithCausef("encrypting account data: %w", err)
 	}
 
 	account := &data.Account{
@@ -130,11 +149,11 @@ func (s *RPC) federateAccount(
 	}
 
 	if _, err := s.Wallets.FederateAccount(waasapi.Context(ctx), account.UserID, waasapi.ConvertToAPIIntent(intent.ToIntent())); err != nil {
-		return nil, fmt.Errorf("creating account with WaaS API: %w", err)
+		return nil, proto.ErrWebrpcInternalError.WithCausef("creating account with WaaS API: %w", err)
 	}
 
 	if err := s.Accounts.Put(ctx, account); err != nil {
-		return nil, fmt.Errorf("save account: %w", err)
+		return nil, proto.ErrWebrpcInternalError.WithCausef("save account: %w", err)
 	}
 
 	outAcc := &intents.Account{

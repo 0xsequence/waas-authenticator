@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/auth"
+	"github.com/0xsequence/waas-authenticator/rpc/auth/email"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/0xsequence/waas-authenticator/rpc/tracing"
@@ -26,11 +28,11 @@ func (s *RPC) RegisterSession(
 
 	intent, sessionID, err := parseIntent(protoIntent)
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse intent: %w", err)
+		return nil, nil, proto.ErrWebrpcBadRequest.WithCausef("parse intent: %w", err)
 	}
 
 	if intent.Name != intents.IntentName_openSession {
-		return nil, nil, fmt.Errorf("unexpected intent name: %q", intent.Name)
+		return nil, nil, proto.ErrWebrpcBadRequest.WithCausef("unexpected intent name: %q", intent.Name)
 	}
 
 	ctx, span := tracing.Intent(ctx, intent)
@@ -38,16 +40,16 @@ func (s *RPC) RegisterSession(
 
 	intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataOpenSession](intent)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, proto.ErrWebrpcBadRequest.WithCause(err)
 	}
 
 	if sessionID != intentTyped.Data.SessionID {
-		return nil, nil, fmt.Errorf("signing session and session to register must match")
+		return nil, nil, proto.ErrWebrpcBadRequest.WithCausef("signing session and session to register must match")
 	}
 
 	authProvider, err := s.getAuthProvider(intentTyped.Data.IdentityType)
 	if err != nil {
-		return nil, nil, fmt.Errorf("get auth provider: %w", err)
+		return nil, nil, proto.ErrWebrpcBadRequest.WithCause(err)
 	}
 
 	sessionHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(sessionID))).String()
@@ -64,20 +66,20 @@ func (s *RPC) RegisterSession(
 	}
 	dbVerifCtx, found, err := s.VerificationContexts.Get(ctx, authID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting verification context: %w", err)
+		return nil, nil, proto.ErrWebrpcInternalError.WithCausef("getting verification context: %w", err)
 	}
 	if found && dbVerifCtx != nil {
 		verifCtx, _, err = crypto.DecryptData[*proto.VerificationContext](ctx, dbVerifCtx.EncryptedKey, dbVerifCtx.Ciphertext, tntData.KMSKeys)
 		if err != nil {
-			return nil, nil, fmt.Errorf("decrypting verification context data: %w", err)
+			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("decrypting verification context data: %w", err)
 		}
 
 		if time.Now().After(verifCtx.ExpiresAt) {
-			return nil, nil, fmt.Errorf("verification context expired")
+			return nil, nil, proto.ErrChallengeExpired
 		}
 
 		if !dbVerifCtx.CorrespondsTo(verifCtx) {
-			return nil, nil, fmt.Errorf("malformed verification context data")
+			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("malformed verification context data")
 		}
 	}
 
@@ -90,29 +92,40 @@ func (s *RPC) RegisterSession(
 
 			encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.KMSKeys[0], verifCtx)
 			if err != nil {
-				return nil, nil, fmt.Errorf("encrypt data: %w", err)
+				return nil, nil, proto.ErrWebrpcInternalError.WithCausef("encrypt data: %w", err)
 			}
 			if err := s.VerificationContexts.UpdateData(ctx, dbVerifCtx, encryptedKey, algorithm, ciphertext); err != nil {
-				return nil, nil, fmt.Errorf("update verification context: %w", err)
+				return nil, nil, proto.ErrWebrpcInternalError.WithCausef("update verification context: %w", err)
 			}
 		}
 
-		return nil, nil, fmt.Errorf("verifying answer: %w", err)
+		var wErr proto.WebRPCError
+		if errors.As(err, &wErr) {
+			return nil, nil, wErr
+		}
+		return nil, nil, proto.ErrAnswerIncorrect.WithCausef("verifying answer: %w", err)
 	}
+
+	// always use normalized email address
+	ident.Email = email.Normalize(ident.Email)
 
 	account, accountFound, err := s.Accounts.Get(ctx, tntData.ProjectID, ident)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve account: %w", err)
+		return nil, nil, proto.ErrWebrpcInternalError.WithCausef("failed to retrieve account: %w", err)
 	}
 
 	if !accountFound {
-		if !intentTyped.Data.ForceCreateAccount {
+		if !intentTyped.Data.ForceCreateAccount && ident.Email != "" {
 			accs, err := s.Accounts.ListByEmail(ctx, tntData.ProjectID, ident.Email)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to perform email check: %w", err)
+				return nil, nil, proto.ErrWebrpcInternalError.WithCausef("failed to perform email check: %w", err)
 			}
 			if len(accs) > 0 {
-				return nil, nil, proto.ErrEmailAlreadyInUse.WithCause(fmt.Errorf("%s", accs[0].Identity.Issuer))
+				cause := string(accs[0].Identity.Type) + "|" + accs[0].Email
+				if iss := accs[0].Identity.Issuer; iss != "" {
+					cause += "|" + iss
+				}
+				return nil, nil, proto.ErrEmailAlreadyInUse.WithCause(errors.New(cause))
 			}
 		}
 
@@ -124,7 +137,7 @@ func (s *RPC) RegisterSession(
 		}
 		encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.KMSKeys[0], accData)
 		if err != nil {
-			return nil, nil, fmt.Errorf("encrypting account data: %w", err)
+			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("encrypting account data: %w", err)
 		}
 
 		account = &data.Account{
@@ -142,12 +155,12 @@ func (s *RPC) RegisterSession(
 
 	res, err := s.Wallets.RegisterSession(waasapi.Context(ctx), account.UserID, waasapi.ConvertToAPIIntent(intent))
 	if err != nil {
-		return nil, nil, fmt.Errorf("registering session with WaaS API: %w", err)
+		return nil, nil, proto.ErrWebrpcInternalError.WithCausef("registering session with WaaS API: %w", err)
 	}
 
 	if !accountFound {
 		if err := s.Accounts.Put(ctx, account); err != nil {
-			return nil, nil, fmt.Errorf("save account: %w", err)
+			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("save account: %w", err)
 		}
 	}
 
@@ -163,7 +176,7 @@ func (s *RPC) RegisterSession(
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tntData.KMSKeys[0], sessData)
 	if err != nil {
-		return nil, convertIntentResponse(res), fmt.Errorf("encrypting session data: %w", err)
+		return nil, convertIntentResponse(res), proto.ErrWebrpcInternalError.WithCausef("encrypting session data: %w", err)
 	}
 
 	dbSess := &data.Session{
@@ -180,7 +193,7 @@ func (s *RPC) RegisterSession(
 	}
 
 	if err := s.Sessions.Put(ctx, dbSess); err != nil {
-		return nil, convertIntentResponse(res), fmt.Errorf("save session: %w", err)
+		return nil, convertIntentResponse(res), proto.ErrWebrpcInternalError.WithCausef("save session: %w", err)
 	}
 
 	retSess := &proto.Session{
