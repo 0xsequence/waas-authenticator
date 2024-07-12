@@ -306,6 +306,8 @@ struct IntentResponseTransactionFailed
 
 struct IntentResponseAccountList
   - accounts: []Account
+  - currentAccountId: string
+    + go.field.name = CurrentAccountID
 
 struct IntentResponseAccountFederated
   - account: Account
@@ -322,6 +324,7 @@ enum IdentityType: string
   - OIDC
   - Email
   - PlayFab
+  - Stytch
 
 struct Account
   - id: string
