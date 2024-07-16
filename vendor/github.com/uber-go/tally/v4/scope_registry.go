@@ -103,7 +103,7 @@ func newScopeRegistryWithShardCount(
 		}
 		r.subscopes[i].s[scopeRegistryKey(root.prefix, root.tags)] = root
 	}
-	if r.root.cachedReporter != nil {
+	if r.root.cachedReporter != nil && !omitCardinalityMetrics {
 		r.cachedCounterCardinalityGauge = r.root.cachedReporter.AllocateGauge(r.sanitizedCounterCardinalityName, r.cardinalityMetricsTags)
 		r.cachedGaugeCardinalityGauge = r.root.cachedReporter.AllocateGauge(r.sanitizedGaugeCardinalityName, r.cardinalityMetricsTags)
 		r.cachedHistogramCardinalityGauge = r.root.cachedReporter.AllocateGauge(r.sanitizedHistogramCardinalityName, r.cardinalityMetricsTags)
@@ -309,6 +309,8 @@ func (r *scopeRegistry) reportInternalMetrics() {
 	scopes.Inc() // Account for root scope.
 	r.ForEachScope(
 		func(ss *scope) {
+			ss.cm.RLock()
+			defer ss.cm.RUnlock()
 			counterSliceLen, gaugeSliceLen, histogramSliceLen := int64(len(ss.countersSlice)), int64(len(ss.gaugesSlice)), int64(len(ss.histogramsSlice))
 			if ss.root { // Root scope is referenced across all buckets.
 				rootCounters.Store(counterSliceLen)

@@ -1,3 +1,104 @@
+# v1.14.9 (2024-07-10.2)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.14.8 (2024-07-10)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.14.7 (2024-06-28)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.14.6 (2024-06-26)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.14.5 (2024-06-20)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.14.4 (2024-06-19)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.14.3 (2024-06-18)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.14.2 (2024-06-17)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.14.1 (2024-06-07)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.14.0 (2024-06-05)
+
+* **Feature**: Add codec options to use encoding.Text/Binary(Un)Marshaler when present on targets.
+
+# v1.13.21 (2024-06-03)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.20 (2024-05-28)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.19 (2024-05-24)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.18 (2024-05-23)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.17 (2024-05-16)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.16 (2024-05-15)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.15 (2024-05-08)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.14 (2024-05-02)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.13 (2024-03-29)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.12 (2024-03-25)
+
+* **Bug Fix**: Removes some duplicated reflection-based calls in the marshaler.
+
+# v1.13.11 (2024-03-20)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.10 (2024-03-18)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.9 (2024-03-07)
+
+* **Bug Fix**: Remove dependency on go-cmp.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.8 (2024-03-06)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.13.7 (2024-03-04)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
 # v1.13.6 (2024-02-23)
 
 * **Dependency Update**: Updated to the latest SDK module versions
