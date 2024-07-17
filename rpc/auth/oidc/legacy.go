@@ -98,7 +98,7 @@ func (p *LegacyAuthProvider) Verify(
 
 	sessionHash := ethcoder.Keccak256Hash([]byte(strings.ToLower(sessionID))).String()
 	validateOptions := []jwt.ValidateOption{
-		jwt.WithValidator(withIssuer(idp.Issuer)),
+		jwt.WithValidator(withIssuer(idp.Issuer, true)),
 		jwt.WithValidator(withSessionHash(sessionHash)),
 		jwt.WithAcceptableSkew(10 * time.Second),
 		jwt.WithValidator(withAudience(idp.Audience)),
