@@ -9,7 +9,7 @@ func (id Identity) String() string {
 	switch id.Type {
 	case IdentityType_Guest, IdentityType_Email:
 		return string(id.Type) + ":" + id.Subject
-	case IdentityType_OIDC, IdentityType_PlayFab:
+	case IdentityType_OIDC, IdentityType_PlayFab, IdentityType_Stytch:
 		return string(id.Type) + ":" + id.Issuer + "#" + id.Subject
 	default:
 		return ""
@@ -28,7 +28,7 @@ func (id *Identity) FromString(s string) error {
 		id.Type = IdentityType_Guest
 		id.Subject = parts[1]
 
-	case IdentityType_OIDC, IdentityType_PlayFab:
+	case IdentityType_OIDC, IdentityType_PlayFab, IdentityType_Stytch:
 		innerParts := strings.SplitN(parts[1], "#", 2)
 		if len(innerParts) != 2 {
 			return fmt.Errorf("invalid identity format: %s", parts[1])
