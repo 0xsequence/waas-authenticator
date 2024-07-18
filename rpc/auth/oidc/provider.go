@@ -59,26 +59,9 @@ func (p *AuthProvider) InitiateAuth(
 		return nil, fmt.Errorf("cannot reuse an old ID token")
 	}
 
-	tokHash, expiresAt, err := p.extractVerifier(verifier)
+	verifCtx, err := p.constructVerificationContext(proto.IdentityType_OIDC, tnt.ProjectID, sessionID, verifier)
 	if err != nil {
 		return nil, err
-	}
-
-	if time.Now().After(expiresAt) {
-		return nil, fmt.Errorf("token expired")
-	}
-
-	answer := tokHash
-	challenge := fmt.Sprintf("exp=%d", expiresAt.Unix())
-
-	verifCtx = &proto.VerificationContext{
-		ProjectID:    tnt.ProjectID,
-		SessionID:    sessionID,
-		IdentityType: proto.IdentityType_OIDC,
-		Verifier:     verifier,
-		Answer:       &answer,
-		Challenge:    &challenge,
-		ExpiresAt:    expiresAt,
 	}
 	if err := storeFn(ctx, verifCtx); err != nil {
 		return nil, err
@@ -129,7 +112,7 @@ func (p *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationC
 	}
 
 	validateOptions := []jwt.ValidateOption{
-		jwt.WithValidator(withIssuer(idp.Issuer)),
+		jwt.WithValidator(withIssuer(idp.Issuer, true)),
 		jwt.WithAcceptableSkew(10 * time.Second),
 		jwt.WithValidator(withAudience(idp.Audience)),
 	}
@@ -185,6 +168,33 @@ func (p *AuthProvider) GetKeySet(ctx context.Context, issuer string) (set jwk.Se
 		return nil, fmt.Errorf("fetch issuer keys: %w", err)
 	}
 	return keySet, nil
+}
+
+func (p *AuthProvider) constructVerificationContext(
+	identityType proto.IdentityType, projectID uint64, sessionID string, verifier string,
+) (*proto.VerificationContext, error) {
+	tokHash, expiresAt, err := p.extractVerifier(verifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if time.Now().After(expiresAt) {
+		return nil, fmt.Errorf("token expired")
+	}
+
+	answer := tokHash
+	challenge := fmt.Sprintf("exp=%d", expiresAt.Unix())
+
+	verifCtx := &proto.VerificationContext{
+		ProjectID:    projectID,
+		SessionID:    sessionID,
+		IdentityType: identityType,
+		Verifier:     verifier,
+		Answer:       &answer,
+		Challenge:    &challenge,
+		ExpiresAt:    expiresAt,
+	}
+	return verifCtx, nil
 }
 
 func (p *AuthProvider) extractVerifier(verifier string) (tokHash string, expiresAt time.Time, err error) {

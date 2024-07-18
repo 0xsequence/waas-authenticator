@@ -14,9 +14,14 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
-func withIssuer(expectedIss string) jwt.ValidatorFunc {
+func withIssuer(expectedIss string, normalize bool) jwt.ValidatorFunc {
 	return func(ctx context.Context, tok jwt.Token) jwt.ValidationError {
-		if normalizeIssuer(tok.Issuer()) != expectedIss {
+		iss := tok.Issuer()
+		if normalize {
+			iss = normalizeIssuer(iss)
+		}
+
+		if iss != expectedIss {
 			return jwt.NewValidationError(fmt.Errorf("iss not satisfied"))
 		}
 		return nil

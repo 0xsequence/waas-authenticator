@@ -294,6 +294,10 @@ func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config)
 	if err != nil {
 		return nil, err
 	}
+	stytchProvider, err := oidc.NewStytchAuthProvider(cacheBackend, client)
+	if err != nil {
+		return nil, err
+	}
 
 	sm := secretsmanager.NewFromConfig(awsCfg)
 	builderClient := builder.NewBuilderClient(
@@ -312,6 +316,7 @@ func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config)
 		intents.IdentityType_OIDC:    auth.NewTracedProvider("oidc.AuthProvider", oidcProvider),
 		intents.IdentityType_Guest:   auth.NewTracedProvider("guest.AuthProvider", guestProvider),
 		intents.IdentityType_PlayFab: auth.NewTracedProvider("playfab.AuthProvider", playfabProvider),
+		intents.IdentityType_Stytch:  auth.NewTracedProvider("oidc.StytchAuthProvider", stytchProvider),
 	}
 	return verifiers, nil
 }

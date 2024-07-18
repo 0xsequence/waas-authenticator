@@ -277,6 +277,76 @@ func TestOIDCAuth(t *testing.T) {
 	})
 }
 
+func TestStytchAuth(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		ctx := context.Background()
+
+		exp := time.Now().Add(120 * time.Second)
+		tokBuilderFn := func(b *jwt.Builder, url string) {
+			b.Expiration(exp)
+		}
+
+		stytchServer, tok := issueAccessTokenAndRunStytchJwksServer(t, "project-123", tokBuilderFn)
+		defer stytchServer.Close()
+
+		svc := initRPCWithClient(t, &http.Client{Transport: testTransport{
+			RoundTripper: http.DefaultTransport,
+			modifyRequest: func(req *http.Request) {
+				if strings.Contains(req.URL.String(), "stytch.com") {
+					req.URL.Host = stytchServer.Listener.Addr().String()
+				}
+			},
+		}})
+		tenant, _ := newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{
+			Stytch: proto.AuthStytchConfig{
+				Enabled:   true,
+				ProjectID: "project-123",
+			},
+		})
+		require.NoError(t, svc.Tenants.Add(ctx, tenant))
+
+		sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
+		require.NoError(t, err)
+		signingSession := intents.NewSessionP256K1(sessWallet)
+
+		srv := httptest.NewServer(svc.Handler())
+		defer srv.Close()
+
+		c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
+		header := make(http.Header)
+		header.Set("X-Sequence-Project", strconv.Itoa(int(tenant.ProjectID)))
+		ctx, err = proto.WithHTTPRequestHeaders(context.Background(), header)
+		require.NoError(t, err)
+
+		hashedToken := hexutil.Encode(crypto.Keccak256([]byte(tok)))
+		verifier := hashedToken + ";" + strconv.Itoa(int(exp.Unix()))
+		initiateAuth := generateSignedIntent(t, intents.IntentName_initiateAuth, intents.IntentDataInitiateAuth{
+			SessionID:    signingSession.SessionID(),
+			IdentityType: intents.IdentityType_Stytch,
+			Verifier:     verifier,
+		}, signingSession)
+		initRes, err := c.SendIntent(ctx, initiateAuth)
+		require.NoError(t, err)
+		assert.Equal(t, proto.IntentResponseCode_authInitiated, initRes.Code)
+
+		b, err := json.Marshal(initRes.Data)
+		require.NoError(t, err)
+		var initResData intents.IntentResponseAuthInitiated
+		require.NoError(t, json.Unmarshal(b, &initResData))
+
+		registerSession := generateSignedIntent(t, intents.IntentName_openSession, intents.IntentDataOpenSession{
+			SessionID:    signingSession.SessionID(),
+			IdentityType: intents.IdentityType_Stytch,
+			Verifier:     verifier,
+			Answer:       tok,
+		}, signingSession)
+		sess, registerRes, err := c.RegisterSession(ctx, registerSession, "Friendly name")
+		require.NoError(t, err)
+		assert.Equal(t, "Stytch:project-123#subject", sess.Identity.String())
+		assert.Equal(t, proto.IntentResponseCode_sessionOpened, registerRes.Code)
+	})
+}
+
 func TestPlayFabAuth(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ctx := context.Background()

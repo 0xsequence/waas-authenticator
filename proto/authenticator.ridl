@@ -62,6 +62,13 @@ struct AuthPlayfabConfig
     + go.field.type = string
     + go.tag.json = titleId,omitempty
 
+struct AuthStytchConfig
+  - enabled: bool
+  - projectId?: string
+    + go.field.name = ProjectID
+    + go.field.type = string
+    + go.tag.json = projectId,omitempty
+
 struct AuthConfig
   - email?: AuthEmailConfig
     + go.field.type = AuthEmailConfig
@@ -72,6 +79,9 @@ struct AuthConfig
   - playfab?: AuthPlayfabConfig
     + go.field.type = AuthPlayfabConfig
     + go.tag.json = playfab,omitempty
+  - stytch?: AuthStytchConfig
+    + go.field.type = AuthStytchConfig
+    + go.tag.json = stytch,omitempty
 
 struct Tenant
   - projectId: uint64
