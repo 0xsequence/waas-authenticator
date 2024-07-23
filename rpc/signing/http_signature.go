@@ -27,10 +27,11 @@ type httpSignatureBuilder struct {
 	status int
 	req    *http.Request
 
-	label  string
-	fields []string
-	nonce  string
-	alg    Algorithm
+	label         string
+	fields        []string
+	contentLength int
+	nonce         string
+	alg           Algorithm
 }
 
 func generateHTTPSignature(ctx context.Context, signer Signer, body []byte, req *http.Request, resHeader http.Header, status int) error {
@@ -131,10 +132,8 @@ func (b *httpSignatureBuilder) generate(ctx context.Context) error {
 	if h.Get("Date") == "" {
 		h.Add("Date", time.Now().UTC().Format(http.TimeFormat))
 	}
-	if h.Get("Content-Length") == "" {
-		h.Add("Content-Length", strconv.Itoa(contentLen))
-	}
 	h.Add("Content-Digest", digest)
+	b.contentLength = contentLen
 
 	sigBytes, err := b.generateSignature(ctx, sigInput)
 	if err != nil {
@@ -209,7 +208,7 @@ func (b *httpSignatureBuilder) generateSignature(ctx context.Context, sigParams 
 }
 
 func (b *httpSignatureBuilder) getFieldValue(key string) string {
-	switch key {
+	switch strings.ToLower(key) {
 	case "@method":
 		return b.req.Method
 	case "@path":
@@ -222,6 +221,8 @@ func (b *httpSignatureBuilder) getFieldValue(key string) string {
 		return b.req.Host
 	case "@status":
 		return strconv.Itoa(b.status)
+	case "content-length":
+		return strconv.Itoa(b.contentLength)
 	default:
 		return b.header.Get(key)
 	}
