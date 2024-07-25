@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/0xsequence/go-sequence/intents"
@@ -38,7 +39,7 @@ type jwks struct {
 
 func (s *RPC) handleOpenidConfiguration(w http.ResponseWriter, r *http.Request) {
 	cfg := &openidConfig{
-		JWKSURI: s.Config.BaseURL + "/.well-known/jwks.json",
+		JWKSURI: s.Config.Signing.Issuer + "/.well-known/jwks.json",
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -100,18 +101,17 @@ func (s *RPC) getIDToken(
 		return nil, fmt.Errorf("getting wallet address: %w", err)
 	}
 
-	aud := fmt.Sprintf("%s/project/%d", s.Config.Builder.BaseURL, tnt.ProjectID)
 	iat := time.Now()
 	exp := iat.Add(10 * time.Minute)
 
 	tokenBuilder := jwt.NewBuilder().
 		Subject(walletAddr).
-		Audience([]string{aud}).
-		Issuer(s.Config.BaseURL).
+		Audience([]string{s.Config.Signing.AudiencePrefix + strconv.Itoa(int(tnt.ProjectID))}).
+		Issuer(s.Config.Signing.Issuer).
 		IssuedAt(iat).
 		Expiration(exp).
 		Claim("auth_time", sessData.CreatedAt.Unix()).
-		Claim(s.Config.BaseURL+"/identity", identity)
+		Claim(s.Config.Signing.Issuer+"/identity", identity)
 
 	if account.Email != "" {
 		tokenBuilder.Claim("email", account.Email)
