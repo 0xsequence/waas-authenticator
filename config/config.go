@@ -12,13 +12,13 @@ type Config struct {
 	Mode      Mode             `toml:"-"`
 	Region    string           `toml:"region"`
 	Service   ServiceConfig    `toml:"service"`
-	BaseURL   string           `toml:"base_url"`
 	Admin     AdminConfig      `toml:"admin"`
 	Endpoints EndpointsConfig  `toml:"endpoints"`
 	KMS       KMSConfig        `toml:"kms"`
 	SES       SESConfig        `toml:"ses"`
 	Builder   BuilderConfig    `toml:"builder"`
 	Database  DatabaseConfig   `toml:"database"`
+	Signing   SigningConfig    `toml:"signing"`
 	Telemetry telemetry.Config `toml:"telemetry"`
 	Tracing   TracingConfig    `toml:"tracing"`
 }
@@ -65,6 +65,11 @@ type DatabaseConfig struct {
 type BuilderConfig struct {
 	BaseURL  string `toml:"base_url"`
 	SecretID string `toml:"secret_id"`
+}
+
+type SigningConfig struct {
+	Issuer         string `toml:"issuer"`
+	AudiencePrefix string `toml:"audience_prefix"`
 }
 
 type TracingConfig struct {
