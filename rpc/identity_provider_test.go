@@ -44,8 +44,8 @@ func TestRPC_SendIntent_GetIdToken(t *testing.T) {
 
 	srv := httptest.NewServer(svc.Handler())
 	defer srv.Close()
-	svc.Config.BaseURL = srv.URL
-	svc.Config.Builder.BaseURL = "https://sequence.build"
+	svc.Config.Signing.Issuer = srv.URL
+	svc.Config.Signing.AudiencePrefix = "https://sequence.build/project/"
 
 	intentData := &intents.IntentDataGetIdToken{
 		Wallet:    walletAddr,
