@@ -20,8 +20,8 @@ func TestRPC_GetTenant(t *testing.T) {
 
 	svc := initRPC(t)
 
-	tenant, _ := newTenant(t, svc.Enclave, issuer)
-	tenant2, _ := newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{Email: proto.AuthEmailConfig{Enabled: true}})
+	tenant, _ := newTenant(t, svc.Enclave, withOIDC(issuer))
+	tenant2, _ := newTenant(t, svc.Enclave, withEmail())
 	require.NoError(t, svc.Tenants.Add(context.Background(), tenant))
 	require.NoError(t, svc.Tenants.Add(context.Background(), tenant2))
 
@@ -63,7 +63,7 @@ func TestRPC_CreateTenant(t *testing.T) {
 
 	svc := initRPC(t)
 
-	tenant, _ := newTenant(t, svc.Enclave, issuer)
+	tenant, _ := newTenant(t, svc.Enclave, withOIDC(issuer))
 	require.NoError(t, svc.Tenants.Add(context.Background(), tenant))
 
 	srv := httptest.NewServer(svc.Handler())

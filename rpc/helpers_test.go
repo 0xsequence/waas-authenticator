@@ -277,49 +277,7 @@ func initLocalstack() (string, func()) {
 
 var currentProjectID atomic.Uint64
 
-func newTenant(t *testing.T, enc *enclave.Enclave, issuer string) (*data.Tenant, *proto.TenantData) {
-	att, err := enc.GetAttestation(context.Background(), nil)
-	require.NoError(t, err)
-
-	wallet, err := ethwallet.NewWalletFromRandomEntropy()
-	require.NoError(t, err)
-
-	projectID := currentProjectID.Add(1)
-
-	userSalt, _ := hexutil.Decode("0xa176de7902ef0781d2c6120cc5fd5add3048e1543f597ef4feae38391d234839")
-	payload := &proto.TenantData{
-		ProjectID:     projectID,
-		PrivateKey:    wallet.PrivateKeyHex()[2:],
-		ParentAddress: common.HexToAddress("0xcF104bc904E4dC1cCe0027aB9F9C905Ad3aE6c21"),
-		UserSalt:      userSalt,
-		SequenceContext: &proto.MiniSequenceContext{
-			Factory:    "0xFaA5c0b14d1bED5C888Ca655B9a8A5911F78eF4A",
-			MainModule: "0xfBf8f1A5E00034762D928f46d438B947f5d4065d",
-		},
-		UpgradeCode:     "CHANGEME",
-		WaasAccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVyX2lkIjozfQ.g2fWwLrKPhTUpLFc7ZM9pMm4kEHGu8haCMzMOOGiqSM",
-		OIDCProviders: []*proto.OpenIdProvider{
-			{Issuer: issuer, Audience: []string{"audience"}},
-			{Issuer: "https://" + strings.TrimPrefix(issuer, "http://"), Audience: []string{"audience"}},
-		},
-		AllowedOrigins: validation.Origins{"http://localhost"},
-		KMSKeys:        []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
-	}
-
-	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79", payload)
-	require.NoError(t, err)
-
-	return &data.Tenant{
-		ProjectID:    projectID,
-		Version:      1,
-		EncryptedKey: encryptedKey,
-		Algorithm:    algorithm,
-		Ciphertext:   ciphertext,
-		CreatedAt:    time.Now(),
-	}, payload
-}
-
-func newTenantWithAuthConfig(t *testing.T, enc *enclave.Enclave, authCfg proto.AuthConfig) (*data.Tenant, *proto.TenantData) {
+func newTenant(t *testing.T, enc *enclave.Enclave, opts ...func(*proto.TenantData)) (*data.Tenant, *proto.TenantData) {
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
 
@@ -341,21 +299,65 @@ func newTenantWithAuthConfig(t *testing.T, enc *enclave.Enclave, authCfg proto.A
 		UpgradeCode:     "CHANGEME",
 		WaasAccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVyX2lkIjozfQ.g2fWwLrKPhTUpLFc7ZM9pMm4kEHGu8haCMzMOOGiqSM",
 		AllowedOrigins:  validation.Origins{"http://localhost"},
-		AuthConfig:      authCfg,
 		KMSKeys:         []string{"arn:aws:kms:us-east-1:000000000000:key/27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79"},
+	}
+
+	for _, opt := range opts {
+		opt(payload)
 	}
 
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79", payload)
 	require.NoError(t, err)
 
 	return &data.Tenant{
-		ProjectID:    projectID,
+		ProjectID:    payload.ProjectID,
 		Version:      1,
 		EncryptedKey: encryptedKey,
 		Algorithm:    algorithm,
 		Ciphertext:   ciphertext,
 		CreatedAt:    time.Now(),
 	}, payload
+}
+
+func withProjectID(projectID uint64) func(*proto.TenantData) {
+	return func(data *proto.TenantData) {
+		data.ProjectID = projectID
+	}
+}
+
+func withOIDC(issuer string) func(*proto.TenantData) {
+	return func(data *proto.TenantData) {
+		data.OIDCProviders = []*proto.OpenIdProvider{
+			{Issuer: issuer, Audience: []string{"audience"}},
+			{Issuer: "https://" + strings.TrimPrefix(issuer, "http://"), Audience: []string{"audience"}},
+		}
+	}
+}
+
+func withGuest() func(*proto.TenantData) {
+	return func(data *proto.TenantData) {
+		data.AuthConfig.Guest.Enabled = true
+	}
+}
+
+func withEmail() func(*proto.TenantData) {
+	return func(data *proto.TenantData) {
+		data.AuthConfig.Email.Enabled = true
+	}
+}
+
+func withPlayFab(titleID string) func(*proto.TenantData) {
+	return func(data *proto.TenantData) {
+		data.AuthConfig.Playfab.Enabled = true
+		data.AuthConfig.Playfab.TitleID = titleID
+	}
+}
+
+func withStytch(stytchProjectID string) func(*proto.TenantData) {
+	return func(data *proto.TenantData) {
+		data.AuthConfig.Stytch.Enabled = true
+		data.AuthConfig.Stytch.ProjectID = stytchProjectID
+	}
 }
 
 func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, identity proto.Identity, wallet *ethwallet.Wallet) *data.Account {

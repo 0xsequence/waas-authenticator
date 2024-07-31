@@ -153,11 +153,7 @@ func TestEmailAuth(t *testing.T) {
 			})
 
 			var p assertionParams
-			p.tenant, _ = newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{
-				Email: proto.AuthEmailConfig{
-					Enabled: true,
-				},
-			})
+			p.tenant, _ = newTenant(t, svc.Enclave, withEmail())
 			require.NoError(t, svc.Tenants.Add(ctx, p.tenant))
 
 			if testCase.emailBuilderFn != nil {
@@ -219,11 +215,7 @@ func TestGuestAuth(t *testing.T) {
 		ctx := context.Background()
 
 		svc := initRPC(t)
-		tenant, _ := newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{
-			Guest: proto.AuthGuestConfig{
-				Enabled: true,
-			},
-		})
+		tenant, _ := newTenant(t, svc.Enclave, withGuest())
 		require.NoError(t, svc.Tenants.Add(ctx, tenant))
 
 		srv := httptest.NewServer(svc.Handler())
@@ -282,7 +274,7 @@ func TestOIDCAuth(t *testing.T) {
 		defer closeJWKS()
 
 		svc := initRPC(t)
-		tenant, _ := newTenant(t, svc.Enclave, issuer)
+		tenant, _ := newTenant(t, svc.Enclave, withOIDC(issuer))
 		require.NoError(t, svc.Tenants.Add(ctx, tenant))
 
 		sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
@@ -347,12 +339,7 @@ func TestStytchAuth(t *testing.T) {
 				}
 			},
 		}})
-		tenant, _ := newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{
-			Stytch: proto.AuthStytchConfig{
-				Enabled:   true,
-				ProjectID: "project-123",
-			},
-		})
+		tenant, _ := newTenant(t, svc.Enclave, withStytch("project-123"))
 		require.NoError(t, svc.Tenants.Add(ctx, tenant))
 
 		sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
@@ -415,12 +402,7 @@ func TestPlayFabAuth(t *testing.T) {
 				}
 			},
 		}})
-		tenant, _ := newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{
-			Playfab: proto.AuthPlayfabConfig{
-				Enabled: true,
-				TitleID: "TITLE",
-			},
-		})
+		tenant, _ := newTenant(t, svc.Enclave, withPlayFab("TITLE"))
 		require.NoError(t, svc.Tenants.Add(ctx, tenant))
 
 		sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
@@ -464,4 +446,111 @@ func TestPlayFabAuth(t *testing.T) {
 		assert.Equal(t, "PlayFab:TITLE#USER", sess.Identity.String())
 		assert.Equal(t, proto.IntentResponseCode_sessionOpened, registerRes.Code)
 	})
+}
+
+func TestEmailAlreadyInUse(t *testing.T) {
+	ctx := context.Background()
+
+	builderServer := httptest.NewServer(builder.NewBuilderServer(builder.NewMock()))
+	defer builderServer.Close()
+	walletService := newWalletServiceMock(nil)
+	waasServer := httptest.NewServer(proto_wallet.NewWaaSServer(walletService))
+	defer waasServer.Close()
+
+	email := "user@example.com"
+	exp := time.Now().Add(120 * time.Second)
+	tokBuilderFn := func(b *jwt.Builder, url string) {
+		b.Expiration(exp)
+		b.Claim("email", email)
+	}
+
+	issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t, tokBuilderFn)
+	defer closeJWKS()
+
+	svc := initRPC(t, func(cfg *config.Config) {
+		cfg.Builder.BaseURL = builderServer.URL
+		cfg.Endpoints.WaasAPIServer = waasServer.URL
+	})
+
+	tenant, _ := newTenant(t, svc.Enclave, withEmail(), withOIDC(issuer))
+	require.NoError(t, svc.Tenants.Add(ctx, tenant))
+
+	srv := httptest.NewServer(svc.Handler())
+	defer srv.Close()
+
+	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
+	header := make(http.Header)
+	header.Set("X-Sequence-Project", strconv.Itoa(int(tenant.ProjectID)))
+	ctx, err := proto.WithHTTPRequestHeaders(context.Background(), header)
+	require.NoError(t, err)
+
+	// Sign up with email
+	{
+		sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
+		require.NoError(t, err)
+		signingSession := intents.NewSessionP256K1(sessWallet)
+
+		initiateAuth := generateSignedIntent(t, intents.IntentName_initiateAuth, intents.IntentDataInitiateAuth{
+			SessionID:    signingSession.SessionID(),
+			IdentityType: intents.IdentityType_Email,
+			Verifier:     email + ";" + signingSession.SessionID(),
+		}, signingSession)
+		initRes, err := c.SendIntent(ctx, initiateAuth)
+		require.NoError(t, err)
+		assert.Equal(t, proto.IntentResponseCode_authInitiated, initRes.Code)
+
+		_, message, found := getSentEmailMessage(t, email)
+		require.True(t, found)
+		code := strings.TrimPrefix(message, "Your login code: ")
+		challenge := initRes.Data.(map[string]any)["challenge"].(string)
+		answer := hexutil.Encode(crypto.Keccak256([]byte(challenge + code)))
+
+		openSessionData := intents.IntentDataOpenSession{
+			SessionID:    signingSession.SessionID(),
+			IdentityType: intents.IdentityType_Email,
+			Verifier:     email + ";" + signingSession.SessionID(),
+			Answer:       answer,
+		}
+		openSession := generateSignedIntent(t, intents.IntentName_openSession, openSessionData, signingSession)
+
+		session, openSessionRes, err := c.RegisterSession(ctx, openSession, "friendly name")
+		require.NoError(t, err)
+		require.NotNil(t, openSessionRes)
+		require.NotNil(t, session)
+	}
+
+	// Try to sign up with OIDC using the same email address
+	{
+		sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
+		require.NoError(t, err)
+		signingSession := intents.NewSessionP256K1(sessWallet)
+
+		hashedToken := hexutil.Encode(crypto.Keccak256([]byte(tok)))
+		verifier := hashedToken + ";" + strconv.Itoa(int(exp.Unix()))
+		initiateAuth := generateSignedIntent(t, intents.IntentName_initiateAuth, intents.IntentDataInitiateAuth{
+			SessionID:    signingSession.SessionID(),
+			IdentityType: intents.IdentityType_OIDC,
+			Verifier:     verifier,
+		}, signingSession)
+		initRes, err := c.SendIntent(ctx, initiateAuth)
+		require.NoError(t, err)
+		assert.Equal(t, proto.IntentResponseCode_authInitiated, initRes.Code)
+
+		b, err := json.Marshal(initRes.Data)
+		require.NoError(t, err)
+		var initResData intents.IntentResponseAuthInitiated
+		require.NoError(t, json.Unmarshal(b, &initResData))
+
+		registerSession := generateSignedIntent(t, intents.IntentName_openSession, intents.IntentDataOpenSession{
+			SessionID:    signingSession.SessionID(),
+			IdentityType: intents.IdentityType_OIDC,
+			Verifier:     verifier,
+			Answer:       tok,
+		}, signingSession)
+		_, _, err = c.RegisterSession(ctx, registerSession, "Friendly name")
+
+		var wErr proto.WebRPCError
+		require.ErrorAs(t, err, &wErr)
+		assert.Equal(t, "Email|user@example.com", wErr.Cause)
+	}
 }

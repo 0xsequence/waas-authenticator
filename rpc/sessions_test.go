@@ -198,7 +198,7 @@ func TestLegacyAuth(t *testing.T) {
 			walletService := newWalletServiceMock(nil)
 			svc.Wallets = walletService
 
-			tenant, _ := newTenant(t, svc.Enclave, issuer)
+			tenant, _ := newTenant(t, svc.Enclave, withOIDC(issuer))
 			account := newAccount(t, tenant, svc.Enclave, newOIDCIdentity("http://another-issuer"), nil)
 
 			require.NoError(t, svc.Tenants.Add(ctx, tenant))
@@ -307,7 +307,7 @@ func TestRPC_SendIntent_DropSession(t *testing.T) {
 
 			svc := initRPC(t)
 
-			tenant, _ := newTenant(t, svc.Enclave, issuer)
+			tenant, _ := newTenant(t, svc.Enclave, withOIDC(issuer))
 			acc := newAccount(t, tenant, svc.Enclave, newOIDCIdentity(issuer), sessWallet)
 			session := newSession(t, tenant, svc.Enclave, issuer, signingSession)
 
@@ -374,7 +374,7 @@ func TestRPC_SendIntent_ListSessions(t *testing.T) {
 
 	svc := initRPC(t)
 
-	tenant, tntData := newTenant(t, svc.Enclave, issuer)
+	tenant, tntData := newTenant(t, svc.Enclave, withOIDC(issuer))
 	acc := newAccount(t, tenant, svc.Enclave, newOIDCIdentity(issuer), sessWallet)
 	sess1 := newSession(t, tenant, svc.Enclave, issuer, signingSession)
 	sess2 := newSessionFromData(t, tenant, svc.Enclave, &proto.SessionData{
