@@ -27,11 +27,13 @@ import (
 
 func TestEmailAuth(t *testing.T) {
 	type assertionParams struct {
-		tenant *data.Tenant
-		email  string
+		tenant  *data.Tenant
+		email   string
+		attempt int
 	}
 
 	testCases := map[string]struct {
+		retryAttempts           int
 		emailBuilderFn          func(t *testing.T, p assertionParams) string
 		assertInitiateAuthFn    func(t *testing.T, res *proto.IntentResponse, err error) bool
 		extractAnswerFn         func(t *testing.T, p assertionParams, res *proto.IntentResponse) string
@@ -83,6 +85,50 @@ func TestEmailAuth(t *testing.T) {
 			},
 			assertRegisterSessionFn: func(t *testing.T, p assertionParams, sess *proto.Session, res *proto.IntentResponse, err error) {
 				require.ErrorContains(t, err, "incorrect answer")
+			},
+		},
+		"MultipleAttempts": {
+			retryAttempts: 2,
+			assertInitiateAuthFn: func(t *testing.T, res *proto.IntentResponse, err error) bool {
+				return true
+			},
+			extractAnswerFn: func(t *testing.T, p assertionParams, res *proto.IntentResponse) string {
+				if p.attempt < 2 {
+					return "Wrong"
+				}
+				_, message, found := getSentEmailMessage(t, fmt.Sprintf("user+%d@example.com", p.tenant.ProjectID))
+				require.True(t, found)
+				return strings.TrimPrefix(message, "Your login code: ")
+			},
+			assertRegisterSessionFn: func(t *testing.T, p assertionParams, sess *proto.Session, res *proto.IntentResponse, err error) {
+				if p.attempt < 2 {
+					require.ErrorContains(t, err, "incorrect answer")
+					return
+				}
+				expectedIdentity := newEmailIdentity(fmt.Sprintf("user+%d@example.com", p.tenant.ProjectID))
+				require.NoError(t, err)
+				assert.Equal(t, expectedIdentity, sess.Identity)
+			},
+		},
+		"TooManyAttempts": {
+			retryAttempts: 10,
+			assertInitiateAuthFn: func(t *testing.T, res *proto.IntentResponse, err error) bool {
+				return true
+			},
+			extractAnswerFn: func(t *testing.T, p assertionParams, res *proto.IntentResponse) string {
+				if p.attempt < 3 {
+					return "Wrong"
+				}
+				_, message, found := getSentEmailMessage(t, fmt.Sprintf("user+%d@example.com", p.tenant.ProjectID))
+				require.True(t, found)
+				return strings.TrimPrefix(message, "Your login code: ")
+			},
+			assertRegisterSessionFn: func(t *testing.T, p assertionParams, sess *proto.Session, res *proto.IntentResponse, err error) {
+				if p.attempt < 3 {
+					require.ErrorContains(t, err, "incorrect answer")
+				} else {
+					require.ErrorContains(t, err, "Too many attempts")
+				}
 			},
 		},
 	}
@@ -143,21 +189,25 @@ func TestEmailAuth(t *testing.T) {
 				}
 			}
 
-			code := testCase.extractAnswerFn(t, p, initiateAuthRes)
-			challenge := initiateAuthRes.Data.(map[string]any)["challenge"].(string)
-			answer := hexutil.Encode(crypto.Keccak256([]byte(challenge + code)))
+			for attempt := 0; attempt < testCase.retryAttempts+1; attempt++ {
+				p.attempt = attempt
 
-			openSessionData := intents.IntentDataOpenSession{
-				SessionID:    signingSession.SessionID(),
-				IdentityType: intents.IdentityType_Email,
-				Verifier:     p.email + ";" + signingSession.SessionID(),
-				Answer:       answer,
-			}
-			openSession := generateSignedIntent(t, intents.IntentName_openSession, openSessionData, signingSession)
+				code := testCase.extractAnswerFn(t, p, initiateAuthRes)
+				challenge := initiateAuthRes.Data.(map[string]any)["challenge"].(string)
+				answer := hexutil.Encode(crypto.Keccak256([]byte(challenge + code)))
 
-			session, openSessionRes, err := c.RegisterSession(ctx, openSession, "friendly name")
-			if testCase.assertRegisterSessionFn != nil {
-				testCase.assertRegisterSessionFn(t, p, session, openSessionRes, err)
+				openSessionData := intents.IntentDataOpenSession{
+					SessionID:    signingSession.SessionID(),
+					IdentityType: intents.IdentityType_Email,
+					Verifier:     p.email + ";" + signingSession.SessionID(),
+					Answer:       answer,
+				}
+				openSession := generateSignedIntent(t, intents.IntentName_openSession, openSessionData, signingSession)
+
+				session, openSessionRes, err := c.RegisterSession(ctx, openSession, "friendly name")
+				if testCase.assertRegisterSessionFn != nil {
+					testCase.assertRegisterSessionFn(t, p, session, openSessionRes, err)
+				}
 			}
 		})
 	}
