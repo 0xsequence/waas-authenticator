@@ -201,6 +201,7 @@ error 7001 AccountAlreadyLinked "Could not link account as it is linked to anoth
 error 7002 ProofVerificationFailed "The authentication proof could not be verified" HTTP 400
 error 7003 AnswerIncorrect "The provided answer is incorrect" HTTP 400
 error 7004 ChallengeExpired "The challenge has expired" HTTP 400
+error 7005 TooManyAttempts "Too many attempts" HTTP 400
 
 
 ##
