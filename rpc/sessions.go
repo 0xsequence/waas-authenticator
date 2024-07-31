@@ -74,6 +74,10 @@ func (s *RPC) RegisterSession(
 			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("decrypting verification context data: %w", err)
 		}
 
+		if verifCtx.Attempts >= 3 {
+			return nil, nil, proto.ErrTooManyAttempts
+		}
+
 		if time.Now().After(verifCtx.ExpiresAt) {
 			return nil, nil, proto.ErrChallengeExpired
 		}
