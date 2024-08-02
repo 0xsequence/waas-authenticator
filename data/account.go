@@ -175,3 +175,80 @@ func (t *AccountTable) Delete(ctx context.Context, projectID uint64, identity pr
 	}
 	return nil
 }
+
+func (t *AccountTable) ListByProjectAndIdentity(ctx context.Context, page Page, projectID uint64, identityType proto.IdentityType, issuer string) ([]*Account, Page, error) {
+	if page.Limit <= 0 {
+		page.Limit = 25
+	}
+
+	input := &dynamodb.QueryInput{
+		TableName:              &t.tableARN,
+		KeyConditionExpression: aws.String("#P = :projectID"),
+		ExpressionAttributeNames: map[string]string{
+			"#P": "ProjectID",
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":projectID": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", projectID)},
+		},
+		Limit:             &page.Limit,
+		ExclusiveStartKey: page.NextKey,
+	}
+
+	var identCond string
+	if identityType != proto.IdentityType_None {
+		identCond = string(identityType) + ":"
+		if issuer != "" {
+			identCond += issuer + "#"
+		}
+
+		*input.KeyConditionExpression += " and begins_with(#I, :identCond)"
+		input.ExpressionAttributeNames["#I"] = "Identity"
+		input.ExpressionAttributeValues[":identCond"] = &types.AttributeValueMemberS{Value: identCond}
+	}
+
+	out, err := t.db.Query(ctx, input)
+	if err != nil {
+		return nil, page, fmt.Errorf("Query: %w", err)
+	}
+
+	accounts := make([]*Account, len(out.Items))
+	for i, item := range out.Items {
+		if err := attributevalue.UnmarshalMap(item, &accounts[i]); err != nil {
+			return nil, page, fmt.Errorf("unmarshal result: %w", err)
+		}
+	}
+
+	page.NextKey = out.LastEvaluatedKey
+	return accounts, page, nil
+}
+
+func (t *AccountTable) GetBatch(ctx context.Context, projectID uint64, identities []proto.Identity) ([]*Account, error) {
+	keys := make([]map[string]types.AttributeValue, len(identities))
+	for i, identity := range identities {
+		acct := Account{ProjectID: projectID, Identity: Identity(identity)}
+		keys[i] = acct.Key()
+	}
+
+	input := &dynamodb.BatchGetItemInput{
+		RequestItems: map[string]types.KeysAndAttributes{
+			t.tableARN: {Keys: keys},
+		},
+	}
+
+	out, err := t.db.BatchGetItem(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("BatchGetItem: %w", err)
+	}
+
+	for _, results := range out.Responses {
+		accounts := make([]*Account, len(results))
+		for i, item := range results {
+			if err := attributevalue.UnmarshalMap(item, &accounts[i]); err != nil {
+				return nil, fmt.Errorf("unmarshal result: %w", err)
+			}
+		}
+		return accounts, nil
+	}
+
+	return make([]*Account, 0), nil
+}
