@@ -189,6 +189,19 @@ struct VerificationContext
   - expiresAt: timestamp
 
 
+struct Page
+  - limit?: uint32
+    + go.field.type = uint32
+    + go.tag.json = limit,omitempty
+  - after?: string
+    + go.field.type = string
+    + go.tag.json = after,omitempty
+
+
+enum Migration: string
+  - OIDCToStytch
+
+
 ##
 ## Errors
 ##
@@ -221,3 +234,6 @@ service WaasAuthenticatorAdmin
     - GetTenant(projectId: uint64) => (tenant: Tenant)
     - CreateTenant(projectId: uint64, waasAccessToken: string, authConfig: AuthConfig, oidcProviders: []OpenIdProvider, allowedOrigins: []string, password?: string) => (tenant: Tenant, upgradeCode: string)
     - UpdateTenant(projectId: uint64, upgradeCode: string, authConfig: AuthConfig, oidcProviders: []OpenIdProvider, allowedOrigins: []string) => (tenant: Tenant)
+
+    - NextMigrationBatch(migration: Migration, projectId: uint64, page: Page) => (page: Page, items: []string)
+    - ProcessMigrationBatch(migration: Migration, projectId: uint64, items: []string) => (logs: map<string, []string>, errors: map<string, string>)
