@@ -378,12 +378,13 @@ func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, identity p
 	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(context.Background(), att, "27ebbde0-49d2-4cb6-ad78-4f2c24fe7b79", payload)
 	require.NoError(t, err)
 
+	email := "user@example.com"
 	return &data.Account{
 		ProjectID:          tnt.ProjectID,
 		Identity:           data.Identity(identity),
 		UserID:             payload.UserID,
-		Email:              "user@example.com",
-		ProjectScopedEmail: fmt.Sprintf("%d|user@example.com", tnt.ProjectID),
+		Email:              email,
+		ProjectScopedEmail: fmt.Sprintf("%d|%s", tnt.ProjectID, email),
 		EncryptedKey:       encryptedKey,
 		Algorithm:          algorithm,
 		Ciphertext:         ciphertext,
@@ -391,11 +392,15 @@ func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, identity p
 	}
 }
 
-func newOIDCIdentity(issuer string) proto.Identity {
+func newOIDCIdentity(issuer string, optSubject ...string) proto.Identity {
+	subject := "SUBJECT"
+	if len(optSubject) > 0 {
+		subject = optSubject[0]
+	}
 	return proto.Identity{
 		Type:    proto.IdentityType_OIDC,
 		Issuer:  issuer,
-		Subject: "SUBJECT",
+		Subject: subject,
 	}
 }
 
@@ -404,6 +409,18 @@ func newEmailIdentity(email string) proto.Identity {
 		Type:    proto.IdentityType_Email,
 		Subject: email,
 		Email:   email,
+	}
+}
+
+func newStytchIdentity(stytchProjectID string, optSubject ...string) proto.Identity {
+	subject := "SUBJECT"
+	if len(optSubject) > 0 {
+		subject = optSubject[0]
+	}
+	return proto.Identity{
+		Type:    proto.IdentityType_Stytch,
+		Issuer:  stytchProjectID,
+		Subject: subject,
 	}
 }
 
