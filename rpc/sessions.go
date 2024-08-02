@@ -200,6 +200,10 @@ func (s *RPC) RegisterSession(
 		return nil, convertIntentResponse(res), proto.ErrWebrpcInternalError.WithCausef("save session: %w", err)
 	}
 
+	if err := s.Migrations.OnRegisterSession(ctx, account); err != nil {
+		return nil, convertIntentResponse(res), proto.ErrWebrpcInternalError.WithCausef("migrate account: %w", err)
+	}
+
 	retSess := &proto.Session{
 		ID:           dbSess.ID,
 		UserID:       dbSess.UserID,
