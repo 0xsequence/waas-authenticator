@@ -24,6 +24,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/auth/oidc"
 	"github.com/0xsequence/waas-authenticator/rpc/auth/playfab"
 	"github.com/0xsequence/waas-authenticator/rpc/awscreds"
+	"github.com/0xsequence/waas-authenticator/rpc/migration"
 	"github.com/0xsequence/waas-authenticator/rpc/signing"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/0xsequence/waas-authenticator/rpc/tracing"
@@ -66,6 +67,8 @@ type RPC struct {
 	Wallets              proto_wallet.WaaS
 	AuthProviders        map[intents.IdentityType]auth.Provider
 	Signer               signing.Signer
+
+	Migrations *migration.Runner
 
 	measurements *enclave.Measurements
 	startTime    time.Time
@@ -161,6 +164,7 @@ func New(cfg *config.Config, client *http.Client) (*RPC, error) {
 		startTime:     time.Now(),
 		measurements:  m,
 	}
+	s.Migrations = migration.NewRunner(cfg.Migrations, s.Accounts)
 	return s, nil
 }
 
