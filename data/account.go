@@ -72,8 +72,12 @@ func (t *AccountTable) Put(ctx context.Context, acct *Account) error {
 		return fmt.Errorf("marshal input: %w", err)
 	}
 	input := &dynamodb.PutItemInput{
-		TableName: &t.tableARN,
-		Item:      av,
+		TableName:           &t.tableARN,
+		Item:                av,
+		ConditionExpression: aws.String("attribute_not_exists(#I)"),
+		ExpressionAttributeNames: map[string]string{
+			"#I": "Identity",
+		},
 	}
 	if _, err := t.db.PutItem(ctx, input); err != nil {
 		return fmt.Errorf("PutItem: %w", err)
