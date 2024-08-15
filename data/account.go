@@ -63,8 +63,8 @@ func NewAccountTable(db DB, tableARN string, indices AccountIndices) *AccountTab
 	}
 }
 
-// Put updates an Account by ProjectID or creates one if it doesn't exist yet.
-func (t *AccountTable) Put(ctx context.Context, acct *Account) error {
+// Create creates a new Account or fails if it already exists.
+func (t *AccountTable) Create(ctx context.Context, acct *Account) error {
 	acct.CreatedAt = time.Now()
 
 	av, err := attributevalue.MarshalMap(acct)
@@ -78,6 +78,24 @@ func (t *AccountTable) Put(ctx context.Context, acct *Account) error {
 		ExpressionAttributeNames: map[string]string{
 			"#I": "Identity",
 		},
+	}
+	if _, err := t.db.PutItem(ctx, input); err != nil {
+		return fmt.Errorf("PutItem: %w", err)
+	}
+	return nil
+}
+
+// Put updates an Account by ProjectID or creates one if it doesn't exist yet.
+func (t *AccountTable) Put(ctx context.Context, acct *Account) error {
+	acct.CreatedAt = time.Now()
+
+	av, err := attributevalue.MarshalMap(acct)
+	if err != nil {
+		return fmt.Errorf("marshal input: %w", err)
+	}
+	input := &dynamodb.PutItemInput{
+		TableName: &t.tableARN,
+		Item:      av,
 	}
 	if _, err := t.db.PutItem(ctx, input); err != nil {
 		return fmt.Errorf("PutItem: %w", err)

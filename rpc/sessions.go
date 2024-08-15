@@ -162,7 +162,8 @@ func (s *RPC) RegisterSession(
 		return nil, nil, proto.ErrWebrpcInternalError.WithCausef("registering session with WaaS API: %w", err)
 	}
 
-	if !accountFound {
+	if !accountFound || (ident.Email != "" && account.Email != ident.Email) {
+		account.Email = ident.Email
 		if err := s.Accounts.Put(ctx, account); err != nil {
 			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("save account: %w", err)
 		}
