@@ -38,8 +38,8 @@ func TestMigrationOIDCToStytch(t *testing.T) {
 			svc := initRPC(t, func(cfg *config.Config) {
 				cfg.Migrations.OIDCToStytch = []config.OIDCToStytchConfig{
 					{
-						ProjectID:       currentProjectID.Load() + 1,
-						StytchProjectID: "TEST",
+						SequenceProject: currentProjectID.Load() + 1,
+						StytchProject:   "TEST",
 						FromIssuer:      "FAKE_ISSUER",
 					},
 				}
@@ -107,8 +107,8 @@ func TestMigrationOIDCToStytch(t *testing.T) {
 		svc := initRPC(t, func(cfg *config.Config) {
 			cfg.Migrations.OIDCToStytch = []config.OIDCToStytchConfig{
 				{
-					ProjectID:       currentProjectID.Load() + 1,
-					StytchProjectID: "TEST",
+					SequenceProject: currentProjectID.Load() + 1,
+					StytchProject:   "TEST",
 					FromIssuer:      issuer,
 				},
 			}
@@ -178,8 +178,8 @@ func TestMigrationOIDCToStytch(t *testing.T) {
 		svc := initRPC(t, func(cfg *config.Config) {
 			cfg.Migrations.OIDCToStytch = []config.OIDCToStytchConfig{
 				{
-					ProjectID:       projectID,
-					StytchProjectID: "TEST",
+					SequenceProject: projectID,
+					StytchProject:   "TEST",
 					FromIssuer:      issuer,
 				},
 			}

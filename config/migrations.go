@@ -5,7 +5,7 @@ type MigrationsConfig struct {
 }
 
 type OIDCToStytchConfig struct {
-	ProjectID       uint64 `toml:"project_id"`
-	StytchProjectID string `toml:"stytch_project_id"`
+	SequenceProject uint64 `toml:"sequence_project"`
+	StytchProject   string `toml:"stytch_project"`
 	FromIssuer      string `toml:"from_issuer"`
 }

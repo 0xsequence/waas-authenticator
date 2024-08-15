@@ -29,7 +29,7 @@ func NewRunner(cfg config.MigrationsConfig, accounts *data.AccountTable) *Runner
 			configs:  make(map[uint64]config.OIDCToStytchConfig),
 		}
 		for _, mCfg := range cfg.OIDCToStytch {
-			m.configs[mCfg.ProjectID] = mCfg
+			m.configs[mCfg.SequenceProject] = mCfg
 		}
 		r.migrations[proto.Migration_OIDCToStytch] = m
 	}

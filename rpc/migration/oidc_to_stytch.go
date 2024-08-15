@@ -40,7 +40,7 @@ func (m *OIDCToStytch) OnRegisterSession(ctx context.Context, originalAccount *d
 
 	migratedIdentity := proto.Identity{
 		Type:    proto.IdentityType_Stytch,
-		Issuer:  cfg.StytchProjectID,
+		Issuer:  cfg.StytchProject,
 		Subject: originalAccount.Identity.Subject,
 		Email:   originalAccount.Email,
 	}
@@ -96,7 +96,7 @@ func (m *OIDCToStytch) NextBatch(ctx context.Context, projectID uint64, page dat
 		for _, acc := range accounts {
 			migratedIdentity := proto.Identity{
 				Type:    proto.IdentityType_Stytch,
-				Issuer:  cfg.StytchProjectID,
+				Issuer:  cfg.StytchProject,
 				Subject: acc.Identity.Subject,
 			}
 			_, found, err := m.accounts.Get(ctx, acc.ProjectID, migratedIdentity)
@@ -148,7 +148,7 @@ func (m *OIDCToStytch) ProcessItems(ctx context.Context, tenant *proto.TenantDat
 		item := originalAccount.Identity.String()
 		migratedIdentity := proto.Identity{
 			Type:    proto.IdentityType_Stytch,
-			Issuer:  cfg.StytchProjectID,
+			Issuer:  cfg.StytchProject,
 			Subject: originalAccount.Identity.Subject,
 			Email:   originalAccount.Email,
 		}
