@@ -74,7 +74,7 @@ func (m *OIDCToStytch) OnRegisterSession(ctx context.Context, originalAccount *d
 		Ciphertext:         ciphertext,
 		CreatedAt:          accData.CreatedAt,
 	}
-	if err := m.accounts.Put(ctx, account); err != nil {
+	if err := m.accounts.Create(ctx, account); err != nil {
 		return fmt.Errorf("saving account: %w", err)
 	}
 	return nil
@@ -175,7 +175,7 @@ func (m *OIDCToStytch) ProcessItems(ctx context.Context, tenant *proto.TenantDat
 			Ciphertext:         ciphertext,
 			CreatedAt:          accData.CreatedAt,
 		}
-		if err := m.accounts.Put(ctx, account); err != nil {
+		if err := m.accounts.Create(ctx, account); err != nil {
 			res.Errorf(item, "saving account: %w", err)
 			continue
 		}
