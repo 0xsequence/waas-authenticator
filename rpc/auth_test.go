@@ -72,6 +72,7 @@ func TestEmailAuth(t *testing.T) {
 			},
 			assertRegisterSessionFn: func(t *testing.T, p assertionParams, sess *proto.Session, res *proto.IntentResponse, err error) {
 				expectedIdentity := newEmailIdentity(fmt.Sprintf("user+%d@example.com", p.tenant.ProjectID))
+				expectedIdentity.Email = expectedIdentity.Subject
 				require.NoError(t, err)
 				assert.Equal(t, expectedIdentity, sess.Identity)
 			},
@@ -106,6 +107,7 @@ func TestEmailAuth(t *testing.T) {
 					return
 				}
 				expectedIdentity := newEmailIdentity(fmt.Sprintf("user+%d@example.com", p.tenant.ProjectID))
+				expectedIdentity.Email = expectedIdentity.Subject
 				require.NoError(t, err)
 				assert.Equal(t, expectedIdentity, sess.Identity)
 			},

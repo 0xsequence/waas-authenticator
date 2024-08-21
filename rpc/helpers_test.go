@@ -358,7 +358,7 @@ func newTenantWithAuthConfig(t *testing.T, enc *enclave.Enclave, authCfg proto.A
 	}, payload
 }
 
-func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, identity proto.Identity, wallet *ethwallet.Wallet) *data.Account {
+func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, identity proto.Identity, wallet *ethwallet.Wallet, optEmail ...string) *data.Account {
 	att, err := enc.GetAttestation(context.Background(), nil)
 	require.NoError(t, err)
 
@@ -379,6 +379,9 @@ func newAccount(t *testing.T, tnt *data.Tenant, enc *enclave.Enclave, identity p
 	require.NoError(t, err)
 
 	email := "user@example.com"
+	if len(optEmail) > 0 {
+		email = optEmail[0]
+	}
 	return &data.Account{
 		ProjectID:          tnt.ProjectID,
 		Identity:           data.Identity(identity),
@@ -408,7 +411,6 @@ func newEmailIdentity(email string) proto.Identity {
 	return proto.Identity{
 		Type:    proto.IdentityType_Email,
 		Subject: email,
-		Email:   email,
 	}
 }
 
