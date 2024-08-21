@@ -200,6 +200,7 @@ struct Page
 
 enum Migration: string
   - OIDCToStytch
+  - OIDCToEmail
 
 
 ##
