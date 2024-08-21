@@ -33,6 +33,12 @@ func NewRunner(cfg config.MigrationsConfig, accounts *data.AccountTable) *Runner
 		}
 		r.migrations[proto.Migration_OIDCToStytch] = m
 	}
+	if cfg.Email.Enabled {
+		r.migrations[proto.Migration_OIDCToEmail] = &OIDCToEmail{
+			accounts: accounts,
+			config:   cfg.Email,
+		}
+	}
 	return r
 }
 

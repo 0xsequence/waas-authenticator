@@ -223,7 +223,7 @@ func (t *AccountTable) ListByProjectAndIdentity(ctx context.Context, page Page, 
 	if identityType != proto.IdentityType_None {
 		identCond = string(identityType) + ":"
 		if issuer != "" {
-			identCond += issuer + "#"
+			identCond += issuer
 		}
 
 		*input.KeyConditionExpression += " and begins_with(#I, :identCond)"
