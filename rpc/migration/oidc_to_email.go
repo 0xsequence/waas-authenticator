@@ -4,22 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/0xsequence/waas-authenticator/config"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
+	"github.com/0xsequence/waas-authenticator/rpc/auth/email"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 )
 
-type OIDCToStytch struct {
+type OIDCToEmail struct {
 	accounts *data.AccountTable
 	tenants  *data.TenantTable
-	configs  map[uint64]config.OIDCToStytchConfig
+	config   config.EmailMigrationConfig
 }
 
-func (m *OIDCToStytch) OnRegisterSession(ctx context.Context, originalAccount *data.Account) error {
+func (m *OIDCToEmail) OnRegisterSession(ctx context.Context, originalAccount *data.Account) error {
 	att := attestation.FromContext(ctx)
 	tntData := tenant.FromContext(ctx)
 
@@ -29,21 +31,17 @@ func (m *OIDCToStytch) OnRegisterSession(ctx context.Context, originalAccount *d
 	if originalAccount.Identity.Type != proto.IdentityType_OIDC {
 		return nil
 	}
-
-	cfg, ok := m.configs[tntData.ProjectID]
-	if !ok {
-		return nil
-	}
-	if originalAccount.Identity.Issuer != cfg.FromIssuer {
+	if !strings.HasPrefix(originalAccount.Identity.Issuer, m.config.IssuerPrefix) {
 		return nil
 	}
 
+	normEmail := email.Normalize(originalAccount.Email)
 	migratedIdentity := proto.Identity{
-		Type:    proto.IdentityType_Stytch,
-		Issuer:  cfg.StytchProject,
-		Subject: originalAccount.Identity.Subject,
-		Email:   originalAccount.Email,
+		Type:    proto.IdentityType_Email,
+		Subject: normEmail,
+		Email:   normEmail,
 	}
+
 	_, accountFound, err := m.accounts.Get(ctx, tntData.ProjectID, migratedIdentity)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve account: %w", err)
@@ -80,24 +78,20 @@ func (m *OIDCToStytch) OnRegisterSession(ctx context.Context, originalAccount *d
 	return nil
 }
 
-func (m *OIDCToStytch) NextBatch(ctx context.Context, projectID uint64, page data.Page) ([]string, data.Page, error) {
-	cfg, ok := m.configs[projectID]
-	if !ok {
-		return nil, page, fmt.Errorf("project %d not found", projectID)
-	}
-
+func (m *OIDCToEmail) NextBatch(ctx context.Context, projectID uint64, page data.Page) ([]string, data.Page, error) {
 	items := make([]string, 0, page.Limit)
 	for {
-		accounts, page, err := m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, cfg.FromIssuer+"#")
+		accounts, page, err := m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, m.config.IssuerPrefix)
 		if err != nil {
 			return nil, page, err
 		}
 
 		for _, acc := range accounts {
+			normEmail := email.Normalize(acc.Email)
 			migratedIdentity := proto.Identity{
-				Type:    proto.IdentityType_Stytch,
-				Issuer:  cfg.StytchProject,
-				Subject: acc.Identity.Subject,
+				Type:    proto.IdentityType_Email,
+				Subject: normEmail,
+				Email:   normEmail,
 			}
 			_, found, err := m.accounts.Get(ctx, acc.ProjectID, migratedIdentity)
 			if err != nil {
@@ -114,17 +108,12 @@ func (m *OIDCToStytch) NextBatch(ctx context.Context, projectID uint64, page dat
 	}
 }
 
-func (m *OIDCToStytch) ProcessItems(ctx context.Context, tenant *proto.TenantData, items []string) (*Result, error) {
+func (m *OIDCToEmail) ProcessItems(ctx context.Context, tenant *proto.TenantData, items []string) (*Result, error) {
 	if len(items) > 100 {
 		return nil, fmt.Errorf("can only process 100 items at a time")
 	}
 
 	att := attestation.FromContext(ctx)
-	cfg, ok := m.configs[tenant.ProjectID]
-	if !ok {
-		return nil, fmt.Errorf("project not configured for migration")
-	}
-
 	res := NewResult()
 
 	identities := make([]proto.Identity, len(items))
@@ -133,7 +122,7 @@ func (m *OIDCToStytch) ProcessItems(ctx context.Context, tenant *proto.TenantDat
 			res.Errorf(item, "parsing identity: %w", err)
 			continue
 		}
-		if identities[i].Type != proto.IdentityType_OIDC || identities[i].Issuer != cfg.FromIssuer {
+		if identities[i].Type != proto.IdentityType_OIDC || !strings.HasPrefix(identities[i].Issuer, m.config.IssuerPrefix) {
 			res.Errorf(item, "incorrect identity: %s", identities[i].String())
 			continue
 		}
@@ -146,11 +135,11 @@ func (m *OIDCToStytch) ProcessItems(ctx context.Context, tenant *proto.TenantDat
 
 	for _, originalAccount := range originalAccounts {
 		item := originalAccount.Identity.String()
+		normEmail := email.Normalize(originalAccount.Email)
 		migratedIdentity := proto.Identity{
-			Type:    proto.IdentityType_Stytch,
-			Issuer:  cfg.StytchProject,
-			Subject: originalAccount.Identity.Subject,
-			Email:   originalAccount.Email,
+			Type:    proto.IdentityType_Email,
+			Subject: normEmail,
+			Email:   normEmail,
 		}
 		accData := &proto.AccountData{
 			ProjectID: tenant.ProjectID,
