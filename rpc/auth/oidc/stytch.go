@@ -142,12 +142,16 @@ func (p *StytchAuthProvider) getEmailFromToken(tok jwt.Token) string {
 	if !ok {
 		return ""
 	}
-	authFactors, ok := sessionMap["auth_factors"].([]map[string]any)
+	authFactors, ok := sessionMap["authentication_factors"].([]any)
 	if !ok || len(authFactors) == 0 {
 		return ""
 	}
 	for _, authFactor := range authFactors {
-		emailFactor, ok := authFactor["email_factor"].(map[string]any)
+		factorMap, ok := authFactor.(map[string]any)
+		if !ok {
+			continue
+		}
+		emailFactor, ok := factorMap["email_factor"].(map[string]any)
 		if !ok {
 			continue
 		}

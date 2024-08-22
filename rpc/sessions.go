@@ -162,7 +162,8 @@ func (s *RPC) RegisterSession(
 		return nil, nil, proto.ErrWebrpcInternalError.WithCausef("registering session with WaaS API: %w", err)
 	}
 
-	if !accountFound {
+	if !accountFound || (ident.Email != "" && account.Email != ident.Email) {
+		account.Email = ident.Email
 		if err := s.Accounts.Put(ctx, account); err != nil {
 			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("save account: %w", err)
 		}
@@ -198,6 +199,10 @@ func (s *RPC) RegisterSession(
 
 	if err := s.Sessions.Put(ctx, dbSess); err != nil {
 		return nil, convertIntentResponse(res), proto.ErrWebrpcInternalError.WithCausef("save session: %w", err)
+	}
+
+	if err := s.Migrations.OnRegisterSession(ctx, account); err != nil {
+		return nil, convertIntentResponse(res), proto.ErrWebrpcInternalError.WithCausef("migrate account: %w", err)
 	}
 
 	retSess := &proto.Session{

@@ -9,18 +9,19 @@ import (
 )
 
 type Config struct {
-	Mode      Mode             `toml:"-"`
-	Region    string           `toml:"region"`
-	Service   ServiceConfig    `toml:"service"`
-	Admin     AdminConfig      `toml:"admin"`
-	Endpoints EndpointsConfig  `toml:"endpoints"`
-	KMS       KMSConfig        `toml:"kms"`
-	SES       SESConfig        `toml:"ses"`
-	Builder   BuilderConfig    `toml:"builder"`
-	Database  DatabaseConfig   `toml:"database"`
-	Signing   SigningConfig    `toml:"signing"`
-	Telemetry telemetry.Config `toml:"telemetry"`
-	Tracing   TracingConfig    `toml:"tracing"`
+	Mode       Mode             `toml:"-"`
+	Region     string           `toml:"region"`
+	Service    ServiceConfig    `toml:"service"`
+	Admin      AdminConfig      `toml:"admin"`
+	Endpoints  EndpointsConfig  `toml:"endpoints"`
+	KMS        KMSConfig        `toml:"kms"`
+	SES        SESConfig        `toml:"ses"`
+	Builder    BuilderConfig    `toml:"builder"`
+	Database   DatabaseConfig   `toml:"database"`
+	Signing    SigningConfig    `toml:"signing"`
+	Telemetry  telemetry.Config `toml:"telemetry"`
+	Tracing    TracingConfig    `toml:"tracing"`
+	Migrations MigrationsConfig `toml:"migrations"`
 }
 
 type AdminConfig struct {
