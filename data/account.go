@@ -202,6 +202,9 @@ func (t *AccountTable) ListByProjectAndIdentity(ctx context.Context, page Page, 
 	if page.Limit <= 0 {
 		page.Limit = 25
 	}
+	if page.Limit > 100 {
+		page.Limit = 100
+	}
 
 	input := &dynamodb.QueryInput{
 		TableName:              &t.tableARN,
