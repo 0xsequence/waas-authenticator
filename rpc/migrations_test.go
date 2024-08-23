@@ -249,10 +249,12 @@ func TestMigrationEmail(t *testing.T) {
 		issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t, tokBuilderFn)
 		defer closeJWKS()
 
+		projectID := currentProjectID.Load() + 1
 		svc := initRPC(t, func(cfg *config.Config) {
 			cfg.Migrations.Email = config.EmailMigrationConfig{
 				Enabled:      true,
 				IssuerPrefix: issuer,
+				Projects:     []uint64{projectID},
 			}
 		})
 		tenant, _ := newTenant(t, svc.Enclave, issuer)
@@ -316,6 +318,7 @@ func TestMigrationEmail(t *testing.T) {
 			cfg.Migrations.Email = config.EmailMigrationConfig{
 				Enabled:      true,
 				IssuerPrefix: issuer,
+				Projects:     []uint64{projectID},
 			}
 		})
 		tenant, _ := newTenant(t, svc.Enclave, issuer)

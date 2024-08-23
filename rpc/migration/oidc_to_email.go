@@ -83,6 +83,10 @@ func (m *OIDCToEmail) OnRegisterSession(ctx context.Context, originalAccount *da
 }
 
 func (m *OIDCToEmail) NextBatch(ctx context.Context, projectID uint64, page data.Page) ([]string, data.Page, error) {
+	if !slices.Contains(m.config.Projects, projectID) {
+		return nil, data.Page{}, fmt.Errorf("project id does not match")
+	}
+
 	items := make([]string, 0, page.Limit)
 	for {
 		accounts, page, err := m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, m.config.IssuerPrefix)
@@ -113,6 +117,10 @@ func (m *OIDCToEmail) NextBatch(ctx context.Context, projectID uint64, page data
 }
 
 func (m *OIDCToEmail) ProcessItems(ctx context.Context, tenant *proto.TenantData, items []string) (*Result, error) {
+	if !slices.Contains(m.config.Projects, tenant.ProjectID) {
+		return nil, fmt.Errorf("project id does not match")
+	}
+
 	if len(items) > 100 {
 		return nil, fmt.Errorf("can only process 100 items at a time")
 	}
