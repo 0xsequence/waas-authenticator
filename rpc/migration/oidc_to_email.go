@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/0xsequence/waas-authenticator/config"
@@ -27,6 +28,9 @@ func (m *OIDCToEmail) OnRegisterSession(ctx context.Context, originalAccount *da
 
 	if originalAccount.ProjectID != tntData.ProjectID {
 		return errors.New("project id does not match")
+	}
+	if !slices.Contains(m.config.Projects, originalAccount.ProjectID) {
+		return nil
 	}
 	if originalAccount.Identity.Type != proto.IdentityType_OIDC {
 		return nil

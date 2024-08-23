@@ -12,6 +12,7 @@ type OIDCToStytchConfig struct {
 }
 
 type EmailMigrationConfig struct {
-	Enabled      bool   `toml:"enabled"`
-	IssuerPrefix string `toml:"issuer_prefix"`
+	Enabled      bool     `toml:"enabled"`
+	IssuerPrefix string   `toml:"issuer_prefix"`
+	Projects     []uint64 `toml:"projects"`
 }
