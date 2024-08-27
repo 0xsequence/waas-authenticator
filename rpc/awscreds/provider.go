@@ -61,6 +61,10 @@ func (p *Provider) getAWSCredential(ctx context.Context) (*aws.Credentials, erro
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %s", res.Status)
+	}
+
 	var cred struct {
 		AccessKeyID     string `json:"AccessKeyId"`
 		SecretAccessKey string `json:"SecretAccessKey"`
