@@ -88,7 +88,11 @@ func (m *OIDCToStytch) NextBatch(ctx context.Context, projectID uint64, page dat
 
 	items := make([]string, 0, page.Limit)
 	for {
-		accounts, page, err := m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, cfg.FromIssuer+"#")
+		var (
+			accounts []*data.Account
+			err      error
+		)
+		accounts, page, err = m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, cfg.FromIssuer+"#")
 		if err != nil {
 			return nil, page, err
 		}
@@ -108,7 +112,7 @@ func (m *OIDCToStytch) NextBatch(ctx context.Context, projectID uint64, page dat
 			}
 		}
 
-		if len(accounts) < int(page.Limit) || len(items) >= int(page.Limit) {
+		if len(page.NextKey) == 0 || len(items) >= int(page.Limit) {
 			return items, page, nil
 		}
 	}

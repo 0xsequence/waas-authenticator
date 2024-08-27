@@ -89,7 +89,11 @@ func (m *OIDCToEmail) NextBatch(ctx context.Context, projectID uint64, page data
 
 	items := make([]string, 0, page.Limit)
 	for {
-		accounts, page, err := m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, m.config.IssuerPrefix)
+		var (
+			accounts []*data.Account
+			err      error
+		)
+		accounts, page, err = m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, m.config.IssuerPrefix)
 		if err != nil {
 			return nil, page, err
 		}
@@ -110,7 +114,7 @@ func (m *OIDCToEmail) NextBatch(ctx context.Context, projectID uint64, page data
 			}
 		}
 
-		if len(accounts) < int(page.Limit) || len(items) >= int(page.Limit) {
+		if len(page.NextKey) == 0 || len(items) >= int(page.Limit) {
 			return items, page, nil
 		}
 	}
