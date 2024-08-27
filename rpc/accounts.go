@@ -237,7 +237,6 @@ func (s *RPC) deleteAccountSessions(ctx context.Context, projectID uint64, userI
 	if err != nil {
 		return err
 	}
-	fmt.Printf("sessions of user %s: %+v\n", userID, sessions)
 
 	// TODO: make the removal of all sessions more efficient
 	// we can achieve it by paginating over sessions (adding an index would help here) and then batching deletes
@@ -245,7 +244,6 @@ func (s *RPC) deleteAccountSessions(ctx context.Context, projectID uint64, userI
 	var errs []error
 	for _, sess := range sessions {
 		if sess.Identity != identity.String() {
-			fmt.Println("deleteAccountSessions: skipping session", sess.Identity)
 			continue
 		}
 
