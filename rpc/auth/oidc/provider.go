@@ -131,9 +131,7 @@ func (p *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationC
 }
 
 func (p *AuthProvider) ValidateTenant(ctx context.Context, tenant *proto.TenantData) error {
-	var wg errgroup.Group
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	eg, ctx := errgroup.WithContext(ctx)
 
 	for i, provider := range tenant.OIDCProviders {
 		provider := provider
@@ -146,7 +144,7 @@ func (p *AuthProvider) ValidateTenant(ctx context.Context, tenant *proto.TenantD
 			return fmt.Errorf("provider %d: at least one audience is required", i)
 		}
 
-		wg.Go(func() error {
+		eg.Go(func() error {
 			if _, err := p.GetKeySet(ctx, provider.Issuer); err != nil {
 				return err
 			}
@@ -154,7 +152,7 @@ func (p *AuthProvider) ValidateTenant(ctx context.Context, tenant *proto.TenantD
 		})
 	}
 
-	return wg.Wait()
+	return eg.Wait()
 }
 
 func (p *AuthProvider) GetKeySet(ctx context.Context, issuer string) (set jwk.Set, err error) {

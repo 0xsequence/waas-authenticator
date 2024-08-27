@@ -86,6 +86,9 @@ func (ks *operationKeySet) Clone() (jwk.Set, error) {
 }
 
 func (ks *operationKeySet) getCachedSet(ctx context.Context) jwk.Set {
+	if ks.cachedSet != nil {
+		return ks.cachedSet
+	}
 	set, err := ks.getKeySet(ctx, ks.iss)
 	if err != nil {
 		return jwk.NewSet()
