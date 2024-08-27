@@ -77,7 +77,7 @@ type RPC struct {
 
 func New(cfg *config.Config, client *http.Client) (*RPC, error) {
 	if client == nil {
-		client = http.DefaultClient
+		client = &http.Client{Timeout: 10 * time.Second}
 	}
 	wrappedClient := tracing.WrapClient(client)
 
