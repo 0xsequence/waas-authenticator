@@ -225,6 +225,7 @@ func (s *RPC) UpdateTenant(
 	tnt.EncryptedKey = encryptedKey
 	tnt.Ciphertext = ciphertext
 	tnt.Algorithm = algorithm
+	tnt.CreatedAt = time.Now()
 
 	if err := s.Tenants.Add(ctx, tnt); err != nil {
 		return nil, err
