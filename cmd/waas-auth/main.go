@@ -42,6 +42,7 @@ func main() {
 
 	// HTTP client to use for all outgoing connections out of the enclave
 	client := &http.Client{
+		Timeout: 10 * time.Second,
 		Transport: transport.Chain(
 			baseTransport,
 			transport.SetHeader("User-Agent", "waas-authenticator/"+waasauthenticator.VERSION),

@@ -25,7 +25,7 @@ func EncryptData(
 
 	ciphertext, err = aescbc.Encrypt(att, dk.Plaintext, plaintext)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("AES decrypt: %w", err)
+		return nil, "", nil, fmt.Errorf("AES encrypt: %w", err)
 	}
 	return dk.Ciphertext, "AES-256", ciphertext, nil
 }

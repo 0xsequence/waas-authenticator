@@ -41,9 +41,17 @@ func getAccountInfo(ctx context.Context, titleID string, sessionTicket string, c
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("PlayFab error: %s", res.Status)
+	}
+
 	var resp response
 	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if resp.Data.AccountInfo.PlayFabID == "" {
+		return nil, fmt.Errorf("PlayFab account info not found")
 	}
 
 	return &resp.Data.AccountInfo, nil

@@ -76,7 +76,7 @@ func (p *KMS) PublicKey(ctx context.Context) (jwk.RSAPublicKey, error) {
 
 	pubKey, ok := jwtKey.(jwk.RSAPublicKey)
 	if !ok {
-		return nil, fmt.Errorf("invalid public key type: %T", jwtKey)
+		return nil, fmt.Errorf("invalid public key type")
 	}
 	_ = pubKey.Set(jwk.KeyIDKey, p.KeyID())
 	return pubKey, nil

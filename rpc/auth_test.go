@@ -400,70 +400,102 @@ func TestStytchAuth(t *testing.T) {
 }
 
 func TestPlayFabAuth(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		ctx := context.Background()
-
-		playfabAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"data":{"AccountInfo":{"PlayFabId":"USER","PrivateInfo":{"Email":"user@example.com"}}}}`))
-		}))
-		defer playfabAPI.Close()
-
-		svc := initRPCWithClient(t, &http.Client{Transport: testTransport{
-			RoundTripper: http.DefaultTransport,
-			modifyRequest: func(req *http.Request) {
-				if strings.Contains(req.URL.String(), "playfabapi.com") {
-					req.URL.Host = playfabAPI.Listener.Addr().String()
-				}
+	testCases := map[string]struct {
+		playfabHandler          func(w http.ResponseWriter, r *http.Request)
+		assertRegisterSessionFn func(t *testing.T, sess *proto.Session, res *proto.IntentResponse, err error)
+	}{
+		"Success": {
+			playfabHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"data":{"AccountInfo":{"PlayFabId":"USER","PrivateInfo":{"Email":"user@example.com"}}}}`))
 			},
-		}})
-		tenant, _ := newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{
-			Playfab: proto.AuthPlayfabConfig{
-				Enabled: true,
-				TitleID: "TITLE",
+			assertRegisterSessionFn: func(t *testing.T, sess *proto.Session, res *proto.IntentResponse, err error) {
+				require.NoError(t, err)
+				assert.Equal(t, "PlayFab:TITLE#USER", sess.Identity.String())
+				assert.Equal(t, proto.IntentResponseCode_sessionOpened, res.Code)
 			},
+		},
+		"PlayFabReturns500": {
+			playfabHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"data":{"AccountInfo":{"PlayFabId":"USER","PrivateInfo":{"Email":"user@example.com"}}}}`))
+			},
+			assertRegisterSessionFn: func(t *testing.T, sess *proto.Session, res *proto.IntentResponse, err error) {
+				assert.ErrorContains(t, err, "PlayFab error: 500 Internal Server Error")
+			},
+		},
+		"PlayFabReturnsEmptyID": {
+			playfabHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"data":{"AccountInfo":{"PlayFabId":"","PrivateInfo":{"Email":"user@example.com"}}}}`))
+			},
+			assertRegisterSessionFn: func(t *testing.T, sess *proto.Session, res *proto.IntentResponse, err error) {
+				assert.ErrorContains(t, err, "PlayFab account info not found")
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+
+			playfabAPI := httptest.NewServer(http.HandlerFunc(testCase.playfabHandler))
+			defer playfabAPI.Close()
+
+			svc := initRPCWithClient(t, &http.Client{Transport: testTransport{
+				RoundTripper: http.DefaultTransport,
+				modifyRequest: func(req *http.Request) {
+					if strings.Contains(req.URL.String(), "playfabapi.com") {
+						req.URL.Host = playfabAPI.Listener.Addr().String()
+					}
+				},
+			}})
+			tenant, _ := newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{
+				Playfab: proto.AuthPlayfabConfig{
+					Enabled: true,
+					TitleID: "TITLE",
+				},
+			})
+			require.NoError(t, svc.Tenants.Add(ctx, tenant))
+
+			sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
+			require.NoError(t, err)
+			signingSession := intents.NewSessionP256K1(sessWallet)
+
+			srv := httptest.NewServer(svc.Handler())
+			defer srv.Close()
+
+			c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
+			header := make(http.Header)
+			header.Set("X-Sequence-Project", strconv.Itoa(int(tenant.ProjectID)))
+			ctx, err = proto.WithHTTPRequestHeaders(context.Background(), header)
+			require.NoError(t, err)
+
+			ticket := "SESSION_TICKET"
+			hashedTicket := hexutil.Encode(crypto.Keccak256([]byte(ticket)))
+			verifier := "TITLE|" + hashedTicket
+			initiateAuth := generateSignedIntent(t, intents.IntentName_initiateAuth, intents.IntentDataInitiateAuth{
+				SessionID:    signingSession.SessionID(),
+				IdentityType: intents.IdentityType_PlayFab,
+				Verifier:     verifier,
+			}, signingSession)
+			initRes, err := c.SendIntent(ctx, initiateAuth)
+			require.NoError(t, err)
+			assert.Equal(t, proto.IntentResponseCode_authInitiated, initRes.Code)
+
+			b, err := json.Marshal(initRes.Data)
+			require.NoError(t, err)
+			var initResData intents.IntentResponseAuthInitiated
+			require.NoError(t, json.Unmarshal(b, &initResData))
+
+			registerSession := generateSignedIntent(t, intents.IntentName_openSession, intents.IntentDataOpenSession{
+				SessionID:    signingSession.SessionID(),
+				IdentityType: intents.IdentityType_PlayFab,
+				Verifier:     verifier,
+				Answer:       ticket,
+			}, signingSession)
+			sess, registerRes, err := c.RegisterSession(ctx, registerSession, "Friendly name")
+			testCase.assertRegisterSessionFn(t, sess, registerRes, err)
 		})
-		require.NoError(t, svc.Tenants.Add(ctx, tenant))
-
-		sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
-		require.NoError(t, err)
-		signingSession := intents.NewSessionP256K1(sessWallet)
-
-		srv := httptest.NewServer(svc.Handler())
-		defer srv.Close()
-
-		c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
-		header := make(http.Header)
-		header.Set("X-Sequence-Project", strconv.Itoa(int(tenant.ProjectID)))
-		ctx, err = proto.WithHTTPRequestHeaders(context.Background(), header)
-		require.NoError(t, err)
-
-		ticket := "SESSION_TICKET"
-		hashedTicket := hexutil.Encode(crypto.Keccak256([]byte(ticket)))
-		verifier := "TITLE|" + hashedTicket
-		initiateAuth := generateSignedIntent(t, intents.IntentName_initiateAuth, intents.IntentDataInitiateAuth{
-			SessionID:    signingSession.SessionID(),
-			IdentityType: intents.IdentityType_PlayFab,
-			Verifier:     verifier,
-		}, signingSession)
-		initRes, err := c.SendIntent(ctx, initiateAuth)
-		require.NoError(t, err)
-		assert.Equal(t, proto.IntentResponseCode_authInitiated, initRes.Code)
-
-		b, err := json.Marshal(initRes.Data)
-		require.NoError(t, err)
-		var initResData intents.IntentResponseAuthInitiated
-		require.NoError(t, json.Unmarshal(b, &initResData))
-
-		registerSession := generateSignedIntent(t, intents.IntentName_openSession, intents.IntentDataOpenSession{
-			SessionID:    signingSession.SessionID(),
-			IdentityType: intents.IdentityType_PlayFab,
-			Verifier:     verifier,
-			Answer:       ticket,
-		}, signingSession)
-		sess, registerRes, err := c.RegisterSession(ctx, registerSession, "Friendly name")
-		require.NoError(t, err)
-		assert.Equal(t, "PlayFab:TITLE#USER", sess.Identity.String())
-		assert.Equal(t, proto.IntentResponseCode_sessionOpened, registerRes.Code)
-	})
+	}
 }

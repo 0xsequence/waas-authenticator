@@ -77,7 +77,7 @@ type RPC struct {
 
 func New(cfg *config.Config, client *http.Client) (*RPC, error) {
 	if client == nil {
-		client = http.DefaultClient
+		client = &http.Client{Timeout: 10 * time.Second}
 	}
 	wrappedClient := tracing.WrapClient(client)
 
@@ -104,7 +104,7 @@ func New(cfg *config.Config, client *http.Client) (*RPC, error) {
 		return nil, err
 	}
 
-	tp, err := newOtelTracerProvider(context.Background(), client, cfg.Tracing)
+	tp, err := newOtelTracerProvider(client, cfg.Tracing)
 	if err != nil {
 		return nil, err
 	}
@@ -275,11 +275,6 @@ func (s *RPC) Handler() http.Handler {
 	return r
 }
 
-// Ping is a healthcheck that returns an empty message.
-func (s *RPC) Ping(ctx context.Context) (bool, error) {
-	return true, nil
-}
-
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("."))
 }
@@ -325,7 +320,7 @@ func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config)
 	return verifiers, nil
 }
 
-func newOtelTracerProvider(ctx context.Context, client *http.Client, cfg config.TracingConfig) (*trace.TracerProvider, error) {
+func newOtelTracerProvider(client *http.Client, cfg config.TracingConfig) (*trace.TracerProvider, error) {
 	traceExporter, err := zipkin.New(cfg.Endpoint, zipkin.WithClient(client))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new OTLP trace exporter: %v", err)
