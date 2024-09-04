@@ -75,9 +75,10 @@ type RPC struct {
 	running      int32
 }
 
-func New(cfg *config.Config, client *http.Client) (*RPC, error) {
-	if client == nil {
-		client = &http.Client{Timeout: 10 * time.Second}
+func New(cfg *config.Config, transport http.RoundTripper) (*RPC, error) {
+	client := &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: transport,
 	}
 	wrappedClient := tracing.WrapClient(client)
 
