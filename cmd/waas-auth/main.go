@@ -40,17 +40,14 @@ func main() {
 		}
 	}
 
-	// HTTP client to use for all outgoing connections out of the enclave
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-		Transport: transport.Chain(
-			baseTransport,
-			transport.SetHeader("User-Agent", "waas-authenticator/"+waasauthenticator.VERSION),
-			traceid.Transport,
-		),
-	}
+	// HTTP transport chain to use for all outgoing connections out of the enclave
+	transportChain := transport.Chain(
+		baseTransport,
+		transport.SetHeader("User-Agent", "waas-authenticator/"+waasauthenticator.VERSION),
+		traceid.Transport,
+	)
 
-	s, err := rpc.New(cfg, client)
+	s, err := rpc.New(cfg, transportChain)
 	if err != nil {
 		panic(err)
 	}
