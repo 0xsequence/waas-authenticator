@@ -341,14 +341,14 @@ func TestStytchAuth(t *testing.T) {
 		stytchServer, tok := issueAccessTokenAndRunStytchJwksServer(t, "project-123", tokBuilderFn)
 		defer stytchServer.Close()
 
-		svc := initRPCWithClient(t, &http.Client{Transport: testTransport{
+		svc := initRPCWithClient(t, testTransport{
 			RoundTripper: http.DefaultTransport,
 			modifyRequest: func(req *http.Request) {
 				if strings.Contains(req.URL.String(), "stytch.com") {
 					req.URL.Host = stytchServer.Listener.Addr().String()
 				}
 			},
-		}})
+		})
 		tenant, _ := newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{
 			Stytch: proto.AuthStytchConfig{
 				Enabled:   true,
@@ -442,14 +442,14 @@ func TestPlayFabAuth(t *testing.T) {
 			playfabAPI := httptest.NewServer(http.HandlerFunc(testCase.playfabHandler))
 			defer playfabAPI.Close()
 
-			svc := initRPCWithClient(t, &http.Client{Transport: testTransport{
+			svc := initRPCWithClient(t, testTransport{
 				RoundTripper: http.DefaultTransport,
 				modifyRequest: func(req *http.Request) {
 					if strings.Contains(req.URL.String(), "playfabapi.com") {
 						req.URL.Host = playfabAPI.Listener.Addr().String()
 					}
 				},
-			}})
+			})
 			tenant, _ := newTenantWithAuthConfig(t, svc.Enclave, proto.AuthConfig{
 				Playfab: proto.AuthPlayfabConfig{
 					Enabled: true,

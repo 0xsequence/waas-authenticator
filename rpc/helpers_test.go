@@ -51,7 +51,7 @@ func initRPC(t *testing.T, options ...func(*config.Config)) *rpc.RPC {
 		opt(cfg)
 	}
 
-	svc, err := rpc.New(cfg, &http.Client{Transport: &testTransport{RoundTripper: http.DefaultTransport}})
+	svc, err := rpc.New(cfg, &testTransport{RoundTripper: http.DefaultTransport})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,13 +59,13 @@ func initRPC(t *testing.T, options ...func(*config.Config)) *rpc.RPC {
 	return svc
 }
 
-func initRPCWithClient(t *testing.T, client *http.Client, options ...func(*config.Config)) *rpc.RPC {
+func initRPCWithClient(t *testing.T, transport http.RoundTripper, options ...func(*config.Config)) *rpc.RPC {
 	cfg := initConfig(t, awsEndpoint)
 	for _, opt := range options {
 		opt(cfg)
 	}
 
-	svc, err := rpc.New(cfg, client)
+	svc, err := rpc.New(cfg, transport)
 	if err != nil {
 		t.Fatal(err)
 	}
