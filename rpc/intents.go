@@ -166,6 +166,16 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		}
 		return makeTypedIntentResponse(&intents.IntentResponseAccountRemoved{})
 
+	case intents.IntentName_adoptChildWallet:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataAdoptChildWallet](intent)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.adoptChildWallet(ctx, sess, intentTyped); err != nil {
+			return nil, err
+		}
+		return makeTypedIntentResponse(&intents.IntentResponseChildWalletAdopted{})
+
 	case intents.IntentName_getIdToken:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataGetIdToken](intent)
 		if err != nil {

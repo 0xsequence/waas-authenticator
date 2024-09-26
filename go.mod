@@ -2,6 +2,8 @@ module github.com/0xsequence/waas-authenticator
 
 go 1.22.1
 
+replace github.com/0xsequence/go-sequence => /Users/patryk/Projects/Horizon/go-sequence
+
 require (
 	github.com/0xsequence/ethkit v1.27.7
 	github.com/0xsequence/go-sequence v0.40.2
@@ -34,7 +36,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.31.0
 	github.com/testcontainers/testcontainers-go/modules/localstack v0.31.0
-	github.com/webrpc/webrpc v0.18.8
+	github.com/webrpc/webrpc v0.19.3
 	go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws v0.50.0
 	go.opentelemetry.io/contrib/propagators/aws v1.25.0
 	go.opentelemetry.io/otel v1.27.0
@@ -178,7 +180,7 @@ require (
 	github.com/uber-go/tally/v4 v4.1.16 // indirect
 	github.com/webrpc/gen-dart v0.1.1 // indirect
 	github.com/webrpc/gen-golang v0.14.8 // indirect
-	github.com/webrpc/gen-javascript v0.12.0 // indirect
+	github.com/webrpc/gen-javascript v0.13.0 // indirect
 	github.com/webrpc/gen-kotlin v0.1.0 // indirect
 	github.com/webrpc/gen-openapi v0.13.0 // indirect
 	github.com/webrpc/gen-typescript v0.13.0 // indirect
