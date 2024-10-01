@@ -4,7 +4,6 @@ dario.cat/mergo
 # github.com/0xsequence/ethkit v1.27.7
 ## explicit; go 1.21
 github.com/0xsequence/ethkit
-github.com/0xsequence/ethkit/cmd/ethkit
 github.com/0xsequence/ethkit/ethartifact
 github.com/0xsequence/ethkit/ethcoder
 github.com/0xsequence/ethkit/ethcontract
@@ -42,8 +41,8 @@ github.com/0xsequence/ethkit/util
 # github.com/0xsequence/go-ethauth v0.13.0
 ## explicit; go 1.17
 github.com/0xsequence/go-ethauth
-# github.com/0xsequence/go-sequence v0.40.2
-## explicit; go 1.22
+# github.com/0xsequence/go-sequence v0.41.0
+## explicit; go 1.22.0
 github.com/0xsequence/go-sequence
 github.com/0xsequence/go-sequence/contracts
 github.com/0xsequence/go-sequence/contracts/gen/gasestimator
@@ -303,7 +302,7 @@ github.com/cloudflare/circl/math/mlsbset
 github.com/cloudflare/circl/sign
 github.com/cloudflare/circl/sign/ed25519
 github.com/cloudflare/circl/sign/ed448
-# github.com/consensys/bavard v0.1.15
+# github.com/consensys/bavard v0.1.17
 ## explicit; go 1.15
 github.com/consensys/bavard
 # github.com/consensys/gnark-crypto v0.14.0
@@ -552,7 +551,7 @@ github.com/gorilla/websocket
 # github.com/goware/breaker v0.1.2
 ## explicit; go 1.16
 github.com/goware/breaker
-# github.com/goware/cachestore v0.8.1
+# github.com/goware/cachestore v0.9.0
 ## explicit; go 1.18
 github.com/goware/cachestore
 github.com/goware/cachestore/cachestorectl
@@ -595,9 +594,6 @@ github.com/huandu/xstrings
 # github.com/imdario/mergo v0.3.16
 ## explicit; go 1.13
 github.com/imdario/mergo
-# github.com/inconshreveable/mousetrap v1.1.0
-## explicit; go 1.18
-github.com/inconshreveable/mousetrap
 # github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 ## explicit
 github.com/jbenet/go-context/io
@@ -838,12 +834,6 @@ github.com/skeema/knownhosts
 # github.com/spf13/cast v1.6.0
 ## explicit; go 1.19
 github.com/spf13/cast
-# github.com/spf13/cobra v1.8.1
-## explicit; go 1.15
-github.com/spf13/cobra
-# github.com/spf13/pflag v1.0.5
-## explicit; go 1.12
-github.com/spf13/pflag
 # github.com/stretchr/testify v1.9.0
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
@@ -991,16 +981,15 @@ golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/agent
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/ssh/knownhosts
-golang.org/x/crypto/ssh/terminal
-# golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
-## explicit; go 1.20
+# golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
+## explicit; go 1.22.0
 golang.org/x/exp/constraints
-# golang.org/x/mod v0.20.0
-## explicit; go 1.18
+# golang.org/x/mod v0.21.0
+## explicit; go 1.22.0
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.28.0
+# golang.org/x/net v0.29.0
 ## explicit; go 1.18
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -1014,21 +1003,17 @@ golang.org/x/sync/errgroup
 ## explicit; go 1.18
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
-golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.24.0
-## explicit; go 1.18
-golang.org/x/term
 # golang.org/x/text v0.18.0
 ## explicit; go 1.18
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/tools v0.24.0
-## explicit; go 1.19
+# golang.org/x/tools v0.25.0
+## explicit; go 1.22.0
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/packages
