@@ -100,6 +100,10 @@ func (p *Provider) getInstanceProfileName(ctx context.Context) (string, error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status: %s", res.Status)
+	}
+
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
 		return "", fmt.Errorf("reading response body: %w", err)
