@@ -217,3 +217,39 @@ func (s *RPC) signUsingParent(wallet *ethwallet.Wallet, parentAddress common.Add
 	// The signature must end with SIG_TYPE_EIP712
 	return append(sig, byte(1)), parentSubdigest, nil
 }
+
+func (s *RPC) signUsingParentHash(wallet *ethwallet.Wallet, parentAddress common.Address, subdigest common.Hash, chainId *big.Int) ([]byte, []byte, error) {
+	parentSubdigest, err := sequence.SubDigest(chainId, parentAddress, subdigest)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Sign parent's subdigest
+	// notice we don't use s.key.SignData because it hashes the data again
+	sig, err := ethcrypto.Sign(parentSubdigest, wallet.PrivateKey())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if sig[64] < 27 {
+		sig[64] += 27
+	}
+
+	// The signature must end with SIG_TYPE_EIP712
+	return append(sig, byte(1)), parentSubdigest, nil
+}
+
+func (s *RPC) signDirectlyUsingParent(wallet *ethwallet.Wallet, digest []byte) ([]byte, error) {
+	// notice we don't use s.key.SignData because it hashes the data again
+	sig, err := ethcrypto.Sign(digest, wallet.PrivateKey())
+	if err != nil {
+		return nil, err
+	}
+
+	if sig[64] < 27 {
+		sig[64] += 27
+	}
+
+	// The signature must end with SIG_TYPE_EIP712
+	return append(sig, byte(1)), nil
+}
