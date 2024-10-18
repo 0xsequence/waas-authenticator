@@ -118,9 +118,15 @@ func (s *RPC) RegisterSession(
 		return nil, nil, proto.ErrWebrpcInternalError.WithCausef("failed to retrieve account: %w", err)
 	}
 
+	// If there's no account for this identity then we know it's used for the first time. Prepare the account to be
+	// created at the end of the process.
 	if !accountFound {
+		// The user ID is deterministic and derived from the first session ever used by the user.
 		userID := fmt.Sprintf("%d|%s", tntData.ProjectID, sessionHash)
 
+		// If the user already has an account (of a different identity), we need to reject this intent. Otherwise, it
+		// would result in an accidental account federation as a new identity is connected to an existing user through
+		// unintended method.
 		userExists, err := s.Accounts.ExistsByUserID(ctx, userID)
 		if err != nil {
 			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("failed to check if user exists: %w", err)
@@ -129,6 +135,10 @@ func (s *RPC) RegisterSession(
 			return nil, nil, proto.ErrWebrpcBadRequest.WithCausef("user already exists")
 		}
 
+		// Warn the user if another account already exists with the same email address. This allows them to go back and
+		// sign in using the other identity and then use account federation to add this one.
+		// Otherwise, this would result in a creation of a new user and thus separate wallet that's very unlikely to be
+		// the user's intent.
 		if !intentTyped.Data.ForceCreateAccount && ident.Email != "" {
 			accs, err := s.Accounts.ListByEmail(ctx, tntData.ProjectID, ident.Email)
 			if err != nil {
@@ -154,6 +164,7 @@ func (s *RPC) RegisterSession(
 			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("encrypting account data: %w", err)
 		}
 
+		// This account is inserted to the DB, once the WaaS API returns successfully.
 		account = &data.Account{
 			ProjectID:          tntData.ProjectID,
 			Identity:           data.Identity(ident),
@@ -167,11 +178,17 @@ func (s *RPC) RegisterSession(
 		}
 	}
 
+	// This calls the Sequence WaaS API. No changes to the DB were done yet up to this point, and we can only execute
+	// them if the call is successful.
+	// Note that if we return an error *after* this and *before* the DB is updated, we risk having data desync between
+	// the enclave and the guard. This is a dangerous state to be in, so this call is expected -- and assumed -- to be
+	// idempotent. Retrying it with the same input is safe.
 	res, err := s.Wallets.RegisterSession(waasapi.Context(ctx), account.UserID, waasapi.ConvertToAPIIntent(intent))
 	if err != nil {
 		return nil, nil, proto.ErrWebrpcInternalError.WithCausef("registering session with WaaS API: %w", err)
 	}
 
+	// Insert an account if it's new OR update it with a fresh email if it differs from what we have in the DB.
 	if !accountFound || (ident.Email != "" && account.Email != ident.Email) {
 		account.Email = ident.Email
 		if err := s.Accounts.Put(ctx, account); err != nil {
