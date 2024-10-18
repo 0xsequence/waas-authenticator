@@ -119,6 +119,16 @@ func (s *RPC) RegisterSession(
 	}
 
 	if !accountFound {
+		userID := fmt.Sprintf("%d|%s", tntData.ProjectID, sessionHash)
+
+		userExists, err := s.Accounts.ExistsByUserID(ctx, userID)
+		if err != nil {
+			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("failed to check if user exists: %w", err)
+		}
+		if userExists {
+			return nil, nil, proto.ErrWebrpcBadRequest.WithCausef("user already exists")
+		}
+
 		if !intentTyped.Data.ForceCreateAccount && ident.Email != "" {
 			accs, err := s.Accounts.ListByEmail(ctx, tntData.ProjectID, ident.Email)
 			if err != nil {
@@ -135,7 +145,7 @@ func (s *RPC) RegisterSession(
 
 		accData := &proto.AccountData{
 			ProjectID: tntData.ProjectID,
-			UserID:    fmt.Sprintf("%d|%s", tntData.ProjectID, sessionHash),
+			UserID:    userID,
 			Identity:  ident.String(),
 			CreatedAt: time.Now(),
 		}
@@ -264,7 +274,7 @@ func (s *RPC) initiateAuth(
 
 		_, err = s.Wallets.InitiateAuth(waasapi.Context(ctx), waasapi.ConvertToAPIIntent(intent.ToIntent()), answer, challenge)
 		if err != nil {
-			return fmt.Errorf("initiating auth with WaaS API: %m", err)
+			return fmt.Errorf("initiating auth with WaaS API: %w", err)
 		}
 
 		encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tnt.KMSKeys[0], verifCtx)
