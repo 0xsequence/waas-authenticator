@@ -137,8 +137,8 @@ func (s *RPC) RegisterSession(
 
 		// Warn the user if another account already exists with the same email address. This allows them to go back and
 		// sign in using the other identity and then use account federation to add this one.
-		// Otherwise, this would result in a creation of a new user and thus separate wallet that's very unlikely to be
-		// the user's intent.
+		// Otherwise, this would result in a creation of a new user and thus a separate wallet and that's very unlikely
+		// to be the user's intent.
 		if !intentTyped.Data.ForceCreateAccount && ident.Email != "" {
 			accs, err := s.Accounts.ListByEmail(ctx, tntData.ProjectID, ident.Email)
 			if err != nil {
@@ -164,7 +164,7 @@ func (s *RPC) RegisterSession(
 			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("encrypting account data: %w", err)
 		}
 
-		// This account is inserted to the DB, once the WaaS API returns successfully.
+		// This account is inserted to the DB later once the WaaS API returns successfully.
 		account = &data.Account{
 			ProjectID:          tntData.ProjectID,
 			Identity:           data.Identity(ident),
