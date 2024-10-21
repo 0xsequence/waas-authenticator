@@ -80,7 +80,11 @@ func (s *RPC) sendTransaction(
 	}
 
 	// Validate that transactions match intent
-	if !intent.Data.IsValidInterpretation(common.Hash(subdigest), strans, nonce) {
+	ok, err = intent.Data.IsValidInterpretation(common.Hash(subdigest), strans, nonce)
+	if err != nil {
+		return nil, fmt.Errorf("WaaS API returned incompatible transactions: %w", err)
+	}
+	if !ok {
 		return nil, fmt.Errorf("WaaS API returned incompatible transactions")
 	}
 

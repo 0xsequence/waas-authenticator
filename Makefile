@@ -66,3 +66,7 @@ ensure-version:
 	@rm -rf version.go
 	@echo "package waasauthenticator" > version.go
 	@echo "const VERSION = \"$(VERSION)\"" >> version.go
+
+.PHONY: vendor
+vendor:
+	go mod tidy && go mod vendor
