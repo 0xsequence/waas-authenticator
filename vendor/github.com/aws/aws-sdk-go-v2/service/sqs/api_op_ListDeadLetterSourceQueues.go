@@ -122,6 +122,9 @@ func (c *Client) addOperationListDeadLetterSourceQueuesMiddlewares(stack *middle
 	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
+	if err = addSpanRetryLoop(stack, options); err != nil {
+		return err
+	}
 	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
@@ -132,6 +135,12 @@ func (c *Client) addOperationListDeadLetterSourceQueuesMiddlewares(stack *middle
 		return err
 	}
 	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
 		return err
 	}
 	if err = addOpListDeadLetterSourceQueuesValidationMiddleware(stack); err != nil {
@@ -155,16 +164,20 @@ func (c *Client) addOperationListDeadLetterSourceQueuesMiddlewares(stack *middle
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
+	if err = addSpanInitializeStart(stack); err != nil {
+		return err
+	}
+	if err = addSpanInitializeEnd(stack); err != nil {
+		return err
+	}
+	if err = addSpanBuildRequestStart(stack); err != nil {
+		return err
+	}
+	if err = addSpanBuildRequestEnd(stack); err != nil {
+		return err
+	}
 	return nil
 }
-
-// ListDeadLetterSourceQueuesAPIClient is a client that implements the
-// ListDeadLetterSourceQueues operation.
-type ListDeadLetterSourceQueuesAPIClient interface {
-	ListDeadLetterSourceQueues(context.Context, *ListDeadLetterSourceQueuesInput, ...func(*Options)) (*ListDeadLetterSourceQueuesOutput, error)
-}
-
-var _ ListDeadLetterSourceQueuesAPIClient = (*Client)(nil)
 
 // ListDeadLetterSourceQueuesPaginatorOptions is the paginator options for
 // ListDeadLetterSourceQueues
@@ -233,6 +246,9 @@ func (p *ListDeadLetterSourceQueuesPaginator) NextPage(ctx context.Context, optF
 	}
 	params.MaxResults = limit
 
+	optFns = append([]func(*Options){
+		addIsPaginatorUserAgent,
+	}, optFns...)
 	result, err := p.client.ListDeadLetterSourceQueues(ctx, &params, optFns...)
 	if err != nil {
 		return nil, err
@@ -251,6 +267,14 @@ func (p *ListDeadLetterSourceQueuesPaginator) NextPage(ctx context.Context, optF
 
 	return result, nil
 }
+
+// ListDeadLetterSourceQueuesAPIClient is a client that implements the
+// ListDeadLetterSourceQueues operation.
+type ListDeadLetterSourceQueuesAPIClient interface {
+	ListDeadLetterSourceQueues(context.Context, *ListDeadLetterSourceQueuesInput, ...func(*Options)) (*ListDeadLetterSourceQueuesOutput, error)
+}
+
+var _ ListDeadLetterSourceQueuesAPIClient = (*Client)(nil)
 
 func newServiceMetadataMiddleware_opListDeadLetterSourceQueues(region string) *awsmiddleware.RegisterServiceMetadata {
 	return &awsmiddleware.RegisterServiceMetadata{

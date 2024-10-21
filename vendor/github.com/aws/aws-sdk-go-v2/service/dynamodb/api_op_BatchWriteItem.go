@@ -33,9 +33,12 @@ import (
 // iteration would check for unprocessed items and submit a new BatchWriteItem
 // request with those unprocessed items until all items have been processed.
 //
-// If none of the items can be processed due to insufficient provisioned
-// throughput on all of the tables in the request, then BatchWriteItem returns a
-// ProvisionedThroughputExceededException .
+// For tables and indexes with provisioned capacity, if none of the items can be
+// processed due to insufficient provisioned throughput on all of the tables in the
+// request, then BatchWriteItem returns a ProvisionedThroughputExceededException .
+// For all tables and indexes, if none of the items can be processed due to other
+// throttling scenarios (such as exceeding partition level limits), then
+// BatchWriteItem returns a ThrottlingException .
 //
 // If DynamoDB returns any unprocessed items, you should retry the batch operation
 // on those items. However, we strongly recommend that you use an exponential
@@ -279,6 +282,9 @@ func (c *Client) addOperationBatchWriteItemMiddlewares(stack *middleware.Stack, 
 	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
+	if err = addSpanRetryLoop(stack, options); err != nil {
+		return err
+	}
 	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
@@ -325,6 +331,18 @@ func (c *Client) addOperationBatchWriteItemMiddlewares(stack *middleware.Stack, 
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addSpanInitializeStart(stack); err != nil {
+		return err
+	}
+	if err = addSpanInitializeEnd(stack); err != nil {
+		return err
+	}
+	if err = addSpanBuildRequestStart(stack); err != nil {
+		return err
+	}
+	if err = addSpanBuildRequestEnd(stack); err != nil {
 		return err
 	}
 	return nil
