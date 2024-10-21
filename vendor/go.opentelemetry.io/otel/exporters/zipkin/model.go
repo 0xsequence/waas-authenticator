@@ -19,8 +19,7 @@ import (
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv120 "go.opentelemetry.io/otel/semconv/v1.20.0"
 	semconv121 "go.opentelemetry.io/otel/semconv/v1.21.0"
-	semconv125 "go.opentelemetry.io/otel/semconv/v1.25.0"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -183,6 +182,8 @@ var extraZipkinTagsLen = len([]attribute.Key{
 	semconv.OTelStatusCodeKey,
 	semconv.OTelScopeNameKey,
 	semconv.OTelScopeVersionKey,
+	semconv.OTelLibraryNameKey,
+	semconv.OTelLibraryVersionKey,
 })
 
 func toZipkinTags(data tracesdk.ReadOnlySpan) map[string]string {
@@ -212,8 +213,10 @@ func toZipkinTags(data tracesdk.ReadOnlySpan) map[string]string {
 
 	if is := data.InstrumentationScope(); is.Name != "" {
 		m[string(semconv.OTelScopeNameKey)] = is.Name
+		m[string(semconv.OTelLibraryNameKey)] = is.Name
 		if is.Version != "" {
 			m[string(semconv.OTelScopeVersionKey)] = is.Version
+			m[string(semconv.OTelLibraryVersionKey)] = is.Version
 		}
 	}
 
@@ -237,7 +240,7 @@ var remoteEndpointKeyRank = map[attribute.Key]int{
 	semconv120.NetSockPeerAddrKey:     8,
 	keyPeerHostname:                   9,
 	keyPeerAddress:                    10,
-	semconv125.DBNameKey:              11,
+	semconv.DBNameKey:                 11,
 }
 
 func toZipkinRemoteEndpoint(data tracesdk.ReadOnlySpan) *zkmodel.Endpoint {
@@ -299,7 +302,7 @@ func remoteEndpointPeerIPWithPort(peerIP string, portKey attribute.Key, attrs []
 	for _, kv := range attrs {
 		if kv.Key == portKey {
 			port, _ := strconv.ParseUint(kv.Value.Emit(), 10, 16)
-			endpoint.Port = uint16(port) // nolint: gosec  // Bit size of 16 checked above.
+			endpoint.Port = uint16(port)
 			return endpoint
 		}
 	}

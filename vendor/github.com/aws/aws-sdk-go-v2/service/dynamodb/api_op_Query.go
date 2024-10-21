@@ -440,7 +440,7 @@ type QueryOutput struct {
 	// If you did not use a filter in the request, then ScannedCount is the same as
 	// Count .
 	//
-	// [Count and ScannedCount]: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Scan.html#Scan.Count
+	// [Count and ScannedCount]: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/QueryAndScan.html#Count
 	ScannedCount int32
 
 	// Metadata pertaining to the operation's result.
@@ -492,9 +492,6 @@ func (c *Client) addOperationQueryMiddlewares(stack *middleware.Stack, options O
 	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
 	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
@@ -541,18 +538,6 @@ func (c *Client) addOperationQueryMiddlewares(stack *middleware.Stack, options O
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addSpanInitializeStart(stack); err != nil {
-		return err
-	}
-	if err = addSpanInitializeEnd(stack); err != nil {
-		return err
-	}
-	if err = addSpanBuildRequestStart(stack); err != nil {
-		return err
-	}
-	if err = addSpanBuildRequestEnd(stack); err != nil {
 		return err
 	}
 	return nil

@@ -12,7 +12,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -27,10 +26,9 @@ const (
 
 // Exporter exports spans to the zipkin collector.
 type Exporter struct {
-	url     string
-	client  *http.Client
-	logger  logr.Logger
-	headers map[string]string
+	url    string
+	client *http.Client
+	logger logr.Logger
 
 	stoppedMu sync.RWMutex
 	stopped   bool
@@ -42,9 +40,8 @@ var emptyLogger = logr.Logger{}
 
 // Options contains configuration for the exporter.
 type config struct {
-	client  *http.Client
-	logger  logr.Logger
-	headers map[string]string
+	client *http.Client
+	logger logr.Logger
 }
 
 // Option defines a function that configures the exporter.
@@ -73,14 +70,6 @@ func WithLogr(logger logr.Logger) Option {
 	})
 }
 
-// WithHeaders configures the exporter to use the passed HTTP request headers.
-func WithHeaders(headers map[string]string) Option {
-	return optionFunc(func(cfg config) config {
-		cfg.headers = headers
-		return cfg
-	})
-}
-
 // WithClient configures the exporter to use the passed HTTP client.
 func WithClient(client *http.Client) Option {
 	return optionFunc(func(cfg config) config {
@@ -97,7 +86,7 @@ func New(collectorURL string, opts ...Option) (*Exporter, error) {
 	}
 	u, err := url.Parse(collectorURL)
 	if err != nil {
-		return nil, fmt.Errorf("invalid collector URL %q: %w", collectorURL, err)
+		return nil, fmt.Errorf("invalid collector URL %q: %v", collectorURL, err)
 	}
 	if u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("invalid collector URL %q: no scheme or host", collectorURL)
@@ -112,10 +101,9 @@ func New(collectorURL string, opts ...Option) (*Exporter, error) {
 		cfg.client = http.DefaultClient
 	}
 	return &Exporter{
-		url:     collectorURL,
-		client:  cfg.client,
-		logger:  cfg.logger,
-		headers: cfg.headers,
+		url:    collectorURL,
+		client: cfg.client,
+		logger: cfg.logger,
 	}, nil
 }
 
@@ -144,15 +132,6 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpa
 		return e.errf("failed to create request to %s: %v", e.url, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-
-	for k, v := range e.headers {
-		if strings.ToLower(k) == "host" {
-			req.Host = v
-		} else {
-			req.Header.Set(k, v)
-		}
-	}
-
 	resp, err := e.client.Do(req)
 	if err != nil {
 		return e.errf("request to %s failed: %v", e.url, err)

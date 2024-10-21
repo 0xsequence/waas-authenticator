@@ -11,8 +11,6 @@ var (
 
 	ErrKeyLengthTooLong = errors.New("cachestore: key length is too long")
 	ErrInvalidKey       = errors.New("cachestore: invalid key")
-	ErrInvalidKeyPrefix = errors.New("cachestore: invalid key prefix")
-	ErrNotSupported     = errors.New("cachestore: not supported")
 )
 
 type Store[V any] interface {
@@ -63,12 +61,6 @@ type Store[V any] interface {
 	// a lock and call the getter callback to retrieve a new value. Then it stores that
 	// value in the cache, sets expiry ttl for the key and releases the lock.
 	GetOrSetWithLockEx(ctx context.Context, key string, getter func(context.Context, string) (V, error), ttl time.Duration) (V, error)
-}
-
-type StoreCleaner interface {
-	// CleanExpiredEvery cleans expired keys every d duration.
-	// If onError is not nil, it will be called when an error occurs.
-	CleanExpiredEvery(ctx context.Context, d time.Duration, onError func(err error))
 }
 
 type Backend interface {

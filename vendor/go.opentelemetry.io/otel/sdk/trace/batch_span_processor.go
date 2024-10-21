@@ -316,11 +316,7 @@ func (bsp *batchSpanProcessor) processQueue() {
 			bsp.batchMutex.Unlock()
 			if shouldExport {
 				if !bsp.timer.Stop() {
-					// Handle both GODEBUG=asynctimerchan=[0|1] properly.
-					select {
-					case <-bsp.timer.C:
-					default:
-					}
+					<-bsp.timer.C
 				}
 				if err := bsp.exportSpans(ctx); err != nil {
 					otel.Handle(err)
@@ -385,7 +381,7 @@ func (bsp *batchSpanProcessor) enqueueBlockOnQueueFull(ctx context.Context, sd R
 	}
 }
 
-func (bsp *batchSpanProcessor) enqueueDrop(_ context.Context, sd ReadOnlySpan) bool {
+func (bsp *batchSpanProcessor) enqueueDrop(ctx context.Context, sd ReadOnlySpan) bool {
 	if !sd.SpanContext().IsSampled() {
 		return false
 	}
