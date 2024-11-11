@@ -264,7 +264,7 @@ func (s *RPC) initiateAuth(
 
 		_, err = s.Wallets.InitiateAuth(waasapi.Context(ctx), waasapi.ConvertToAPIIntent(intent.ToIntent()), answer, challenge)
 		if err != nil {
-			return fmt.Errorf("initiating auth with WaaS API: %m", err)
+			return fmt.Errorf("initiating auth with WaaS API: %w", err)
 		}
 
 		encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tnt.KMSKeys[0], verifCtx)
