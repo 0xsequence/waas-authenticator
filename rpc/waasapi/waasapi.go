@@ -43,7 +43,7 @@ func ConvertToAPIIntent(intent *intents.Intent) *proto_wallet.Intent {
 	}
 	return &proto_wallet.Intent{
 		Version:    intent.Version,
-		Name:       intent.Name.String(),
+		Name:       proto_wallet.IntentName(intent.Name),
 		ExpiresAt:  intent.ExpiresAt,
 		IssuedAt:   intent.IssuedAt,
 		Data:       intent.Data,
