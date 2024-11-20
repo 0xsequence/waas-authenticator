@@ -59,13 +59,13 @@
 // {{.WebrpcGenCommand}}
 
 // WebRPC description and code-gen version
-export const WebRPCVersion = "{{.WebrpcVersion}}"
+{{if $opts.exports}}export {{end}}const WebRPCVersion = "{{.WebrpcVersion}}"
 
 // Schema version of your RIDL schema
-export const WebRPCSchemaVersion = "{{.SchemaVersion}}"
+{{if $opts.exports}}export {{end}}const WebRPCSchemaVersion = "{{.SchemaVersion}}"
 
 // Schema hash generated from your RIDL schema
-export const WebRPCSchemaHash = "{{.SchemaHash}}"
+{{if $opts.exports}}export {{end}}const WebRPCSchemaHash = "{{.SchemaHash}}"
 
 {{template "types" dict "Services" .Services "Types" .Types "Opts" $opts}}
 {{- if $opts.client}}
