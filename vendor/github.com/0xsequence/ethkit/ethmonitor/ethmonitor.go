@@ -131,6 +131,7 @@ type Monitor struct {
 	nextBlockNumber   *big.Int
 	nextBlockNumberMu sync.Mutex
 	pollInterval      atomic.Int64
+	isStreamingMode   atomic.Bool
 
 	cache cachestore.Store[[]byte]
 
@@ -158,6 +159,11 @@ func NewMonitor(provider ethrpc.RawInterface, options ...Options) (*Monitor, err
 	}
 
 	opts.BlockRetentionLimit += opts.TrailNumBlocksBehindHead
+	if opts.BlockRetentionLimit < 2 {
+		// minimum 2 blocks to track, as we need the previous
+		// block to verify the current block
+		opts.BlockRetentionLimit = 2
+	}
 
 	if opts.DebugLogging {
 		stdLogger, ok := opts.Logger.(*logger.StdLogAdapter)
@@ -297,6 +303,13 @@ func (m *Monitor) Provider() ethrpc.Interface {
 	return m.provider
 }
 
+func (m *Monitor) IsStreamingEnabled() bool {
+	return !m.options.StreamingDisabled && m.provider.IsStreamingEnabled()
+}
+
+func (m *Monitor) IsStreamingMode() bool {
+	return m.isStreamingMode.Load()
+}
 func (m *Monitor) listenNewHead() <-chan uint64 {
 	ch := make(chan uint64)
 
@@ -334,10 +347,11 @@ func (m *Monitor) listenNewHead() <-chan uint64 {
 		// the monitor directly too.
 
 		// listen for new heads either via streaming or polling
-		if !m.options.StreamingDisabled && m.provider.IsStreamingEnabled() && streamingErrCount < m.options.StreamingErrNumToSwitchToPolling {
+		if m.IsStreamingEnabled() && streamingErrCount < m.options.StreamingErrNumToSwitchToPolling {
 			// Streaming mode if available, where we listen for new heads
 			// and push the new block number to the nextBlock channel.
 			m.log.Info("ethmonitor: starting stream head listener")
+			m.isStreamingMode.Store(true)
 
 			newHeads := make(chan *types.Header)
 			sub, err := m.provider.SubscribeNewHeads(m.ctx, newHeads)
@@ -378,11 +392,12 @@ func (m *Monitor) listenNewHead() <-chan uint64 {
 		} else {
 			// We default to polling if streaming is not enabled
 			m.log.Info("ethmonitor: starting poll head listener")
+			m.isStreamingMode.Store(false)
 
 			retryStreamingTimer := time.NewTimer(m.options.StreamingRetryAfter)
 			for {
 				// if streaming is enabled, we'll retry streaming
-				if m.provider.IsStreamingEnabled() {
+				if m.IsStreamingEnabled() {
 					select {
 					case <-retryStreamingTimer.C:
 						// retry streaming
@@ -546,8 +561,10 @@ func (m *Monitor) buildCanonicalChain(ctx context.Context, nextBlock *types.Bloc
 
 	headBlock := m.chain.Head()
 
-	m.log.Debugf("ethmonitor: new block #%d hash:%s prevHash:%s numTxns:%d",
-		nextBlock.NumberU64(), nextBlock.Hash().String(), nextBlock.ParentHash().String(), len(nextBlock.Transactions()))
+	if m.options.DebugLogging {
+		m.log.Debugf("ethmonitor: new block #%d hash:%s prevHash:%s numTxns:%d",
+			nextBlock.NumberU64(), nextBlock.Hash().String(), nextBlock.ParentHash().String(), len(nextBlock.Transactions()))
+	}
 
 	if headBlock == nil || nextBlock.ParentHash() == headBlock.Hash() {
 		// block-chaining it up
@@ -571,7 +588,9 @@ func (m *Monitor) buildCanonicalChain(ctx context.Context, nextBlock *types.Bloc
 		}
 	}
 
-	m.log.Debugf("ethmonitor: block reorg, reverting block #%d hash:%s prevHash:%s", poppedBlock.NumberU64(), poppedBlock.Hash().Hex(), poppedBlock.ParentHash().Hex())
+	if m.options.DebugLogging {
+		m.log.Debugf("ethmonitor: block reorg, reverting block #%d hash:%s prevHash:%s", poppedBlock.NumberU64(), poppedBlock.Hash().Hex(), poppedBlock.ParentHash().Hex())
+	}
 	events = append(events, &poppedBlock)
 
 	// let's always take a pause between any reorg for the polling interval time
@@ -662,7 +681,9 @@ func (m *Monitor) addLogs(ctx context.Context, blocks Blocks) {
 
 func (m *Monitor) filterLogs(ctx context.Context, blockHash common.Hash, topics [][]common.Hash) ([]types.Log, []byte, error) {
 	getter := func(ctx context.Context, _ string) ([]byte, error) {
-		m.log.Debugf("ethmonitor: filterLogs is calling origin for block hash %s", blockHash)
+		if m.options.DebugLogging {
+			m.log.Debugf("ethmonitor: filterLogs is calling origin for block hash %s", blockHash)
+		}
 
 		tctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 		defer cancel()
@@ -679,7 +700,7 @@ func (m *Monitor) filterLogs(ctx context.Context, blockHash common.Hash, topics 
 		if err != nil {
 			return nil, resp, err
 		}
-		logs, err := unmarshalLogs(resp)
+		logs, err := m.unmarshalLogs(resp)
 		return logs, resp, err
 	}
 
@@ -696,7 +717,7 @@ func (m *Monitor) filterLogs(ctx context.Context, blockHash common.Hash, topics 
 	if err != nil {
 		return nil, resp, err
 	}
-	logs, err := unmarshalLogs(resp)
+	logs, err := m.unmarshalLogs(resp)
 	return logs, resp, err
 }
 
@@ -743,7 +764,9 @@ func (m *Monitor) fetchNextBlock(ctx context.Context) (*types.Block, []byte, boo
 	miss := false
 
 	getter := func(ctx context.Context, _ string) ([]byte, error) {
-		m.log.Debugf("ethmonitor: fetchNextBlock is calling origin for number %s", m.nextBlockNumber)
+		if m.options.DebugLogging {
+			m.log.Debugf("ethmonitor: fetchNextBlock is calling origin for number %s", m.nextBlockNumber)
+		}
 		for {
 			select {
 			case <-ctx.Done():
@@ -754,7 +777,7 @@ func (m *Monitor) fetchNextBlock(ctx context.Context) (*types.Block, []byte, boo
 			nextBlockPayload, err := m.fetchRawBlockByNumber(ctx, m.nextBlockNumber)
 			if errors.Is(err, ethereum.NotFound) {
 				miss = true
-				if m.provider.IsStreamingEnabled() {
+				if m.IsStreamingEnabled() {
 					// in streaming mode, we'll use a shorter time to pause before we refetch
 					time.Sleep(200 * time.Millisecond)
 				} else {
@@ -786,7 +809,7 @@ func (m *Monitor) fetchNextBlock(ctx context.Context) (*types.Block, []byte, boo
 		if err != nil {
 			return nil, resp, miss, err
 		}
-		block, err := unmarshalBlock(resp)
+		block, err := m.unmarshalBlock(resp)
 		return block, resp, miss, err
 	}
 
@@ -796,7 +819,7 @@ func (m *Monitor) fetchNextBlock(ctx context.Context) (*types.Block, []byte, boo
 	if err != nil {
 		return nil, resp, miss, err
 	}
-	block, err := unmarshalBlock(resp)
+	block, err := m.unmarshalBlock(resp)
 	return block, resp, miss, err
 }
 
@@ -805,7 +828,9 @@ func cacheKeyBlockNum(chainID *big.Int, num *big.Int) string {
 }
 
 func (m *Monitor) fetchRawBlockByNumber(ctx context.Context, num *big.Int) ([]byte, error) {
-	m.log.Debugf("ethmonitor: fetchRawBlockByNumber is calling origin for number %s", num)
+	if m.options.DebugLogging {
+		m.log.Debugf("ethmonitor: fetchRawBlockByNumber is calling origin for number %s", num)
+	}
 	maxErrAttempts, errAttempts := 3, 0 // quick retry in case of short-term node connection failures
 
 	var blockPayload []byte
@@ -843,8 +868,9 @@ func (m *Monitor) fetchRawBlockByNumber(ctx context.Context, num *big.Int) ([]by
 
 func (m *Monitor) fetchBlockByHash(ctx context.Context, hash common.Hash) (*types.Block, []byte, error) {
 	getter := func(ctx context.Context, _ string) ([]byte, error) {
-		m.log.Debugf("ethmonitor: fetchBlockByHash is calling origin for hash %s", hash)
-
+		if m.options.DebugLogging {
+			m.log.Debugf("ethmonitor: fetchBlockByHash is calling origin for hash %s", hash)
+		}
 		maxNotFoundAttempts, notFoundAttempts := 2, 0 // waiting for node to sync
 		maxErrAttempts, errAttempts := 2, 0           // quick retry in case of short-term node connection failures
 
@@ -890,7 +916,7 @@ func (m *Monitor) fetchBlockByHash(ctx context.Context, hash common.Hash) (*type
 		if err != nil {
 			return nil, nil, err
 		}
-		block, err := unmarshalBlock(resp)
+		block, err := m.unmarshalBlock(resp)
 		return block, nil, err
 	}
 
@@ -900,7 +926,7 @@ func (m *Monitor) fetchBlockByHash(ctx context.Context, hash common.Hash) (*type
 	if err != nil {
 		return nil, nil, err
 	}
-	block, err := unmarshalBlock(resp)
+	block, err := m.unmarshalBlock(resp)
 	return block, resp, err
 }
 
@@ -1131,16 +1157,27 @@ func clampDuration(x, y time.Duration) time.Duration {
 	}
 }
 
-func unmarshalBlock(blockPayload []byte) (*types.Block, error) {
+func (m *Monitor) unmarshalBlock(blockPayload []byte) (*types.Block, error) {
 	var block *types.Block
-	err := ethrpc.IntoBlock(blockPayload, &block)
+
+	var strictness ethrpc.StrictnessLevel
+	getStrictnessLevel, ok := m.provider.(ethrpc.StrictnessLevelGetter)
+	if !ok {
+		// default to no validation if provider does not support strictness
+		// level interface
+		strictness = 0
+	} else {
+		strictness = getStrictnessLevel.StrictnessLevel()
+	}
+
+	err := ethrpc.IntoBlock(blockPayload, &block, strictness)
 	if err != nil {
 		return nil, err
 	}
 	return block, nil
 }
 
-func unmarshalLogs(logsPayload []byte) ([]types.Log, error) {
+func (m *Monitor) unmarshalLogs(logsPayload []byte) ([]types.Log, error) {
 	var logs []types.Log
 	err := json.Unmarshal(logsPayload, &logs)
 	if err != nil {
