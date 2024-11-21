@@ -489,6 +489,10 @@ type walletServiceMock struct {
 	registeredSessions map[string]struct{}
 }
 
+func (w walletServiceMock) AdoptChildWallet(ctx context.Context, intent *proto_wallet.Intent, checkpoint uint32, signatures []*proto_wallet.ProvidedSignature) (*proto_wallet.IntentResponse, error) {
+	panic("unimplemented")
+}
+
 func (w walletServiceMock) InitiateAuth(ctx context.Context, intent *proto_wallet.Intent, answer string, challenge string) (*proto_wallet.IntentResponse, error) {
 	return nil, nil
 }
@@ -498,32 +502,32 @@ func (w walletServiceMock) InitiateEmailAuth(ctx context.Context, intent *proto_
 }
 
 func (w walletServiceMock) UpdateProjectUserMapRules(ctx context.Context, projectID uint64, userMapRules *proto_wallet.ProjectSessionUserMapRules) error {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) GetProjectParentWalletDeployCalldata(ctx context.Context, projectID uint64, chainID string) (string, string, string, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) FederateAccount(ctx context.Context, userID string, intent *proto_wallet.Intent) (*proto_wallet.IntentResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) RemoveAccount(ctx context.Context, intent *proto_wallet.Intent) (*proto_wallet.IntentResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) ProjectParentWalletStatus(ctx context.Context, projectID uint64) ([]*proto_wallet.ParentWalletStatus, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) SessionAuthProof(ctx context.Context, intent *proto_wallet.Intent, proof *proto_wallet.SessionAuthProof) (*proto_wallet.IntentResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -539,32 +543,32 @@ func newWalletServiceMock(registeredSessions []string) *walletServiceMock {
 }
 
 func (w walletServiceMock) CreateProject(ctx context.Context, projectID uint64, name string, config *proto_wallet.ProjectWalletPreConfig, jwtAlg string, jwtSecret *string, jwtPublic *string) (*proto_wallet.Project, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) ProjectParentConfig(ctx context.Context, projectId uint64) (string, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) ProjectParentWallet(ctx context.Context, projectId uint64) (string, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) DeployProjectParentWallet(ctx context.Context, projectId uint64, chainID string) (string, string, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) ProjectWallets(ctx context.Context, projectId uint64, page *proto_wallet.Page) ([]*proto_wallet.ProjectWallet, *proto_wallet.Page, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) ProjectUserSalt(ctx context.Context, projectId uint64) (string, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -585,12 +589,12 @@ func (w walletServiceMock) UseHotWallet(ctx context.Context, walletAddress strin
 }
 
 func (w walletServiceMock) Wallets(ctx context.Context, page *proto_wallet.Page) ([]*proto_wallet.ProjectWallet, *proto_wallet.Page, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) IsValidMessageSignature(ctx context.Context, chainID uint64, walletAddress string, message string, signature string) (bool, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -646,7 +650,7 @@ func (w walletServiceMock) SignMessage(ctx context.Context, intent *proto_wallet
 }
 
 func (w walletServiceMock) GetSession(ctx context.Context, sessionID string) (*proto_wallet.IntentResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -667,12 +671,12 @@ func (w *walletServiceMock) RegisterSession(ctx context.Context, userID string, 
 	w.registeredUsers[userID] = struct{}{}
 
 	return &proto_wallet.IntentResponse{
-		Code: string(proto.IntentResponseCode_sessionOpened),
+		Code: proto_wallet.IntentResponseCode_sessionOpened,
 	}, nil
 }
 
 func (w walletServiceMock) StartSessionValidation(ctx context.Context, walletAddress string, sessionID string, deviceMetadata string) (*proto_wallet.IntentResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -694,12 +698,12 @@ func (w walletServiceMock) SendIntent(ctx context.Context, intent *proto_wallet.
 }
 
 func (w walletServiceMock) ChainList(ctx context.Context) ([]*proto_wallet.Chain, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (w walletServiceMock) FinishValidateSession(ctx context.Context, sessionId string, salt string, challenge string) (*proto_wallet.IntentResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 

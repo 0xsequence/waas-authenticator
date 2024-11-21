@@ -16,7 +16,6 @@ import (
 	"github.com/0xsequence/ethkit/go-ethereum/common"
 	"github.com/0xsequence/ethkit/go-ethereum/common/hexutil"
 	"github.com/0xsequence/ethkit/go-ethereum/crypto"
-
 	"github.com/0xsequence/go-sequence/contracts"
 	"github.com/0xsequence/go-sequence/core"
 )
@@ -1532,8 +1531,6 @@ func (c *WalletConfig) BuildRegularSignature(ctx context.Context, sign core.Sign
 			signerSignatures[signerSig.Signer] = signerSignature{signerSig.Signer,
 				signerSig.Type, signerSig.Signature}
 			signedSigners[signerSig.Signer] = 0
-
-			fmt.Println("!!! ---- found signature for signer", signerSig.Signer.Hex())
 
 			weight := c.Tree.unverifiedWeight(signedSigners)
 			if weight.Cmp(new(big.Int).SetUint64(uint64(c.Threshold_))) >= 0 {

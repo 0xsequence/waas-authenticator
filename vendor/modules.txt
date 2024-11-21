@@ -41,7 +41,7 @@ github.com/0xsequence/ethkit/util
 # github.com/0xsequence/go-ethauth v0.13.0
 ## explicit; go 1.17
 github.com/0xsequence/go-ethauth
-# github.com/0xsequence/go-sequence v0.43.0 => /Users/patryk/Projects/Horizon/go-sequence
+# github.com/0xsequence/go-sequence v0.43.4
 ## explicit; go 1.22.0
 github.com/0xsequence/go-sequence
 github.com/0xsequence/go-sequence/contracts
@@ -1106,4 +1106,3 @@ moul.io/http2curl/v2
 ## explicit; go 1.17
 rsc.io/tmplfunc
 rsc.io/tmplfunc/internal/parse
-# github.com/0xsequence/go-sequence => /Users/patryk/Projects/Horizon/go-sequence

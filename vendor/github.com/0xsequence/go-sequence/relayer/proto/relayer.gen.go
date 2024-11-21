@@ -14,7 +14,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/0xsequence/go-sequence/lib/prototyp"
@@ -1343,12 +1342,6 @@ func doHTTPRequest(ctx context.Context, client HTTPClient, url string, in, out i
 		return nil, ErrWebrpcRequestFailed.WithCause(fmt.Errorf("could not build request: %w", err))
 	}
 
-	curl, err := RequestToCurl(req)
-	if err != nil {
-		return nil, fmt.Errorf("could not make curl request: %w", err)
-	}
-	fmt.Println(curl)
-
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, ErrWebrpcRequestFailed.WithCause(err)
@@ -1359,9 +1352,6 @@ func doHTTPRequest(ctx context.Context, client HTTPClient, url string, in, out i
 		if err != nil {
 			return nil, ErrWebrpcBadResponse.WithCause(fmt.Errorf("failed to read server error response body: %w", err))
 		}
-
-		fmt.Println("RESP CODE:", resp.StatusCode)
-		fmt.Println(string(respBody))
 
 		var rpcErr WebRPCError
 		if err := json.Unmarshal(respBody, &rpcErr); err != nil {
@@ -1534,43 +1524,3 @@ var (
 	ErrNotFound         = WebRPCError{Code: 3000, Name: "NotFound", Message: "Resource not found", HTTPStatus: 400}
 	ErrInsufficientFee  = WebRPCError{Code: 3004, Name: "InsufficientFee", Message: "Insufficient fee", HTTPStatus: 402}
 )
-
-// RequestToCurl generates a curl command from an http.Request
-func RequestToCurl(req *http.Request) (string, error) {
-	// Start building the curl command
-	var curlCmd strings.Builder
-	curlCmd.WriteString("curl -X ")
-	curlCmd.WriteString(req.Method)
-
-	// Add headers to the curl command
-	for key, values := range req.Header {
-		for _, value := range values {
-			curlCmd.WriteString(fmt.Sprintf(" -H \"%s: %s\"", key, value))
-		}
-	}
-
-	// Add body if the method requires it (e.g., POST, PUT)
-	if req.Body != nil && (req.Method == http.MethodPost || req.Method == http.MethodPut || req.Method == http.MethodPatch) {
-		var bodyBytes []byte
-		var err error
-		if req.Body != nil {
-			// Read the body into bytes
-			bodyBytes, err = io.ReadAll(req.Body)
-			if err != nil {
-				return "", err
-			}
-			// Restore the body to the request so it can still be used
-			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-		}
-
-		// If there's a non-empty body, add it to the curl command
-		if len(bodyBytes) > 0 {
-			curlCmd.WriteString(fmt.Sprintf(" --data '%s'", string(bodyBytes)))
-		}
-	}
-
-	// Add the request URL
-	curlCmd.WriteString(fmt.Sprintf(" \"%s\"", req.URL.String()))
-
-	return curlCmd.String(), nil
-}
