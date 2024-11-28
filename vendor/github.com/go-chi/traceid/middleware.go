@@ -18,6 +18,7 @@ func Middleware(next http.Handler) http.Handler {
 
 		ctx = context.WithValue(ctx, ctxKey{}, traceID)
 		w.Header().Set(Header, traceID)
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
