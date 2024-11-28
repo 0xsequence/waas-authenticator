@@ -128,6 +128,25 @@ func (t *AccountTable) Get(ctx context.Context, projectID uint64, identity proto
 	return &acct, true, nil
 }
 
+func (t *AccountTable) ExistsByUserID(ctx context.Context, userID string) (bool, error) {
+	input := &dynamodb.QueryInput{
+		TableName:              &t.tableARN,
+		IndexName:              &t.indices.ByUserID,
+		KeyConditionExpression: aws.String("UserID = :userID"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":userID": &types.AttributeValueMemberS{Value: userID},
+		},
+		Limit: aws.Int32(1),
+	}
+
+	out, err := t.db.Query(ctx, input)
+	if err != nil {
+		return false, fmt.Errorf("Query: %w", err)
+	}
+
+	return len(out.Items) > 0, nil
+}
+
 // ListByUserID returns all Accounts of a given user.
 //
 // TODO: implement pagination.
