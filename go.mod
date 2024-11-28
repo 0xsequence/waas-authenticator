@@ -5,8 +5,8 @@ go 1.22.7
 toolchain go1.23.2
 
 require (
-	github.com/0xsequence/ethkit v1.29.4
-	github.com/0xsequence/go-sequence v0.43.4
+	github.com/0xsequence/ethkit v1.29.5
+	github.com/0xsequence/go-sequence v0.43.6
 	github.com/0xsequence/nitrocontrol v0.3.0
 	github.com/BurntSushi/toml v1.4.0
 	github.com/aws/aws-sdk-go-v2 v1.30.3
