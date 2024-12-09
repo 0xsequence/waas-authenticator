@@ -171,10 +171,11 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		if err != nil {
 			return nil, err
 		}
-		if err := s.adoptChildWallet(ctx, sess, intentTyped); err != nil {
+		res, err := s.adoptChildWallet(ctx, sess, intentTyped)
+		if err != nil {
 			return nil, err
 		}
-		return makeTypedIntentResponse(&intents.IntentResponseChildWalletAdopted{})
+		return convertIntentResponse(res), nil
 
 	case intents.IntentName_getIdToken:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataGetIdToken](intent)
