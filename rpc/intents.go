@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -13,6 +14,7 @@ import (
 	v2 "github.com/0xsequence/go-sequence/core/v2"
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/waas-authenticator/proto"
+	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/0xsequence/waas-authenticator/rpc/tracing"
 	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
@@ -58,7 +60,24 @@ func AddressForUser(ctx context.Context, tntData *proto.TenantData, user string)
 	return address.String(), nil
 }
 
-func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto.IntentResponse, error) {
+func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (iResp *proto.IntentResponse, err error) {
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		var wrErr proto_wallet.WebRPCError
+		if errors.As(err, &wrErr) {
+			err = proto.WebRPCError{
+				Name:       wrErr.Name,
+				Code:       wrErr.Code,
+				Message:    wrErr.Message,
+				Cause:      err.Error(),
+				HTTPStatus: wrErr.HTTPStatus,
+			}
+		}
+	}()
+
 	tntData := tenant.FromContext(ctx)
 
 	intent, sessionID, err := parseIntent(protoIntent)
