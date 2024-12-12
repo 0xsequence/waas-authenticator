@@ -19,16 +19,16 @@ import (
 
 func (s *RPC) adoptChildWallet(
 	ctx context.Context, sess *data.Session, intent *intents.IntentTyped[intents.IntentDataAdoptChildWallet],
-) error {
+) (*proto_wallet.IntentResponse, error) {
 	tnt := tenant.FromContext(ctx)
 
 	signerWallet, err := ethwallet.NewWalletFromPrivateKey(tnt.PrivateKey)
 	if err != nil {
-		return fmt.Errorf("recovering parent wallet: %w", err)
+		return nil, fmt.Errorf("recovering parent wallet: %w", err)
 	}
 
 	if !common.IsHexAddress(intent.Data.Adopter) {
-		return fmt.Errorf("invalid adopter: %s", intent.Data.Adopter)
+		return nil, fmt.Errorf("invalid adopter: %s", intent.Data.Adopter)
 	}
 
 	adopterAddress := common.HexToAddress(intent.Data.Adopter)
@@ -51,13 +51,13 @@ func (s *RPC) adoptChildWallet(
 
 	subdigest, err := sequence.SubDigest(big.NewInt(0), common.HexToAddress(intent.Data.Wallet), approval.Hash)
 	if err != nil {
-		return fmt.Errorf("calculating digest: %w", err)
+		return nil, fmt.Errorf("calculating digest: %w", err)
 	}
 
 	// Our EOA belongs to the *parent* wallet, so we need to sign the subdigest with the parent key
 	sig, parentSubdigest, err := s.signUsingParent(signerWallet, tnt.ParentAddress, subdigest, big.NewInt(0))
 	if err != nil {
-		return fmt.Errorf("signing subdigest using parent wallet: %w", err)
+		return nil, fmt.Errorf("signing subdigest using parent wallet: %w", err)
 	}
 
 	signatures := []*proto_wallet.ProvidedSignature{
@@ -69,9 +69,9 @@ func (s *RPC) adoptChildWallet(
 	}
 
 	apiIntent := waasapi.ConvertToAPIIntent(&intent.Intent)
-	_, err = s.Wallets.AdoptChildWallet(waasapi.Context(ctx), apiIntent, childWalletConfig.Checkpoint_, signatures)
+	res, err := s.Wallets.AdoptChildWallet(waasapi.Context(ctx), apiIntent, childWalletConfig.Checkpoint_, signatures)
 	if err != nil {
-		return fmt.Errorf("adopting child wallet: %w", err)
+		return nil, fmt.Errorf("adopting child wallet: %w", err)
 	}
-	return nil
+	return res, nil
 }
