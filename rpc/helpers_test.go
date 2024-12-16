@@ -649,6 +649,16 @@ func (w walletServiceMock) SignMessage(ctx context.Context, intent *proto_wallet
 	}, nil
 }
 
+func (w *walletServiceMock) SignTypedData(ctx context.Context, intent *proto_wallet.Intent, message *proto_wallet.SignTypedData, signatures []*proto_wallet.ProvidedSignature) (*proto_wallet.IntentResponse, error) {
+	return &proto_wallet.IntentResponse{
+		Code: "signedTypedData",
+		Data: map[string]any{
+			"message":          "0x6D657373616765",
+			"encodedTypedData": "0x7369676E6174757265",
+		},
+	}, nil
+}
+
 func (w walletServiceMock) GetSession(ctx context.Context, sessionID string) (*proto_wallet.IntentResponse, error) {
 	// TODO implement me
 	panic("implement me")
