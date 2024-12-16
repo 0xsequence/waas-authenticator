@@ -1,7 +1,7 @@
 # dario.cat/mergo v1.0.0
 ## explicit; go 1.13
 dario.cat/mergo
-# github.com/0xsequence/ethkit v1.29.5
+# github.com/0xsequence/ethkit v1.30.1
 ## explicit; go 1.21
 github.com/0xsequence/ethkit
 github.com/0xsequence/ethkit/ethartifact
@@ -41,7 +41,7 @@ github.com/0xsequence/ethkit/util
 # github.com/0xsequence/go-ethauth v0.13.0
 ## explicit; go 1.17
 github.com/0xsequence/go-ethauth
-# github.com/0xsequence/go-sequence v0.43.6
+# github.com/0xsequence/go-sequence v0.44.1
 ## explicit; go 1.22.0
 github.com/0xsequence/go-sequence
 github.com/0xsequence/go-sequence/contracts
@@ -264,7 +264,7 @@ github.com/aws/smithy-go/waiter
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
-# github.com/bits-and-blooms/bitset v1.14.3
+# github.com/bits-and-blooms/bitset v1.19.1
 ## explicit; go 1.16
 github.com/bits-and-blooms/bitset
 # github.com/btcsuite/btcd v0.24.2
@@ -304,7 +304,7 @@ github.com/cloudflare/circl/math/mlsbset
 github.com/cloudflare/circl/sign
 github.com/cloudflare/circl/sign/ed25519
 github.com/cloudflare/circl/sign/ed448
-# github.com/consensys/bavard v0.1.22
+# github.com/consensys/bavard v0.1.24
 ## explicit; go 1.22
 github.com/consensys/bavard
 # github.com/consensys/gnark-crypto v0.14.0
@@ -587,7 +587,7 @@ github.com/goware/validation
 github.com/hashicorp/golang-lru/v2
 github.com/hashicorp/golang-lru/v2/internal
 github.com/hashicorp/golang-lru/v2/simplelru
-# github.com/holiman/uint256 v1.3.1
+# github.com/holiman/uint256 v1.3.2
 ## explicit; go 1.19
 github.com/holiman/uint256
 # github.com/huandu/xstrings v1.5.0
@@ -967,7 +967,7 @@ go.opentelemetry.io/otel/trace/noop
 go.uber.org/atomic
 # go.uber.org/goleak v1.3.0
 ## explicit; go 1.20
-# golang.org/x/crypto v0.28.0
+# golang.org/x/crypto v0.31.0
 ## explicit; go 1.20
 golang.org/x/crypto/argon2
 golang.org/x/crypto/bcrypt
@@ -1005,17 +1005,17 @@ golang.org/x/net/context
 golang.org/x/net/idna
 golang.org/x/net/internal/socks
 golang.org/x/net/proxy
-# golang.org/x/sync v0.8.0
+# golang.org/x/sync v0.10.0
 ## explicit; go 1.18
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.26.0
+# golang.org/x/sys v0.28.0
 ## explicit; go 1.18
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/text v0.19.0
+# golang.org/x/text v0.21.0
 ## explicit; go 1.18
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
