@@ -127,6 +127,13 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (*proto
 		}
 		return s.signMessage(ctx, sess, intentTyped)
 
+	case intents.IntentName_signTypedData:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataSignTypedData](intent)
+		if err != nil {
+			return nil, err
+		}
+		return s.signTypedData(ctx, sess, intentTyped)
+
 	case intents.IntentName_sendTransaction:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataSendTransaction](intent)
 		if err != nil {
