@@ -5,8 +5,8 @@ go 1.22.7
 toolchain go1.23.2
 
 require (
-	github.com/0xsequence/ethkit v1.30.1
-	github.com/0xsequence/go-sequence v0.44.1
+	github.com/0xsequence/ethkit v1.30.2
+	github.com/0xsequence/go-sequence v0.44.2
 	github.com/0xsequence/nitrocontrol v0.3.0
 	github.com/BurntSushi/toml v1.4.0
 	github.com/aws/aws-sdk-go-v2 v1.30.3
@@ -48,7 +48,7 @@ require (
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
-	github.com/0xsequence/go-ethauth v0.13.0 // indirect
+	github.com/0xsequence/go-ethauth v0.14.0 // indirect
 	github.com/0xsequence/nsm v0.1.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -86,7 +86,7 @@ require (
 	github.com/crate-crypto/go-kzg-4844 v1.1.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
+	github.com/deckarep/golang-set/v2 v2.7.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.5.0 // indirect
@@ -192,7 +192,7 @@ require (
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
 	golang.org/x/mod v0.21.0 // indirect
-	golang.org/x/net v0.30.0 // indirect
+	golang.org/x/net v0.32.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
