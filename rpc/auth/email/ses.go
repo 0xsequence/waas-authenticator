@@ -12,39 +12,47 @@ import (
 )
 
 type sesSender struct {
-	client    *ses.Client
-	source    *string
-	sourceARN *string
+	cfg    config.SESConfig
+	awsCfg aws.Config
 }
 
 func NewSESSender(awsCfg aws.Config, cfg config.SESConfig) Sender {
-	if cfg.AccessRoleARN != "" {
-		stsClient := sts.NewFromConfig(awsCfg)
-		creds := stscreds.NewAssumeRoleProvider(stsClient, cfg.AccessRoleARN)
-		awsCfg.Credentials = aws.NewCredentialsCache(creds)
-	}
-
-	if cfg.Region != "" {
-		awsCfg.Region = cfg.Region
-	}
-
 	sender := &sesSender{
-		client: ses.NewFromConfig(awsCfg),
-	}
-
-	if cfg.Source != "" {
-		sender.source = &cfg.Source
-	}
-
-	if cfg.SourceARN != "" {
-		sender.sourceARN = &cfg.SourceARN
+		cfg:    cfg,
+		awsCfg: awsCfg,
 	}
 
 	return sender
 }
 
 func (s *sesSender) Send(ctx context.Context, msg *Message) error {
-	_, err := s.client.SendEmail(ctx, &ses.SendEmailInput{
+	awsCfg := s.awsCfg
+	accessRoleARN := s.cfg.AccessRoleARN
+	if msg.AccessRoleARN != "" {
+		accessRoleARN = msg.AccessRoleARN
+	}
+	if accessRoleARN != "" {
+		stsClient := sts.NewFromConfig(awsCfg)
+		creds := stscreds.NewAssumeRoleProvider(stsClient, accessRoleARN)
+		awsCfg.Credentials = aws.NewCredentialsCache(creds)
+	}
+	if s.cfg.Region != "" {
+		awsCfg.Region = s.cfg.Region
+	}
+
+	client := ses.NewFromConfig(awsCfg)
+
+	source := &s.cfg.Source
+	if msg.Source != "" {
+		source = &msg.Source
+	}
+
+	sourceARN := &s.cfg.SourceARN
+	if msg.SourceARN != "" {
+		sourceARN = &msg.SourceARN
+	}
+
+	_, err := client.SendEmail(ctx, &ses.SendEmailInput{
 		Destination: &types.Destination{
 			ToAddresses: []string{msg.Recipient},
 		},
@@ -64,8 +72,8 @@ func (s *sesSender) Send(ctx context.Context, msg *Message) error {
 				Charset: aws.String("UTF-8"),
 			},
 		},
-		Source:    s.source,
-		SourceArn: s.sourceARN,
+		Source:    source,
+		SourceArn: sourceARN,
 	})
 	return err
 }

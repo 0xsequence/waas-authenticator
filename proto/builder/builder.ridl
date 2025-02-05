@@ -3,50 +3,49 @@ webrpc = v1 # TODO, use v2
 name = sequence-builder
 version = v0.1.0
 
-
 # db table: "email_templates"
 struct EmailTemplate
   - id: uint64
     + go.field.name = ID
     + go.tag.db = id,omitempty
-
   - templateType?: EmailTemplateType
     + go.field.name = TemplateType
     + go.tag.db = template_type
-
   - projectId: uint64
     + go.field.name = ProjectID
     + go.tag.db = project_id
-
   - subject: string
     + go.tag.db = subject
-
   - introText: string
     + go.tag.db = intro_text
-
   - logoUrl: string
     + go.field.name = LogoURL
     + go.tag.db = logo_url
-
   - template?: string
     + go.field.name = Template
     + go.tag.db = template
-
+  - fromEmail?: string
+    + go.tag.db = from_email
   - placeholders: []string
     + go.tag.db = placeholders
-
+  - sesConfig?: SESSettings
+    + go.tag.db = ses_config
   - createdAt: timestamp
     + json = createdAt
     + go.tag.db = created_at
-
   - updatedAt: timestamp
     + json = updatedAt
     + go.tag.db = updated_at
-
   - deletedAt?: timestamp
     + go.tag.db = deleted_at,omitempty
     + go.tag.json = deletedAt,omitempty
     + go.field.type = *time.Time
+
+struct SESSettings
+  - accessRoleARN: string
+    + go.field.name = AccessRoleARN
+  - sourceARN: string
+    + go.field.name = SourceARN
 
 enum EmailTemplateType: uint8
   - UNKNOWN

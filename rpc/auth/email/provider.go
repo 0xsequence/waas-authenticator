@@ -111,6 +111,16 @@ func (p *AuthProvider) InitiateAuth(
 		HTML:      strings.Replace(*tpl.Template, "{auth_code}", secretCode, 1),
 		Text:      tpl.IntroText + "\n\n" + secretCode,
 	}
+
+	if tpl.FromEmail != nil {
+		msg.Source = *tpl.FromEmail
+	}
+
+	if tpl.SesConfig != nil {
+		msg.SourceARN = tpl.SesConfig.SourceARN
+		msg.AccessRoleARN = tpl.SesConfig.AccessRoleARN
+	}
+
 	if err := p.Sender.Send(ctx, msg); err != nil {
 		return nil, fmt.Errorf("failed to send email: %w", err)
 	}
