@@ -5,10 +5,13 @@ import (
 )
 
 type Message struct {
-	Recipient string
-	Subject   string
-	HTML      string
-	Text      string
+	Recipient     string
+	Subject       string
+	HTML          string
+	Text          string
+	Source        string
+	SourceARN     string
+	AccessRoleARN string
 }
 
 type Sender interface {
