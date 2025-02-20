@@ -318,6 +318,52 @@ func (s *RPC) initiateAuth(
 	return authProvider.InitiateAuth(ctx, verifCtx, intent.Data.Verifier, intent.Signers()[0], storeSessFn)
 }
 
+func (s *RPC) openScopedSession(
+	ctx context.Context, dbSess *data.Session, intent *intents.IntentTyped[intents.IntentDataOpenScopedSession],
+) (*proto.IntentResponse, error) {
+	tnt := tenant.FromContext(ctx)
+	att := attestation.FromContext(ctx)
+	sessData, _, err := crypto.DecryptData[*proto.SessionData](ctx, dbSess.EncryptedKey, dbSess.Ciphertext, tnt.KMSKeys)
+	if err != nil {
+		return nil, fmt.Errorf("decrypting session data: %w", err)
+	}
+
+	scopedSessData := &proto.SessionData{
+		ID:        intent.Data.ScopedSessionID,
+		ProjectID: sessData.ProjectID,
+		UserID:    sessData.UserID,
+		Identity:  sessData.Identity,
+		CreatedAt: time.Now(),
+		ExpiresAt: sessData.ExpiresAt,
+	}
+	encryptedKey, algorithm, ciphertext, err := crypto.EncryptData(ctx, att, tnt.KMSKeys[0], scopedSessData)
+	if err != nil {
+		return nil, fmt.Errorf("encrypting scoped session data: %w", err)
+	}
+
+	scopedSess := &data.Session{
+		ID:           intent.Data.ScopedSessionID,
+		ProjectID:    sessData.ProjectID,
+		UserID:       sessData.UserID,
+		Identity:     sessData.Identity,
+		EncryptedKey: encryptedKey,
+		Algorithm:    algorithm,
+		Ciphertext:   ciphertext,
+		CreatedAt:    scopedSessData.CreatedAt,
+		RefreshedAt:  scopedSessData.CreatedAt,
+	}
+	if err := s.Sessions.Put(ctx, scopedSess); err != nil {
+		return nil, fmt.Errorf("saving scoped session: %w", err)
+	}
+
+	res, err := s.Wallets.SendIntent(waasapi.Context(ctx), waasapi.ConvertToAPIIntent(intent.ToIntent()))
+	if err != nil {
+		return nil, fmt.Errorf("sending intent: %w", err)
+	}
+
+	return convertIntentResponse(res), nil
+}
+
 func (s *RPC) dropSession(
 	ctx context.Context, sess *data.Session, intent *intents.IntentTyped[intents.IntentDataCloseSession],
 ) (bool, error) {

@@ -109,6 +109,13 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (iResp 
 	case intents.IntentName_openSession:
 		return nil, fmt.Errorf("opening a session is unsupported outside of RegisterSession")
 
+	case intents.IntentName_openScopedSession:
+		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataOpenScopedSession](intent)
+		if err != nil {
+			return nil, err
+		}
+		return s.openScopedSession(ctx, sess, intentTyped)
+
 	case intents.IntentName_closeSession:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataCloseSession](intent)
 		if err != nil {
