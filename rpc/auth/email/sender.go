@@ -12,6 +12,7 @@ type Message struct {
 	Source        string
 	SourceARN     string
 	AccessRoleARN string
+	Region        string
 }
 
 type Sender interface {
