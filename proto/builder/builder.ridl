@@ -46,6 +46,7 @@ struct SESSettings
     + go.field.name = AccessRoleARN
   - sourceARN: string
     + go.field.name = SourceARN
+  - region: string
 
 enum EmailTemplateType: uint8
   - UNKNOWN

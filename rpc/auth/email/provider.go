@@ -119,6 +119,7 @@ func (p *AuthProvider) InitiateAuth(
 	if tpl.SesConfig != nil {
 		msg.SourceARN = tpl.SesConfig.SourceARN
 		msg.AccessRoleARN = tpl.SesConfig.AccessRoleARN
+		msg.Region = tpl.SesConfig.Region
 	}
 
 	if err := p.Sender.Send(ctx, msg); err != nil {

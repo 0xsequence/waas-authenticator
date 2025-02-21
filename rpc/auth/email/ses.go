@@ -36,7 +36,9 @@ func (s *sesSender) Send(ctx context.Context, msg *Message) error {
 		creds := stscreds.NewAssumeRoleProvider(stsClient, accessRoleARN)
 		awsCfg.Credentials = aws.NewCredentialsCache(creds)
 	}
-	if s.cfg.Region != "" {
+	if msg.Region != "" {
+		awsCfg.Region = msg.Region
+	} else if s.cfg.Region != "" {
 		awsCfg.Region = s.cfg.Region
 	}
 
