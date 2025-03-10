@@ -5,8 +5,8 @@ go 1.22.7
 toolchain go1.23.2
 
 require (
-	github.com/0xsequence/ethkit v1.30.6
-	github.com/0xsequence/go-sequence v0.44.2
+	github.com/0xsequence/ethkit v1.30.7
+	github.com/0xsequence/go-sequence v0.50.3
 	github.com/0xsequence/nitrocontrol v0.3.0
 	github.com/BurntSushi/toml v1.4.0
 	github.com/aws/aws-sdk-go-v2 v1.30.3
@@ -24,7 +24,7 @@ require (
 	github.com/go-chi/jwtauth/v5 v5.3.1
 	github.com/go-chi/telemetry v0.3.4
 	github.com/go-chi/traceid v0.2.0
-	github.com/go-chi/transport v0.2.0
+	github.com/go-chi/transport v0.5.0
 	github.com/goccy/go-json v0.10.3
 	github.com/goware/cachestore v0.9.0
 	github.com/goware/rerun v0.0.9
@@ -203,6 +203,5 @@ require (
 	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	moul.io/http2curl/v2 v2.3.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
