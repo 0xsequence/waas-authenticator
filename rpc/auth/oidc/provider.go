@@ -107,7 +107,12 @@ func (p *AuthProvider) Verify(ctx context.Context, verifCtx *proto.VerificationC
 		getKeySet: p.GetKeySet,
 	}
 
-	if _, err := jws.Verify([]byte(answer), jws.WithKeySet(ks, jws.WithMultipleKeysPerKeyID(false))); err != nil {
+	keySetOpts := []jws.WithKeySetSuboption{
+		jws.WithMultipleKeysPerKeyID(false),
+		jws.WithInferAlgorithmFromKey(true),
+	}
+
+	if _, err := jws.Verify([]byte(answer), jws.WithKeySet(ks, keySetOpts...)); err != nil {
 		return proto.Identity{}, fmt.Errorf("signature verification: %w", err)
 	}
 
