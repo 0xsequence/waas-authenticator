@@ -2,6 +2,8 @@ package prototyp
 
 import (
 	"database/sql/driver"
+	"encoding"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -10,9 +12,9 @@ import (
 
 // BigInt is a type alias for big.Int used for JSON/Database marshalling.
 //
-// For JSON values we encoded BigInt's as strings.
+// For JSON values we encode BigInt's as strings.
 //
-// For Database values we encoded BigInt's as NUMERIC(78).
+// For Database values we encode BigInt's as NUMERIC(78).
 type BigInt big.Int
 
 func NewBigInt(n int64) BigInt {
@@ -54,7 +56,6 @@ func NewBigIntFromString(s string, base int) BigInt {
 	} else {
 		bi, _ = ParseBigIntString(s, base)
 	}
-
 	return bi
 }
 
@@ -104,17 +105,24 @@ func (b BigInt) String() string {
 	return b.Int().String()
 }
 
+func (b BigInt) Bytes() []byte {
+	bp := (*big.Int)(&b)
+	return bp.Bytes()
+}
+
 func (b BigInt) Int() *big.Int {
-	v := big.Int(b)
-	return &v
+	bp := (*big.Int)(&b)
+	return bp
 }
 
 func (b BigInt) Uint64() uint64 {
-	return b.Int().Uint64()
+	bp := (*big.Int)(&b)
+	return bp.Uint64()
 }
 
 func (b BigInt) Int64() int64 {
-	return b.Int().Int64()
+	bp := (*big.Int)(&b)
+	return bp.Int64()
 }
 
 func (b *BigInt) Add(n *big.Int) {
@@ -128,24 +136,44 @@ func (b *BigInt) Sub(n *big.Int) {
 }
 
 func (b BigInt) Equals(n *big.Int) bool {
-	return b.Int().Cmp(n) == 0
+	bp := (*big.Int)(&b)
+	return bp.Cmp(n) == 0
 }
 
 func (b BigInt) Gt(n *big.Int) bool {
-	return b.Int().Cmp(n) == 1
+	bp := (*big.Int)(&b)
+	return bp.Cmp(n) == 1
 }
 
 func (b BigInt) Gte(n *big.Int) bool {
-	return b.Int().Cmp(n) == 0 || b.Int().Cmp(n) == 1
+	bp := (*big.Int)(&b)
+	return bp.Cmp(n) >= 0
 }
 
 func (b BigInt) Lt(n *big.Int) bool {
-	return b.Int().Cmp(n) == -1
+	bp := (*big.Int)(&b)
+	return bp.Cmp(n) == -1
 }
 
 func (b BigInt) Lte(n *big.Int) bool {
-	return b.Int().Cmp(n) == 0 || b.Int().Cmp(n) == -1
+	bp := (*big.Int)(&b)
+	return bp.Cmp(n) <= 0
 }
+
+func (b BigInt) Cmp(n *big.Int) int {
+	bp := (*big.Int)(&b)
+	return bp.Cmp(n)
+}
+
+var (
+	_bi                            = BigInt{}
+	_   encoding.BinaryMarshaler   = _bi
+	_   encoding.BinaryUnmarshaler = &_bi
+	_   encoding.TextMarshaler     = _bi
+	_   encoding.TextUnmarshaler   = &_bi
+	_   json.Marshaler             = _bi
+	_   json.Unmarshaler           = &_bi
+)
 
 // MarshalText implements encoding.TextMarshaler.
 func (b BigInt) MarshalText() ([]byte, error) {
@@ -178,6 +206,47 @@ func (b *BigInt) UnmarshalJSON(text []byte) error {
 		return nil
 	}
 	return b.UnmarshalText(text)
+}
+
+// MarshalBinary implements encoding.BinaryMarshaler. The first byte is the sign byte
+// to represent positive or negative numbers.
+func (b BigInt) MarshalBinary() ([]byte, error) {
+	bytes := b.Bytes()
+	out := make([]byte, len(bytes)+1)
+	copy(out[1:], bytes)
+	if b.Int().Sign() < 0 {
+		// Prepend a sign byte (0xFF for negative)
+		out[0] = 0xFF
+	} else {
+		// For zero or positive numbers, prepend 0x00
+		out[0] = 0x00
+	}
+	return out, nil
+}
+
+// UnmarshalBinary implements encoding.BinaryUnmarshaler. The first byte is the sign byte
+// to represent positive or negative numbers.
+func (b *BigInt) UnmarshalBinary(buff []byte) error {
+	if len(buff) == 0 {
+		*b = BigInt(*big.NewInt(0))
+		return nil
+	}
+
+	// Extract the sign byte
+	signByte := buff[0]
+
+	i := new(big.Int)
+	if len(buff) > 1 {
+		i.SetBytes(buff[1:])
+	}
+
+	// Apply sign if negative
+	if signByte == 0xFF {
+		i.Neg(i)
+	}
+
+	*b = BigInt(*i)
+	return nil
 }
 
 func (b BigInt) Value() (driver.Value, error) {
@@ -219,36 +288,13 @@ func (b *BigInt) Scan(src interface{}) error {
 	}
 
 	*b = BigInt(*i)
-
 	return nil
-}
-
-func (b *BigInt) ExtensionType() int8 {
-	return 12
-}
-
-func (b *BigInt) Len() int {
-	nb, _ := b.MarshalText()
-	return len(nb)
-}
-
-func (b *BigInt) MarshalBinaryTo(buff []byte) error {
-	nb, _ := b.MarshalText()
-	copy(buff, nb)
-	return nil
-}
-
-func (b *BigInt) MarshalBinary() (data []byte, err error) {
-	return b.MarshalText()
-}
-
-func (b *BigInt) UnmarshalBinary(buff []byte) error {
-	return b.UnmarshalText(buff)
 }
 
 func ParseBigIntString(s string, base int) (BigInt, bool) {
 	neg := strings.HasPrefix(s, "-")
 	var ns strings.Builder
+
 	switch base {
 	case 2:
 		for _, char := range s {
@@ -292,6 +338,7 @@ func ParseBigIntString(s string, base int) (BigInt, bool) {
 		s = ns.String()
 		s = strings.TrimPrefix(s, "0X")
 		s = strings.TrimPrefix(s, "0x")
+
 	default:
 		return BigInt{}, false
 	}

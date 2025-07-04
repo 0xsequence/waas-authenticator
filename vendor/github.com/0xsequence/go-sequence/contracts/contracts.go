@@ -6,9 +6,14 @@ import (
 	"github.com/0xsequence/ethkit/ethartifact"
 	"github.com/0xsequence/ethkit/ethcontract"
 	"github.com/0xsequence/ethkit/go-ethereum/common"
+
 	"github.com/0xsequence/go-sequence/contracts/gen/gasestimator"
 	"github.com/0xsequence/go-sequence/contracts/gen/ierc1271"
 	"github.com/0xsequence/go-sequence/contracts/gen/niftyswap"
+	seqmarketplace "github.com/0xsequence/go-sequence/contracts/gen/seq_marketplace"
+	seqsale1155 "github.com/0xsequence/go-sequence/contracts/gen/seq_sale/erc1155"
+	seqsale721 "github.com/0xsequence/go-sequence/contracts/gen/seq_sale/erc721"
+	"github.com/0xsequence/go-sequence/contracts/gen/supply"
 	"github.com/0xsequence/go-sequence/contracts/gen/tokens"
 	walletfactory1 "github.com/0xsequence/go-sequence/contracts/gen/v1/walletfactory"
 	walletgasestimator1 "github.com/0xsequence/go-sequence/contracts/gen/v1/walletgasestimator"
@@ -24,13 +29,13 @@ import (
 	walletutils2 "github.com/0xsequence/go-sequence/contracts/gen/v2/walletutils"
 )
 
-var (
-	GasEstimator,
+var GasEstimator,
 	IERC1271,
 	ERC20Mock,
 	IERC20,
 	IERC721,
 	IERC1155,
+	IERC1155Supply,
 	IERC20Wrapper,
 	INiftyswapExchange,
 	INiftyswapExchange20,
@@ -38,8 +43,10 @@ var (
 	NiftyswapExchange20,
 	NiftyswapFactory,
 	WrapAndNiftyswap,
+	SeqMarketplace,
+	SeqSale721,
+	SeqSale1155,
 	_ ethartifact.Artifact
-)
 
 var V1 struct {
 	WalletFactory              ethartifact.Artifact
@@ -60,10 +67,8 @@ var V2 struct {
 	WalletGasEstimator         ethartifact.Artifact
 }
 
-var (
-	//go:embed artifacts/erc1155/mocks/ERC20Mock.sol/ERC20Mock.json
-	artifact_erc20mock string
-)
+//go:embed artifacts/erc1155/mocks/ERC20Mock.sol/ERC20Mock.json
+var artifact_erc20mock string
 
 func init() {
 	V1.WalletFactory = artifact("WALLET_FACTORY", walletfactory1.WalletFactoryABI, walletfactory1.WalletFactoryBin)
@@ -90,12 +95,18 @@ func init() {
 	IERC1155 = artifact("IERC1155", tokens.IERC1155ABI, "")
 	IERC20Wrapper = artifact("IERC20Wrapper", tokens.IERC20WrapperABI, "")
 
+	IERC1155Supply = artifact("IERC1155Supply", supply.IERC1155SupplyABI, "")
+
 	INiftyswapExchange = artifact("INIFTYSWAP_EXCHANGE", niftyswap.INiftyswapExchangeABI, "")
 	INiftyswapExchange20 = artifact("INIFTYSWAP_EXCHANGE_20", niftyswap.INiftyswapExchange20ABI, "")
 	NiftyswapExchange = artifact("NIFTYSWAP_EXCHANGE", niftyswap.NiftyswapExchangeABI, niftyswap.NiftyswapExchangeBin)
 	NiftyswapExchange20 = artifact("NIFTYSWAP_EXCHANGE_20", niftyswap.NiftyswapExchange20ABI, niftyswap.NiftyswapExchange20Bin)
 	NiftyswapFactory = artifact("NIFTYSWAP_FACTORY", niftyswap.NiftyswapFactoryABI, niftyswap.NiftyswapFactoryBin)
 	WrapAndNiftyswap = artifact("WRAP_AND_NIFTYSWAP", niftyswap.WrapAndNiftyswapABI, niftyswap.WrapAndNiftyswapBin)
+
+	SeqMarketplace = artifact("SEQ_MARKETPLACE", seqmarketplace.SequenceMarketplaceABI, seqmarketplace.SequenceMarketplaceMetaData.Bin)
+	SeqSale721 = artifact("SEQ_SALE_ERC721", seqsale721.SaleABI, seqsale721.SaleMetaData.Bin)
+	SeqSale1155 = artifact("SEQ_SALE_ERC1155", seqsale1155.SaleABI, seqsale1155.SaleMetaData.Bin)
 
 	ERC20Mock = ethartifact.MustParseArtifactJSON(artifact_erc20mock)
 }
