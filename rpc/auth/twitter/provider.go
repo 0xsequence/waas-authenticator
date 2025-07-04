@@ -88,8 +88,6 @@ func (p *AuthProvider) Verify(
 		return proto.Identity{}, fmt.Errorf("failed to get X user info: %w", err)
 	}
 
-	fmt.Println("accInfo", accInfo)
-
 	identity := proto.Identity{
 		Type:    proto.IdentityType_Twitter,
 		Issuer:  "",
