@@ -23,6 +23,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/auth/guest"
 	"github.com/0xsequence/waas-authenticator/rpc/auth/oidc"
 	"github.com/0xsequence/waas-authenticator/rpc/auth/playfab"
+	"github.com/0xsequence/waas-authenticator/rpc/auth/twitter"
 	"github.com/0xsequence/waas-authenticator/rpc/awscreds"
 	"github.com/0xsequence/waas-authenticator/rpc/migration"
 	"github.com/0xsequence/waas-authenticator/rpc/signing"
@@ -309,6 +310,7 @@ func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config)
 	guestProvider := guest.NewAuthProvider()
 
 	playfabProvider := playfab.NewAuthProvider(client)
+	twitterProvider := twitter.NewAuthProvider(client)
 
 	verifiers := map[intents.IdentityType]auth.Provider{
 		intents.IdentityType_None:    auth.NewTracedProvider("oidc.LegacyAuthProvider", legacyVerifier),
@@ -317,6 +319,7 @@ func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config)
 		intents.IdentityType_Guest:   auth.NewTracedProvider("guest.AuthProvider", guestProvider),
 		intents.IdentityType_PlayFab: auth.NewTracedProvider("playfab.AuthProvider", playfabProvider),
 		intents.IdentityType_Stytch:  auth.NewTracedProvider("oidc.StytchAuthProvider", stytchProvider),
+		intents.IdentityType_Twitter: auth.NewTracedProvider("twitter.AuthProvider", twitterProvider),
 	}
 	return verifiers, nil
 }

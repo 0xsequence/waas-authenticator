@@ -7,7 +7,7 @@ import (
 
 func (id Identity) String() string {
 	switch id.Type {
-	case IdentityType_Guest, IdentityType_Email:
+	case IdentityType_Guest, IdentityType_Email, IdentityType_Twitter:
 		return string(id.Type) + ":" + id.Subject
 	case IdentityType_OIDC, IdentityType_PlayFab, IdentityType_Stytch:
 		return string(id.Type) + ":" + id.Issuer + "#" + id.Subject
@@ -37,8 +37,8 @@ func (id *Identity) FromString(s string) error {
 		id.Issuer = innerParts[0]
 		id.Subject = innerParts[1]
 
-	case IdentityType_Email:
-		id.Type = IdentityType_Email
+	case IdentityType_Email, IdentityType_Twitter:
+		id.Type = idType
 		id.Subject = parts[1]
 
 	default:

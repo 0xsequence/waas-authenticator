@@ -69,6 +69,13 @@ struct AuthStytchConfig
     + go.field.type = string
     + go.tag.json = projectId,omitempty
 
+struct AuthTwitterConfig
+  - enabled: bool
+  - clientId?: string
+    + go.field.name = ClientID
+    + go.field.type = string
+    + go.tag.json = clientId,omitempty
+
 struct AuthConfig
   - email?: AuthEmailConfig
     + go.field.type = AuthEmailConfig
@@ -82,6 +89,9 @@ struct AuthConfig
   - stytch?: AuthStytchConfig
     + go.field.type = AuthStytchConfig
     + go.tag.json = stytch,omitempty
+  - twitter?: AuthTwitterConfig
+    + go.field.type = AuthTwitterConfig
+    + go.tag.json = twitter,omitempty
 
 struct Tenant
   - projectId: uint64
