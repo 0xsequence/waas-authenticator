@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be found in
 // the LICENSE file.
 
-// secp256k1_context_create_sign_verify creates a context for signing and signature verification.
-static secp256k1_context* secp256k1_context_create_sign_verify() {
+// ethkit_secp256k1_context_create_sign_verify creates a context for signing and signature verification.
+static secp256k1_context* ethkit_secp256k1_context_create_sign_verify() {
 	return ethkit_secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
 }
 
@@ -21,10 +21,10 @@ static int secp256k1_ext_ecdsa_recover(
 	const unsigned char *sigdata,
 	const unsigned char *msgdata
 ) {
-	secp256k1_ecdsa_recoverable_signature sig;
+	ethkit_secp256k1_ecdsa_recoverable_signature sig;
 	secp256k1_pubkey pubkey;
 
-	if (!ethkit_secp256k1_ecdsa_recoverable_signature_parse_compact(ctx, &sig, sigdata, (int)sigdata[64])) {
+	if (!ethkit_ethkit_secp256k1_ecdsa_recoverable_signature_parse_compact(ctx, &sig, sigdata, (int)sigdata[64])) {
 		return 0;
 	}
 	if (!ethkit_secp256k1_ecdsa_recover(ctx, &pubkey, &sig, msgdata)) {
@@ -50,10 +50,10 @@ static int secp256k1_ext_ecdsa_verify(
 	const unsigned char *pubkeydata,
 	size_t pubkeylen
 ) {
-	secp256k1_ecdsa_signature sig;
+	ethkit_secp256k1_ecdsa_signature sig;
 	secp256k1_pubkey pubkey;
 
-	if (!ethkit_secp256k1_ecdsa_signature_parse_compact(ctx, &sig, sigdata)) {
+	if (!ethkit_ethkit_secp256k1_ecdsa_signature_parse_compact(ctx, &sig, sigdata)) {
 		return 0;
 	}
 	if (!ethkit_secp256k1_ec_pubkey_parse(ctx, &pubkey, pubkeydata, pubkeylen)) {
@@ -109,8 +109,8 @@ int ethkit_secp256k1_ext_scalar_mul(const secp256k1_context* ctx, unsigned char 
 	ARG_CHECK(scalar != NULL);
 	(void)ctx;
 
-	secp256k1_fe_set_b32(&feX, point);
-	secp256k1_fe_set_b32(&feY, point+32);
+	secp256k1_fe_set_b32_limit(&feX, point);
+	secp256k1_fe_set_b32_limit(&feY, point+32);
 	secp256k1_ge_set_xy(&ge, &feX, &feY);
 	secp256k1_scalar_set_b32(&s, scalar, &overflow);
 	if (overflow || secp256k1_scalar_is_zero(&s)) {
