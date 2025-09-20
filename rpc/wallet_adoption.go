@@ -49,7 +49,7 @@ func (s *RPC) adoptChildWallet(
 	imageHash := childWalletConfig.ImageHash()
 	approval := imageHash.Approval()
 
-	subdigest, err := sequence.SubDigest(big.NewInt(0), common.HexToAddress(intent.Data.Wallet), approval.Hash)
+	subdigest, err := sequence.SubDigest(big.NewInt(0), common.HexToAddress(intent.Data.Wallet), approval)
 	if err != nil {
 		return nil, fmt.Errorf("calculating digest: %w", err)
 	}

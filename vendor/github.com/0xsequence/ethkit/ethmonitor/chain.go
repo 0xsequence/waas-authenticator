@@ -19,7 +19,7 @@ type Chain struct {
 	// before starting the monitor.
 	bootstrapMode bool
 
-	mu               sync.Mutex
+	mu               sync.RWMutex
 	averageBlockTime float64 // in seconds
 }
 
@@ -156,8 +156,8 @@ func (c *Chain) GetBlock(hash common.Hash) *Block {
 }
 
 func (c *Chain) GetBlockByNumber(blockNum uint64, event Event) *Block {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	for i := len(c.blocks) - 1; i >= 0; i-- {
 		if c.blocks[i].NumberU64() == blockNum && c.blocks[i].Event == event {
 			return c.blocks[i]
@@ -221,11 +221,6 @@ type Block struct {
 
 	// OK flag which represents the block is ready for broadcasting
 	OK bool
-
-	// Raw byte payloads for block and logs responses from the nodes.
-	// The values are only set if RetainPayloads is set to true on monitor.
-	BlockPayload []byte
-	LogsPayload  []byte
 }
 
 type Blocks []*Block
@@ -304,23 +299,11 @@ func (blocks Blocks) Copy() Blocks {
 			copy(logs, b.Logs)
 		}
 
-		var blockPayload []byte
-		if b.BlockPayload != nil {
-			copy(blockPayload, b.BlockPayload)
-		}
-
-		var logsPayload []byte
-		if b.LogsPayload != nil {
-			copy(logsPayload, b.LogsPayload)
-		}
-
 		nb[i] = &Block{
-			Block:        b.Block,
-			Event:        b.Event,
-			Logs:         logs,
-			OK:           b.OK,
-			BlockPayload: blockPayload,
-			LogsPayload:  logsPayload,
+			Block: b.Block,
+			Event: b.Event,
+			Logs:  logs,
+			OK:    b.OK,
 		}
 	}
 

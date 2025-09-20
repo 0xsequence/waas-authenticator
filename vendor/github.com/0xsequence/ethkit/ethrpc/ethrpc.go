@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/big"
+	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -20,12 +22,11 @@ import (
 	"github.com/0xsequence/ethkit/go-ethereum/core/types"
 	"github.com/0xsequence/ethkit/go-ethereum/rpc"
 	"github.com/goware/breaker"
-	"github.com/goware/logger"
 	"github.com/goware/superr"
 )
 
 type Provider struct {
-	log                 logger.Logger
+	log                 *slog.Logger // TODO: not used..
 	nodeURL             string
 	nodeWSURL           string
 	httpClient          httpClient
@@ -47,10 +48,6 @@ type Provider struct {
 func NewProvider(nodeURL string, options ...Option) (*Provider, error) {
 	p := &Provider{
 		nodeURL: nodeURL,
-		httpClient: &http.Client{
-			// default timeout of 60 seconds
-			Timeout: 60 * time.Second,
-		},
 	}
 	for _, opt := range options {
 		if opt == nil {
@@ -58,6 +55,30 @@ func NewProvider(nodeURL string, options ...Option) (*Provider, error) {
 		}
 		opt(p)
 	}
+
+	if p.httpClient == nil {
+		httpTransport := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 60 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			DisableKeepAlives:     false,
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			ResponseHeaderTimeout: 30 * time.Second,
+		}
+		httpClient := &http.Client{
+			Transport: httpTransport,
+			Timeout:   35 * time.Second,
+		}
+		p.httpClient = httpClient
+	}
+
 	return p, nil
 }
 
