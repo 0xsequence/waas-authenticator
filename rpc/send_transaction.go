@@ -13,6 +13,7 @@ import (
 	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/0xsequence/waas-authenticator/rpc/waasapi"
+	"github.com/davecgh/go-spew/spew"
 )
 
 func (s *RPC) sendTransaction(
@@ -27,10 +28,15 @@ func (s *RPC) sendTransaction(
 
 	// use original intent otherwise we may experience lose of data because of outdated struct
 	apiIntent := waasapi.ConvertToAPIIntent(&intent.Intent)
+
+	s.Log.Info().Str("intent", spew.Sdump(intent)).Str("apiIntent", spew.Sdump(apiIntent)).Msgf("RPC.sendTransaction")
+
 	bundle, err := s.Wallets.GenTransaction(waasapi.Context(ctx), apiIntent)
 	if err != nil {
 		return nil, fmt.Errorf("generating transaction: %w", err)
 	}
+
+	s.Log.Info().Str("intent", spew.Sdump(intent)).Str("apiIntent", spew.Sdump(apiIntent)).Str("bundle", spew.Sdump(bundle)).Msgf("RPC.sendTransaction")
 
 	nonce, ok := sequence.ParseHexOrDec(bundle.Nonce)
 	if !ok {
@@ -101,6 +107,8 @@ func (s *RPC) sendTransaction(
 			Address:   parentWallet.Address().String(),
 		},
 	}
+
+	s.Log.Info().Str("apiIntent", spew.Sdump(apiIntent)).Str("bundle", spew.Sdump(bundle)).Msgf("s.Wallets.SendTransaction")
 
 	res, err := s.Wallets.SendTransaction(waasapi.Context(ctx), apiIntent, bundle, signatures)
 	if err != nil {
