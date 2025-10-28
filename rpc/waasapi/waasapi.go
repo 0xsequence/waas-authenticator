@@ -21,9 +21,11 @@ func Context(ctx context.Context, optJwtToken ...string) context.Context {
 	waasHeader := http.Header{}
 	waasHeader.Set("Authorization", "BEARER "+jwtToken)
 
-	accessKey := tenant.AccessKeyFromContext(ctx)
-	if accessKey != "" {
+	if accessKey := tenant.AccessKeyFromContext(ctx); accessKey != "" {
 		waasHeader.Set("X-Access-Key", accessKey)
+	}
+	if origin := tenant.OriginFromContext(ctx); origin != "" {
+		waasHeader.Set("Origin", origin)
 	}
 
 	waasCtx, err := proto_wallet.WithHTTPRequestHeaders(ctx, waasHeader)

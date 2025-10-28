@@ -10,6 +10,7 @@ type contextKeyType string
 
 var (
 	accessKeyCtxKey = contextKeyType("access-key")
+	originKeyCtxKey = contextKeyType("origin")
 	tenantCtxKey    = contextKeyType("tenant-data")
 )
 
@@ -25,4 +26,13 @@ func AccessKeyFromContext(ctx context.Context) string {
 
 func WithAccessKey(ctx context.Context, accessKey string) context.Context {
 	return context.WithValue(ctx, accessKeyCtxKey, accessKey)
+}
+
+func OriginFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(originKeyCtxKey).(string)
+	return v
+}
+
+func WithOrigin(ctx context.Context, origin string) context.Context {
+	return context.WithValue(ctx, originKeyCtxKey, origin)
 }
