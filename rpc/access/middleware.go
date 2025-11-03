@@ -51,6 +51,10 @@ func accessKeyMiddleware(next http.Handler) http.Handler {
 		if accessKey != "" {
 			ctx = tenant.WithAccessKey(ctx, accessKey)
 		}
+		origin := r.Header.Get("origin")
+		if origin != "" {
+			ctx = tenant.WithOrigin(ctx, origin)
+		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
