@@ -48,11 +48,10 @@ func AddressForUser(ctx context.Context, tntData *proto.TenantData, user string)
 	}
 
 	imageHash := childWalletConfig.ImageHash()
-	seqContext := sequence.WalletContext{
-		FactoryAddress:    common.HexToAddress(tntData.SequenceContext.Factory),
-		MainModuleAddress: common.HexToAddress(tntData.SequenceContext.MainModule),
-	}
-	address, err := sequence.AddressFromImageHash(imageHash.String(), seqContext)
+	seqContext := sequence.V2SequenceContext()
+	seqContext.FactoryAddress = common.HexToAddress(tntData.SequenceContext.Factory)
+	seqContext.MainModuleAddress = common.HexToAddress(tntData.SequenceContext.MainModule)
+	address, err := sequence.AddressFromImageHash(imageHash, seqContext)
 	if err != nil {
 		return "", fmt.Errorf("failed to compute address: %w", err)
 	}
