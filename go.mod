@@ -2,7 +2,7 @@ module github.com/0xsequence/waas-authenticator
 
 go 1.23.0
 
-toolchain go1.24.3
+toolchain go1.26.10
 
 require (
 	github.com/0xsequence/ethkit v1.30.7
