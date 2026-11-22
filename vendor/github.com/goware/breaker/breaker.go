@@ -3,6 +3,8 @@ package breaker
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/goware/superr"
@@ -14,14 +16,14 @@ var (
 )
 
 type Breaker struct {
-	log      Logger
+	log      *slog.Logger
 	backoff  time.Duration
 	factor   float64
 	maxTries int
 }
 
-func Default(optLog ...Logger) *Breaker {
-	var log Logger
+func Default(optLog ...*slog.Logger) *Breaker {
+	var log *slog.Logger
 	if len(optLog) > 0 {
 		log = optLog[0]
 	}
@@ -33,7 +35,7 @@ func Default(optLog ...Logger) *Breaker {
 	}
 }
 
-func New(log Logger, backoff time.Duration, factor float64, maxTries int) *Breaker {
+func New(log *slog.Logger, backoff time.Duration, factor float64, maxTries int) *Breaker {
 	return &Breaker{
 		log:      log,
 		backoff:  backoff,
@@ -69,13 +71,13 @@ func (b *Breaker) Do(ctx context.Context, fn func() error) error {
 		// Move on if we have tried a few times.
 		if try >= b.maxTries {
 			if b.log != nil {
-				b.log.Errorf("breaker: exhausted after max number of retries %d. fail :(", b.maxTries)
+				b.log.Error(fmt.Sprintf("breaker: exhausted after max number of retries %d. fail :(", b.maxTries))
 			}
 			return superr.New(ErrHitMaxRetries, err)
 		}
 
 		if b.log != nil {
-			b.log.Warnf("breaker: fn failed: '%v' - backing off for %v and trying again (retry #%d)", err, time.Duration(int64(delay)).String(), try+1)
+			b.log.Warn(fmt.Sprintf("breaker: fn failed: '%v' - backing off for %v and trying again (retry #%d)", err, time.Duration(int64(delay)).String(), try+1))
 		}
 
 		// Sleep and try again.
@@ -85,6 +87,6 @@ func (b *Breaker) Do(ctx context.Context, fn func() error) error {
 	}
 }
 
-func Do(ctx context.Context, fn func() error, log Logger, backoff time.Duration, factor float64, maxTries int) error {
+func Do(ctx context.Context, fn func() error, log *slog.Logger, backoff time.Duration, factor float64, maxTries int) error {
 	return New(log, backoff, factor, maxTries).Do(ctx, fn)
 }
