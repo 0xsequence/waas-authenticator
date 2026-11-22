@@ -57,6 +57,19 @@ func TestRPC_SendIntent_RejectsOtherUsersWallet(t *testing.T) {
 			Wallet:  victimWallet,
 			Message: "Test",
 		},
+		intents.IntentName_signTypedData: &intents.IntentDataSignTypedData{
+			Network: "1",
+			Wallet:  victimWallet,
+		},
+		intents.IntentName_sendTransaction: &intents.IntentDataSendTransaction{
+			Network:    "1",
+			Wallet:     victimWallet,
+			Identifier: "test",
+		},
+		intents.IntentName_sessionAuthProof: &intents.IntentDataSessionAuthProof{
+			Network: "1",
+			Wallet:  victimWallet,
+		},
 		intents.IntentName_adoptChildWallet: &intents.IntentDataAdoptChildWallet{
 			Network: "1",
 			Wallet:  victimWallet,
@@ -115,4 +128,104 @@ func TestRPC_SendIntent_AdoptChildWalletDisabled(t *testing.T) {
 	_, err = c.SendIntent(ctx, intent)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, proto.ErrUnauthorized)
+}
+
+func TestRPC_SendIntent_RejectsWalletKeyVariants(t *testing.T) {
+	ctx := context.Background()
+
+	issuer, _, closeJWKS := issueAccessTokenAndRunJwksServer(t)
+	defer closeJWKS()
+
+	svc := initRPC(t)
+	tenant, tntData := newTenant(t, svc.Enclave, issuer)
+	require.NoError(t, svc.Tenants.Add(ctx, tenant))
+
+	newUser := func() (intents.Session, string) {
+		sessWallet, err := ethwallet.NewWalletFromRandomEntropy()
+		require.NoError(t, err)
+		signingSession := intents.NewSessionP256K1(sessWallet)
+
+		acc := newAccount(t, tenant, svc.Enclave, newOIDCIdentity(issuer), sessWallet)
+		sess := newSession(t, tenant, svc.Enclave, issuer, signingSession)
+		require.NoError(t, svc.Accounts.Put(ctx, acc))
+		require.NoError(t, svc.Sessions.Put(ctx, sess))
+
+		walletAddr, err := rpc.AddressForUser(ctx, tntData, acc.UserID)
+		require.NoError(t, err)
+		return signingSession, walletAddr
+	}
+	attacker, attackerWallet := newUser()
+	_, victimWallet := newUser()
+
+	srv := httptest.NewServer(svc.Handler())
+	defer srv.Close()
+
+	c := proto.NewWaasAuthenticatorClient(srv.URL, http.DefaultClient)
+	header := make(http.Header)
+	header.Set("X-Sequence-Project", strconv.Itoa(int(tenant.ProjectID)))
+	ctx, err := proto.WithHTTPRequestHeaders(ctx, header)
+	require.NoError(t, err)
+
+	// The intent handlers match JSON keys case-insensitively, so each of these
+	// would otherwise reach them with the victim's wallet.
+	intentData := map[intents.IntentName]map[string]any{
+		intents.IntentName_signMessage: {
+			"network": "1",
+			"message": "0x1234",
+		},
+		intents.IntentName_signTypedData: {
+			"network":   "1",
+			"typedData": map[string]any{},
+		},
+		intents.IntentName_sendTransaction: {
+			"network":              "1",
+			"identifier":           "test",
+			"transactions":         []any{},
+			"transactionsFeeQuote": nil,
+		},
+		intents.IntentName_sessionAuthProof: {
+			"network": "1",
+			"nonce":   "0x1",
+		},
+		intents.IntentName_feeOptions: {
+			"network":      "1",
+			"identifier":   "test",
+			"transactions": []any{},
+		},
+	}
+	variants := map[string]func(data map[string]any){
+		"capitalised key with null": func(data map[string]any) {
+			data["Wallet"], data["wallet"] = victimWallet, nil
+		},
+		"upper-case key with null": func(data map[string]any) {
+			data["WALLET"], data["wallet"] = victimWallet, nil
+		},
+		"capitalised key alone": func(data map[string]any) {
+			data["Wallet"] = victimWallet
+		},
+		"capitalised victim key next to own wallet": func(data map[string]any) {
+			data["Wallet"], data["wallet"] = victimWallet, attackerWallet
+		},
+		"null wallet": func(data map[string]any) {
+			data["wallet"] = nil
+		},
+		"non-string wallet": func(data map[string]any) {
+			data["wallet"] = 1
+		},
+	}
+	for name, base := range intentData {
+		for variant, apply := range variants {
+			t.Run(string(name)+"/"+variant, func(t *testing.T) {
+				data := map[string]any{}
+				for k, v := range base {
+					data[k] = v
+				}
+				apply(data)
+				intent := generateSignedIntent(t, name, data, attacker)
+				_, err := c.SendIntent(ctx, intent)
+				require.Error(t, err)
+				assert.ErrorIs(t, err, proto.ErrWebrpcBadRequest)
+			})
+		}
+	}
 }
