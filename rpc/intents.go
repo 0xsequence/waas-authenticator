@@ -105,6 +105,12 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (iResp 
 		return nil, fmt.Errorf("session invalid or not found")
 	}
 
+	if found {
+		if err := checkIntentWallet(ctx, tntData, sess, intent); err != nil {
+			return nil, err
+		}
+	}
+
 	switch intent.Name {
 	case intents.IntentName_openSession:
 		return nil, fmt.Errorf("opening a session is unsupported outside of RegisterSession")
@@ -193,15 +199,7 @@ func (s *RPC) SendIntent(ctx context.Context, protoIntent *proto.Intent) (iResp 
 		return makeTypedIntentResponse(&intents.IntentResponseAccountRemoved{})
 
 	case intents.IntentName_adoptChildWallet:
-		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataAdoptChildWallet](intent)
-		if err != nil {
-			return nil, err
-		}
-		res, err := s.adoptChildWallet(ctx, sess, intentTyped)
-		if err != nil {
-			return nil, err
-		}
-		return convertIntentResponse(res), nil
+		return nil, proto.ErrUnauthorized.WithCausef("child wallet adoption is disabled")
 
 	case intents.IntentName_getIdToken:
 		intentTyped, err := intents.NewIntentTypedFromIntent[intents.IntentDataGetIdToken](intent)
