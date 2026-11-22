@@ -89,19 +89,23 @@ func (m *OIDCToEmail) NextBatch(ctx context.Context, projectID uint64, page data
 		return nil, data.Page{}, fmt.Errorf("project id does not match")
 	}
 
-	limit:=page.Limit
- if limit<=0 {limit=25}
- if limit>100 {limit=100}
- items:=make([]string,0,limit)
- for {
- page.Limit=limit-int32(len(items))
- accounts,nextPage,err:= m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, m.config.IssuerPrefix)
+	limit := page.Limit
+	if limit <= 0 {
+		limit = 25
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	items := make([]string, 0, limit)
+	for {
+		page.Limit = limit - int32(len(items))
+		accounts, nextPage, err := m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, m.config.IssuerPrefix)
 		if err != nil {
 			return nil, page, err
 		}
 
-		page=nextPage
- for _, acc := range accounts {
+		page = nextPage
+		for _, acc := range accounts {
 			if !m.eligible(acc) {
 				continue
 			}
@@ -120,8 +124,8 @@ func (m *OIDCToEmail) NextBatch(ctx context.Context, projectID uint64, page data
 			}
 		}
 
-		if len(page.NextKey)==0 || len(items)>=int(limit){
- page.Limit=limit
+		if len(page.NextKey) == 0 || len(items) >= int(limit) {
+			page.Limit = limit
 			return items, page, nil
 		}
 	}
