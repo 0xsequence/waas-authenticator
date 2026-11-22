@@ -228,4 +228,20 @@ func TestRPC_SendIntent_RejectsWalletKeyVariants(t *testing.T) {
 			})
 		}
 	}
+
+	// The parent-signing intents would otherwise sign for the zero address.
+	for _, name := range []intents.IntentName{
+		intents.IntentName_signMessage,
+		intents.IntentName_signTypedData,
+		intents.IntentName_sendTransaction,
+		intents.IntentName_sessionAuthProof,
+	} {
+		t.Run(string(name)+"/missing wallet", func(t *testing.T) {
+			intent := generateSignedIntent(t, name, intentData[name], attacker)
+			_, err := c.SendIntent(ctx, intent)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, proto.ErrWebrpcBadRequest)
+			assert.ErrorContains(t, err, "requires a wallet")
+		})
+	}
 }

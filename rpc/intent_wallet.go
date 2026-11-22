@@ -12,6 +12,15 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto"
 )
 
+// walletRequired are the intents the parent key signs for a wallet. Without a
+// wallet, their handlers would sign for the zero address.
+var walletRequired = map[intents.IntentName]bool{
+	intents.IntentName_signMessage:      true,
+	intents.IntentName_signTypedData:    true,
+	intents.IntentName_sendTransaction:  true,
+	intents.IntentName_sessionAuthProof: true,
+}
+
 // checkIntentWallet rejects an intent that names a wallet other than the
 // session user's own. Intents act on the caller's wallet only, and the
 // authenticator signs with the tenant's parent key for whichever wallet the
@@ -22,6 +31,9 @@ func checkIntentWallet(ctx context.Context, tntData *proto.TenantData, sess *dat
 		return err
 	}
 	if wallet == nil {
+		if walletRequired[intent.Name] {
+			return proto.ErrWebrpcBadRequest.WithCausef("intent %s requires a wallet", intent.Name)
+		}
 		return nil
 	}
 
