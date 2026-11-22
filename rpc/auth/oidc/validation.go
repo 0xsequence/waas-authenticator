@@ -119,3 +119,16 @@ func getEmailFromToken(tok jwt.Token) string {
 	email, _ := emailClaim.(string)
 	return email
 }
+
+// VerifiedEmail reads the email claim after the identity provider has verified the token.
+func VerifiedEmail(validatedToken string) string {
+	tok, err := jwt.ParseString(validatedToken, jwt.WithVerify(false), jwt.WithValidate(false))
+	if err != nil {
+		return ""
+	}
+	verified, _ := tok.Get("email_verified")
+	if verified != true && verified != "true" {
+		return ""
+	}
+	return getEmailFromToken(tok)
+}

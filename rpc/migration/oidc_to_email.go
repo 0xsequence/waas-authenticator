@@ -22,6 +22,11 @@ type OIDCToEmail struct {
 	config   config.EmailMigrationConfig
 }
 
+func (m *OIDCToEmail) eligible(account *data.Account) bool {
+	return account.Identity.Type == proto.IdentityType_OIDC && strings.HasPrefix(account.Identity.Issuer, m.config.IssuerPrefix) &&
+		account.VerifiedEmail != "" && account.VerifiedEmail == email.Normalize(account.Email)
+}
+
 func (m *OIDCToEmail) OnRegisterSession(ctx context.Context, originalAccount *data.Account) error {
 	att := attestation.FromContext(ctx)
 	tntData := tenant.FromContext(ctx)
@@ -32,10 +37,7 @@ func (m *OIDCToEmail) OnRegisterSession(ctx context.Context, originalAccount *da
 	if !slices.Contains(m.config.Projects, originalAccount.ProjectID) {
 		return nil
 	}
-	if originalAccount.Identity.Type != proto.IdentityType_OIDC {
-		return nil
-	}
-	if !strings.HasPrefix(originalAccount.Identity.Issuer, m.config.IssuerPrefix) {
+	if !m.eligible(originalAccount) {
 		return nil
 	}
 
@@ -87,14 +89,22 @@ func (m *OIDCToEmail) NextBatch(ctx context.Context, projectID uint64, page data
 		return nil, data.Page{}, fmt.Errorf("project id does not match")
 	}
 
-	items := make([]string, 0, page.Limit)
-	for {
-		accounts, page, err := m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, m.config.IssuerPrefix)
+	limit:=page.Limit
+ if limit<=0 {limit=25}
+ if limit>100 {limit=100}
+ items:=make([]string,0,limit)
+ for {
+ page.Limit=limit-int32(len(items))
+ accounts,nextPage,err:= m.accounts.ListByProjectAndIdentity(ctx, page, projectID, proto.IdentityType_OIDC, m.config.IssuerPrefix)
 		if err != nil {
 			return nil, page, err
 		}
 
-		for _, acc := range accounts {
+		page=nextPage
+ for _, acc := range accounts {
+			if !m.eligible(acc) {
+				continue
+			}
 			normEmail := email.Normalize(acc.Email)
 			migratedIdentity := proto.Identity{
 				Type:    proto.IdentityType_Email,
@@ -110,7 +120,8 @@ func (m *OIDCToEmail) NextBatch(ctx context.Context, projectID uint64, page data
 			}
 		}
 
-		if len(accounts) < int(page.Limit) || len(items) >= int(page.Limit) {
+		if len(page.NextKey)==0 || len(items)>=int(limit){
+ page.Limit=limit
 			return items, page, nil
 		}
 	}
@@ -147,6 +158,10 @@ func (m *OIDCToEmail) ProcessItems(ctx context.Context, tenant *proto.TenantData
 
 	for _, originalAccount := range originalAccounts {
 		item := originalAccount.Identity.String()
+		if !m.eligible(originalAccount) {
+			res.Errorf(item, "account has no verified migration email")
+			continue
+		}
 		normEmail := email.Normalize(originalAccount.Email)
 		migratedIdentity := proto.Identity{
 			Type:    proto.IdentityType_Email,

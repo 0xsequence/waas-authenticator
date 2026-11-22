@@ -14,6 +14,7 @@ import (
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/auth"
 	"github.com/0xsequence/waas-authenticator/rpc/auth/email"
+	"github.com/0xsequence/waas-authenticator/rpc/auth/oidc"
 	"github.com/0xsequence/waas-authenticator/rpc/crypto"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 	"github.com/0xsequence/waas-authenticator/rpc/tracing"
@@ -188,9 +189,16 @@ func (s *RPC) RegisterSession(
 		return nil, nil, proto.ErrWebrpcInternalError.WithCausef("registering session with WaaS API: %w", err)
 	}
 
-	// Insert an account if it's new OR update it with a fresh email if it differs from what we have in the DB.
-	if !accountFound || (ident.Email != "" && account.Email != ident.Email) {
-		account.Email = ident.Email
+	verifiedEmail := ""
+	if ident.Type == proto.IdentityType_OIDC {
+		verifiedEmail = email.Normalize(oidc.VerifiedEmail(answer))
+	}
+	if !accountFound || (ident.Email != "" && account.Email != ident.Email) || account.VerifiedEmail != verifiedEmail {
+		if ident.Email != "" {
+			account.Email = ident.Email
+			account.ProjectScopedEmail = fmt.Sprintf("%d|%s", tntData.ProjectID, ident.Email)
+		}
+		account.VerifiedEmail = verifiedEmail
 		if err := s.Accounts.Put(ctx, account); err != nil {
 			return nil, nil, proto.ErrWebrpcInternalError.WithCausef("save account: %w", err)
 		}
