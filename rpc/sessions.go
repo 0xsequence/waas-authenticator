@@ -2,6 +2,8 @@ package rpc
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/0xsequence/go-sequence/intents"
 	"github.com/0xsequence/waas-authenticator/data"
 	"github.com/0xsequence/waas-authenticator/proto"
+	proto_wallet "github.com/0xsequence/waas-authenticator/proto/waas"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/auth"
 	"github.com/0xsequence/waas-authenticator/rpc/auth/email"
@@ -328,7 +331,18 @@ func (s *RPC) dropSession(
 		return true, nil
 	}
 
-	if _, err := s.Wallets.InvalidateSession(waasapi.Context(ctx), dropSess.ID); err != nil {
+	wire, err := json.Marshal(waasapi.ConvertToAPIIntent(&intent.Intent))
+	if err != nil {
+		return false, err
+	}
+	waasCtx := waasapi.Context(ctx)
+	headers, _ := proto_wallet.HTTPRequestHeaders(waasCtx)
+	headers.Set("X-WaaS-Close-Intent", base64.RawURLEncoding.EncodeToString(wire))
+	waasCtx, err = proto_wallet.WithHTTPRequestHeaders(waasCtx, headers)
+	if err != nil {
+		return false, err
+	}
+	if _, err := s.Wallets.InvalidateSession(waasCtx, dropSess.ID); err != nil {
 		return false, fmt.Errorf("invalidating session with WaaS API: %w", err)
 	}
 

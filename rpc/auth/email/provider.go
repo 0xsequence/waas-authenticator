@@ -16,17 +16,20 @@ import (
 	"github.com/0xsequence/waas-authenticator/proto/builder"
 	"github.com/0xsequence/waas-authenticator/rpc/attestation"
 	"github.com/0xsequence/waas-authenticator/rpc/auth"
+	"github.com/0xsequence/waas-authenticator/rpc/signing"
 	"github.com/0xsequence/waas-authenticator/rpc/tenant"
 )
 
 // AuthProvider is a Verifier that uses a secret code, delivered to user's email address, as the auth challenge.
 type AuthProvider struct {
+	Signer  signing.Signer
 	Sender  Sender
 	Builder builder.Builder
 }
 
-func NewAuthProvider(sender Sender, builder builder.Builder) auth.Provider {
+func NewAuthProvider(sender Sender, builder builder.Builder, signer signing.Signer) auth.Provider {
 	return &AuthProvider{
+		Signer:  signer,
 		Sender:  sender,
 		Builder: builder,
 	}
@@ -77,14 +80,14 @@ func (p *AuthProvider) InitiateAuth(
 	if err != nil {
 		return nil, err
 	}
-	// server salt is sent to the WaaS API and stored in the auth session
-	serverSalt, err := randomHex(att, 12)
-	if err != nil {
-		return nil, err
-	}
-
 	// clientAnswer is the value that we expect the client to produce
 	clientAnswer := hexutil.Encode(ethcrypto.Keccak256([]byte(clientSalt + secretCode)))
+
+	expires := time.Now().Add(30 * time.Minute)
+	serverSalt, err := signedChallenge(ctx, p.Signer, tnt.ProjectID, sessionID, verifier, clientAnswer, expires)
+	if err != nil {
+		return nil, fmt.Errorf("signing email challenge: %w", err)
+	}
 
 	// serverAnswer is the value we compare the answer against during verification
 	serverAnswer := hexutil.Encode(ethcrypto.Keccak256([]byte(serverSalt + clientAnswer)))
@@ -97,7 +100,7 @@ func (p *AuthProvider) InitiateAuth(
 		Verifier:     verifier,
 		Challenge:    &serverSalt,   // the SERVER salt is a challenge in server's context
 		Answer:       &serverAnswer, // the final answer, after hashing clientAnswer with serverSalt
-		ExpiresAt:    time.Now().Add(30 * time.Minute),
+		ExpiresAt:    expires,
 	}
 	if err := storeFn(ctx, verifCtx); err != nil {
 		return nil, err

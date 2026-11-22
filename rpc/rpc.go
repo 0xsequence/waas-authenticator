@@ -139,7 +139,8 @@ func New(cfg *config.Config, transport http.RoundTripper) (*RPC, error) {
 		return nil, err
 	}
 
-	authProviders, err := makeAuthProviders(wrappedClient, awsCfg, cfg)
+	signer := signing.NewKMS(kmsClient, cfg.KMS.SigningKey)
+	authProviders, err := makeAuthProviders(wrappedClient, awsCfg, cfg, signer)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +163,7 @@ func New(cfg *config.Config, transport http.RoundTripper) (*RPC, error) {
 		}),
 		Wallets:       proto_wallet.NewWaaSClient(cfg.Endpoints.WaasAPIServer, wrappedClient),
 		AuthProviders: authProviders,
-		Signer:        signing.NewKMS(kmsClient, cfg.KMS.SigningKey),
+		Signer:        signer,
 		startTime:     time.Now(),
 		measurements:  m,
 	}
@@ -285,7 +286,7 @@ func emptyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(""))
 }
 
-func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config) (map[intents.IdentityType]auth.Provider, error) {
+func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config, signer signing.Signer) (map[intents.IdentityType]auth.Provider, error) {
 	cacheBackend := memlru.Backend(1024)
 	legacyVerifier, err := oidc.NewLegacyAuthProvider(cacheBackend, client)
 	if err != nil {
@@ -306,7 +307,7 @@ func makeAuthProviders(client HTTPClient, awsCfg aws.Config, cfg *config.Config)
 		builder.NewAuthenticatedClient(client, sm, cfg.Builder.SecretID),
 	)
 	sender := email.NewSESSender(awsCfg, cfg.SES)
-	emailProvider := email.NewAuthProvider(sender, builderClient)
+	emailProvider := email.NewAuthProvider(sender, builderClient, signer)
 	guestProvider := guest.NewAuthProvider()
 
 	playfabProvider := playfab.NewAuthProvider(client)
