@@ -367,9 +367,12 @@ func TestMigrationEmail(t *testing.T) {
 		}
 		assert.Contains(t, identities, newEmailIdentity(account.Email))
 
-		// 2 accounts of original user + 10 doubled (migrated) additional users
+		_, found, err := svc.Accounts.Get(ctx, tenant.ProjectID, newEmailIdentity(legacy.Email))
+		require.NoError(t, err)
+		require.False(t, found)
+		// Eleven migrated users have two accounts each. The legacy user keeps one.
 		allAccounts, _, err := svc.Accounts.ListByProjectAndIdentity(ctx, data.Page{}, tenant.ProjectID, proto.IdentityType_None, "")
 		require.NoError(t, err)
-		require.Len(t, allAccounts, 22)
+		require.Len(t, allAccounts, 23)
 	})
 }
