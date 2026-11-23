@@ -243,7 +243,7 @@ func TestMigrationEmail(t *testing.T) {
 		exp := time.Now().Add(120 * time.Second)
 		tokBuilderFn := func(b *jwt.Builder, url string) {
 			b.Expiration(exp)
-			b.Claim("email", signingSession.SessionID()+"@example.com")
+			b.Claim("email", signingSession.SessionID()+"@example.com").Claim("email_verified", true)
 		}
 
 		issuer, tok, closeJWKS := issueAccessTokenAndRunJwksServer(t, tokBuilderFn)
@@ -325,12 +325,16 @@ func TestMigrationEmail(t *testing.T) {
 		require.NoError(t, svc.Tenants.Add(ctx, tenant))
 		require.Equal(t, projectID, tenant.ProjectID)
 		account := newAccount(t, tenant, svc.Enclave, newOIDCIdentity(issuer), nil)
+		account.VerifiedEmail = account.Email
 		require.NoError(t, svc.Accounts.Put(ctx, account))
+		legacy := newAccount(t, tenant, svc.Enclave, newOIDCIdentity(issuer, "legacy"), nil, "legacy@example.com")
+		require.NoError(t, svc.Accounts.Put(ctx, legacy))
 
 		// Add more accounts
 		for i := 0; i < 10; i++ {
 			sub := fmt.Sprintf("acc-%d", i)
 			acc := newAccount(t, tenant, svc.Enclave, newOIDCIdentity(issuer, sub), nil, sub+"@example.com")
+			acc.VerifiedEmail = acc.Email
 			require.NoError(t, svc.Accounts.Put(ctx, acc))
 		}
 
@@ -363,9 +367,12 @@ func TestMigrationEmail(t *testing.T) {
 		}
 		assert.Contains(t, identities, newEmailIdentity(account.Email))
 
-		// 2 accounts of original user + 10 doubled (migrated) additional users
+		_, found, err := svc.Accounts.Get(ctx, tenant.ProjectID, newEmailIdentity(legacy.Email))
+		require.NoError(t, err)
+		require.False(t, found)
+		// Eleven migrated users have two accounts each. The legacy user keeps one.
 		allAccounts, _, err := svc.Accounts.ListByProjectAndIdentity(ctx, data.Page{}, tenant.ProjectID, proto.IdentityType_None, "")
 		require.NoError(t, err)
-		require.Len(t, allAccounts, 22)
+		require.Len(t, allAccounts, 23)
 	})
 }

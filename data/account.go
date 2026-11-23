@@ -25,6 +25,8 @@ type Account struct {
 
 	// Email is optional Email address associated with this Account
 	Email string `dynamodbav:"Email"`
+	// VerifiedEmail records the address confirmed by the OIDC provider at login.
+	VerifiedEmail string `dynamodbav:"VerifiedEmail,omitempty"`
 
 	// ProjectScopedEmail is the Email prefixed by ProjectID, e.g. "123|example@sequence.app"
 	// It's used as an index partition key to ensure uniqueness within a single tenant only
