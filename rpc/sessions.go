@@ -196,7 +196,7 @@ func (s *RPC) RegisterSession(
 	if ident.Type == proto.IdentityType_OIDC {
 		verifiedEmail = email.Normalize(oidc.VerifiedEmail(answer))
 	}
-	if !accountFound || (ident.Email != "" && account.Email != ident.Email) || account.VerifiedEmail != verifiedEmail {
+	if !accountFound || (ident.Email != "" && account.Email != ident.Email) {
 		if ident.Email != "" {
 			account.Email = ident.Email
 			account.ProjectScopedEmail = fmt.Sprintf("%d|%s", tntData.ProjectID, ident.Email)
