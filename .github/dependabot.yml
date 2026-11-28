@@ -1,0 +1,27 @@
+# Security updates only, grouped into one pull request per ecosystem.
+# open-pull-requests-limit: 0 turns off routine version-update pull requests.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directories:
+      - "/"
+      - "/vendor/github.com/webrpc/webrpc"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+  - package-ecosystem: npm
+    directories:
+      - "/vendor/github.com/0xsequence/go-sequence/contracts"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
